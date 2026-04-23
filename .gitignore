@@ -1,0 +1,17 @@
+# Build artifacts
+target/
+
+# Non-authoritative reference code
+non-authorative/
+
+# macOS
+.DS_Store
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Rust
+Cargo.lock
