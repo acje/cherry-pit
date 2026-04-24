@@ -91,7 +91,7 @@ impl<E: DomainEvent> MsgpackFileStore<E> {
 
     /// Scan the directory for the highest numeric filename to seed the
     /// auto-increment counter. Non-numeric filenames are silently
-    /// skipped (e.g. leftover files from an older format).
+    /// skipped.
     async fn scan_max_id(&self) -> Result<u64, StoreError> {
         let mut max: u64 = 0;
         let mut entries = match tokio::fs::read_dir(&self.dir).await {

@@ -466,6 +466,7 @@ pub trait EventStore: Send + Sync + 'static {
 
 ```rust
 /// Errors from event store operations.
+#[non_exhaustive]
 pub enum StoreError {
     ConcurrencyConflict {
         aggregate_id: AggregateId,
@@ -477,8 +478,7 @@ pub enum StoreError {
 ```
 
 **Design rationale:**
-- **Correctness (P1):** The `Event` associated type replaces the
-  previous generic `load<E>` / `append<E>` methods. A
+- **Correctness (P1):** The `Event` associated type means a
   `MsgpackFileStore<OrderEvent>` can only load and persist
   `OrderEvent` — the type parameter is fixed at construction, not
   chosen per-call. This eliminates an entire class of runtime
@@ -486,9 +486,8 @@ pub enum StoreError {
 - **Correctness (P1):** The store creates envelopes from raw domain
   events. Callers pass `Vec<Self::Event>`, the store assigns all
   metadata (`event_id`, `aggregate_id`, `sequence`, `timestamp`).
-  This eliminates the redundancy where `aggregate_id` appeared both
-  as a method parameter and inside each envelope, along with the
-  runtime consistency checks that guarded against mismatches.
+  This eliminates redundancy between method parameters and envelope
+  fields, making malformed envelopes impossible by construction.
 - **Correctness (P1):** `expected_sequence` on `append` makes optimistic
   concurrency explicit in the API. There is no "blind append" — every
   write declares what it expects the current state to be.
@@ -537,14 +536,13 @@ pub trait EventBus: Send + Sync + 'static {
 
 ```rust
 /// Error from event bus publication.
-pub struct BusError(pub Box<dyn Error + Send + Sync>);
+pub struct BusError(Box<dyn Error + Send + Sync>);
 ```
 
 **Design rationale:**
-- **Correctness (P1):** The `Event` associated type replaces the
-  previous generic `publish<E>` method. Each bus publishes exactly
-  one event type — the compiler prevents cross-aggregate event
-  pollution.
+- **Correctness (P1):** The `Event` associated type means each bus
+  publishes exactly one event type — the compiler prevents
+  cross-aggregate event pollution.
 - **Energy (P3):** Takes `&[EventEnvelope<Self::Event>]` — events are
   borrowed. For synchronous in-process delivery, no cloning is needed.
 - **Energy (P3):** `impl Future` (RPITIT) for zero-cost async.
@@ -567,6 +565,7 @@ pub struct BusError(pub Box<dyn Error + Send + Sync>);
 /// HandleCommand<C>::Error. This preserves full type information
 /// through the gateway and bus, allowing callers to match on
 /// domain errors without downcasting.
+#[non_exhaustive]
 pub enum DispatchError<E: Error + Send + Sync> {
     Rejected(E),
     AggregateNotFound { aggregate_id: AggregateId },

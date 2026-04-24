@@ -1,21 +1,12 @@
 # Build plan: cherry-pit crates
 
-Status: planning  
+Status: phases 1 and 4 (partial) implemented  
 Rust edition: 2024 · rust-version: 1.85 (minimum for edition 2024)  
 Resolver: 3
 
-## Dependency mapping from non-authoritative workspace
+## Design decisions
 
-The `non-authoritative/Cargo.toml` workspace is the reference for crate
-selection. All version choices below are drawn from that file unless
-noted otherwise.
-
-## Design decisions to resolve before coding
-
-### 1. Timestamp type: jiff, not chrono
-
-The `pit-core.md` design doc shows `DateTime<Utc>` (chrono) in
-`EventEnvelope`. The non-authoritative workspace uses **jiff** instead.
+### 1. Timestamp type: jiff
 
 **Decision: use `jiff::Timestamp`.**
 
@@ -25,13 +16,12 @@ Rationale:
 - Lossless RFC 9557/RFC 3339 serde roundtrips
 - DST-safe arithmetic by default
 - No need for separate `chrono-tz` for IANA zones
-- Already proven in the non-authoritative codebase
 
-Update `EventEnvelope` accordingly:
+`EventEnvelope` uses `jiff::Timestamp` and `AggregateId`:
 ```rust
 pub struct EventEnvelope<E: DomainEvent> {
     pub event_id: Uuid,
-    pub aggregate_id: String,
+    pub aggregate_id: AggregateId,
     pub sequence: u64,
     pub timestamp: jiff::Timestamp,
     pub payload: E,
@@ -47,10 +37,10 @@ event IDs where chronological ordering is meaningful.
 uuid = { version = "1", features = ["v7", "serde"] }
 ```
 
-### 3. pardosa-genome-derive: add to plan
+### 3. pardosa-genome-derive
 
-The non-authoritative workspace includes `pardosa-genome-derive` (proc
-macro crate). This is not in the README's planned structure. Add it.
+Proc macros require a separate crate. `pardosa-genome-derive` is
+included in the workspace plan.
 
 ### 4. No async_trait
 
@@ -105,16 +95,16 @@ on, so it ships first.
 | Crate      | Version | Features              | Why                                        |
 |------------|---------|----------------------|--------------------------------------------|
 | serde      | 1       | derive               | DomainEvent: Serialize + DeserializeOwned  |
-| serde_json | 1       | —                    | Default serialization format               |
-| thiserror  | 2       | —                    | DispatchError, StoreError, BusError        |
 | uuid       | 1       | v7, serde            | EventEnvelope.event_id                     |
 | jiff       | 0.2     | serde                | EventEnvelope.timestamp                    |
 
 ### Dev dependencies
 
-| Crate    | Version | Why                  |
-|----------|---------|----------------------|
-| proptest | 1       | Property-based tests |
+| Crate      | Version | Why                    |
+|------------|---------|------------------------|
+| trybuild   | 1       | Compile-fail tests     |
+| serde_json | 1       | Serialization tests    |
+| rmp-serde  | 1       | MsgPack serde tests    |
 
 ### Contents (implemented)
 
@@ -219,31 +209,29 @@ Depends on pardosa-genome and pit-core.
 
 ## Phase 4: pit-gateway (port implementations)
 
-Concrete implementations of CommandGateway, CommandBus, EventStore,
-EventBus. In-memory implementations for testing. This is the heart of
-the runtime.
+Concrete implementations of pit-core port traits. Currently provides
+`MsgpackFileStore<E>` — a file-based event store with auto-increment
+IDs, store-created envelopes, and optimistic concurrency.
 
 ### Dependencies
 
-| Crate      | Version | Features                           | Why                     |
-|------------|---------|-----------------------------------|-------------------------|
-| pit-core   | path    | —                                 | Port traits             |
-| tokio      | 1       | macros, rt-multi-thread, sync, time | Async runtime          |
-| serde      | 1       | derive                            | Event serialization     |
-| serde_json | 1       | —                                 | Wire format             |
-| tracing    | 0.1     | —                                 | Observability           |
-| thiserror  | 2       | —                                 | Error types             |
-| arc-swap   | 1       | —                                 | Lock-free config swap   |
-| scc        | 3       | —                                 | Concurrent collections  |
-| uuid       | 1       | v7, serde                         | Event ID generation     |
-| jiff       | 0.2     | serde                             | Timestamps              |
+| Crate      | Version | Features              | Why                     |
+|------------|---------|----------------------|-------------------------|
+| pit-core   | path    | —                    | Port traits             |
+| serde      | 1       | derive               | Event serialization     |
+| rmp-serde  | 0.15    | —                    | MessagePack format      |
+| scc        | 3       | —                    | Concurrent collections  |
+| tokio      | 1       | fs                   | Async file I/O          |
+| uuid       | 1       | v7, serde            | Event ID generation     |
+| jiff       | 0.2     | serde                | Timestamps              |
 
 ### Dev dependencies
 
-| Crate     | Version | Why             |
-|-----------|---------|-----------------|
-| tokio-test| 0.4     | Async test utils|
-| proptest  | 1       | Property tests  |
+| Crate        | Version | Why                |
+|--------------|---------|---------------------|
+| tempfile     | 3       | Temp dirs for tests |
+| futures-util | 0.3     | Concurrent test helpers |
+| tokio        | 1       | macros, rt-multi-thread |
 
 ### Module layout
 
@@ -252,16 +240,9 @@ pit-gateway/
 ├── Cargo.toml
 └── src/
     ├── lib.rs              # Re-exports
-    ├── gateway.rs          # CommandGateway impl
-    ├── command_bus.rs      # CommandBus impl
-    ├── event_store/
-    │   ├── mod.rs
-    │   └── in_memory.rs    # In-memory EventStore for testing
-    ├── event_bus/
-    │   ├── mod.rs
-    │   └── in_memory.rs    # In-memory EventBus for testing
-    ├── interceptor.rs      # Middleware chain
-    └── error.rs
+    └── event_store/
+        ├── mod.rs          # Re-exports
+        └── msgpack_file.rs # MsgpackFileStore<E> + 20 tests
 ```
 
 ## Phase 5: pit-web (HTTP adapter)
@@ -331,7 +312,7 @@ workspace.
 7. `crates/pit-projection`
 8. `crates/pit-agent`
 
-### Release profile (from non-authoritative)
+### Release profile
 
 ```toml
 [profile.release]
@@ -349,22 +330,18 @@ Per design priorities (P1 correctness):
 pedantic = { level = "warn", priority = -1 }
 ```
 
-## Reconciliation: pit-core.md → actual code
+## Key design decisions
 
-Changes applied during implementation:
-
-| Design doc (original)             | Actual implementation              | Reason                                         |
+| Area                              | Decision                           | Reason                                         |
 |-----------------------------------|------------------------------------|-------------------------------------------------|
-| `DateTime<Utc>`                   | `jiff::Timestamp`                  | jiff preferred, proven in non-auth              |
-| `Uuid` (no crate spec)           | `uuid::Uuid` with v7 feature      | Time-ordered event IDs                          |
-| No derive macro crate            | Add `pardosa-genome-derive`        | Non-auth workspace has it                       |
-| 7 planned crates                  | 8 crates (+ genome-derive)         | Proc macros need separate crate                 |
-| Generic methods on ports          | Associated types on ports          | Single-aggregate design for compile-time safety |
-| `EventStore::load<E>`            | `EventStore { type Event; load() }`| Cannot load wrong event type                    |
-| `EventBus::publish<E>`           | `EventBus { type Event; publish()}`| Cannot publish wrong event type                 |
-| `CommandGateway::send<A, C>`     | `CommandGateway { type Aggregate; send<C>() }` | Gateway bound to one aggregate    |
-| `CommandBus::dispatch<A, C>`     | `CommandBus { type Aggregate; dispatch<C>() }` | Bus bound to one aggregate        |
-| No `DispatchResult` alias        | `type DispatchResult<A, C>`        | Readable return types for bus/gateway           |
+| Timestamp type                    | `jiff::Timestamp`                  | Modern Rust datetime, lossless serde roundtrips |
+| Event IDs                         | `uuid::Uuid` with v7 feature      | Time-ordered event IDs                          |
+| Port trait generics               | Associated types on ports          | Single-aggregate design for compile-time safety |
+| Aggregate identity                | `AggregateId(u64)` newtype         | Copy semantics, store-assigned, type-safe       |
+| Envelope construction             | Store creates envelopes            | Eliminates redundancy, impossible to malform    |
+| Aggregate lifecycle               | create/send split                  | ID not known until store assigns it             |
+| Error types                       | Manual `Display`/`Error` impls     | No thiserror dependency in pit-core             |
+| Async traits                      | RPITIT (`impl Future`)             | Zero-cost, no `Box<dyn Future>` allocation      |
 
 ## Open questions
 
@@ -375,7 +352,5 @@ Changes applied during implementation:
    with trait-based port for future SQLite/PostgreSQL?
 3. **pit-agent scope** — what exactly does the agent surface crate
    contain? Builder API? Configuration DSL? This needs design work.
-4. **Error strategy** — thiserror 2 everywhere, or custom error types
-   for some crates?
-5. **Feature flags** — which crates should have optional features vs
+4. **Feature flags** — which crates should have optional features vs
    always-on? E.g., pardosa could gate NATS behind a `nats` feature.
