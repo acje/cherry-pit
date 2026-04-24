@@ -3,6 +3,7 @@
 use pit_core::{AggregateId, DomainEvent, EventEnvelope, EventStore, StoreError};
 use serde::{Deserialize, Serialize};
 use std::future::Future;
+use std::num::NonZeroU64;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 enum OrderEvent {
@@ -43,7 +44,7 @@ impl EventStore for OrderStore {
         _events: Vec<Self::Event>,
     ) -> impl Future<Output = Result<(AggregateId, Vec<EventEnvelope<Self::Event>>), StoreError>>
            + Send {
-        async { Ok((AggregateId::new(1), vec![])) }
+        async { Ok((AggregateId::new(NonZeroU64::new(1).unwrap()), vec![])) }
     }
 
     fn append(
@@ -60,7 +61,7 @@ fn main() {
     let store = OrderStore;
     // This should fail: OrderStore produces OrderEvent, not UserEvent.
     // The future's Output type won't match.
-    let future = store.load(AggregateId::new(1));
+    let future = store.load(AggregateId::new(NonZeroU64::new(1).unwrap()));
     let _: std::pin::Pin<
         Box<dyn Future<Output = Result<Vec<EventEnvelope<UserEvent>>, StoreError>>>,
     > = Box::pin(future);

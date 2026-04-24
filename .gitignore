@@ -15,6 +15,3 @@ store/
 .vscode/
 *.swp
 *.swo
-
-# Rust
-Cargo.lock

@@ -43,22 +43,24 @@ serves as defense-in-depth within the single writer.
 /// coordinate for any single event.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord,
          Serialize, Deserialize)]
-pub struct AggregateId(u64);
+pub struct AggregateId(NonZeroU64);
 ```
 
 **Design rationale:**
-- **Copy semantics** — `u64` is cheap to copy. No `.clone()`, no
+- **Copy semantics** — `NonZeroU64` is cheap to copy. No `.clone()`, no
   references, no lifetimes. Pass by value everywhere.
 - **Type safety** — prevents mixing aggregate IDs with other `u64`
   values (sequence numbers, counts, etc.) at compile time.
+- **Non-zero invariant** — backed by `NonZeroU64`. Zero is never a
+  valid aggregate ID (store-assigned IDs start from 1). This
+  eliminates the `AggregateId(0)` hole at the type level with zero
+  runtime cost. The niche optimization also makes
+  `Option<AggregateId>` the same size as `AggregateId`.
 - **Store-assigned** — IDs are auto-incremented by the
   [`EventStore::create`] method starting from 1. Callers never
-  invent IDs. `AggregateId(0)` is valid at the type level but
-  never assigned.
-- **No validation** — all `u64` values are valid. No `Result`, no
-  error type, no runtime checks.
+  invent IDs.
 - **Serde** — serializes as a plain `u64` for compact wire/storage
-  representation.
+  representation. Deserialization rejects zero.
 
 ## DomainEvent
 
@@ -196,6 +198,8 @@ pub struct EventEnvelope<E: DomainEvent> {
     pub aggregate_id: AggregateId,   // stream partition key
     pub sequence: u64,               // monotonic within aggregate stream
     pub timestamp: jiff::Timestamp,  // UTC instant (single per batch)
+    pub correlation_id: Option<Uuid>,// groups related events across aggregates
+    pub causation_id: Option<Uuid>,  // event_id of the causing event
     pub payload: E,
 }
 ```
@@ -212,6 +216,15 @@ pub struct EventEnvelope<E: DomainEvent> {
 - `timestamp` — single timestamp per batch. A batch (all events from
   one `create` or `append` call) is an atomic operation and shares
   one timestamp.
+- `correlation_id` — groups related events across aggregates and
+  bounded contexts into a single logical operation. All events
+  produced by a command (and downstream commands triggered by policies)
+  share the same `correlation_id`. `None` when no correlation context
+  is provided.
+- `causation_id` — identifies the specific event that caused this
+  event to be produced. For events from a user-initiated command,
+  `causation_id` is `None`. For events from a policy reacting to a
+  prior event, `causation_id` points to that prior event's `event_id`.
 
 ## Policy
 

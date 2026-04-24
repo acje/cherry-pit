@@ -27,6 +27,19 @@ pub trait DomainEvent: Serialize + DeserializeOwned + Clone + Send + Sync + 'sta
 /// Envelopes are created by the [`EventStore`](crate::EventStore)
 /// during `create` and `append` — callers pass raw domain events,
 /// the store stamps on the metadata.
+///
+/// # Correlation and causation
+///
+/// `correlation_id` groups related events across aggregates and
+/// bounded contexts into a single logical operation. All events
+/// produced by a command (and any downstream commands triggered by
+/// policies) share the same `correlation_id`.
+///
+/// `causation_id` identifies the specific event that caused this
+/// event to be produced. For events produced directly by a command,
+/// `causation_id` is `None`. For events produced by a policy
+/// reacting to a prior event, `causation_id` points to that prior
+/// event's `event_id`.
 #[derive(Debug, Clone, Serialize, serde::Deserialize)]
 #[serde(bound(
     serialize = "E: Serialize",
@@ -45,6 +58,18 @@ pub struct EventEnvelope<E: DomainEvent> {
 
     /// When this event was created (UTC instant).
     pub timestamp: jiff::Timestamp,
+
+    /// Correlation ID grouping related events across aggregates into
+    /// a single logical operation. Propagated through policies and
+    /// sagas.
+    #[serde(default)]
+    pub correlation_id: Option<uuid::Uuid>,
+
+    /// The `event_id` of the event that caused this event to be
+    /// produced (via a policy or saga). `None` for events produced
+    /// directly by a user-initiated command.
+    #[serde(default)]
+    pub causation_id: Option<uuid::Uuid>,
 
     /// The domain event payload.
     pub payload: E,

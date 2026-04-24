@@ -1,5 +1,6 @@
 use std::io;
 use std::marker::PhantomData;
+use std::num::NonZeroU64;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -73,7 +74,7 @@ impl<E: DomainEvent> MsgpackFileStore<E> {
     ///
     /// Infallible — `u64` IDs cannot cause path traversal.
     fn aggregate_path(&self, id: AggregateId) -> PathBuf {
-        self.dir.join(format!("{}.msgpack", id.into_inner()))
+        self.dir.join(format!("{}.msgpack", id.get()))
     }
 
     fn get_lock(&self, id: u64) -> Arc<tokio::sync::Mutex<()>> {
@@ -104,10 +105,10 @@ impl<E: DomainEvent> MsgpackFileStore<E> {
             .await
             .map_err(|e| StoreError::Infrastructure(Box::new(e)))?
         {
-            if let Some(stem) = entry.path().file_stem().and_then(|s| s.to_str()) {
-                if let Ok(id) = stem.parse::<u64>() {
-                    max = max.max(id);
-                }
+            if let Some(stem) = entry.path().file_stem().and_then(|s| s.to_str())
+                && let Ok(id) = stem.parse::<u64>()
+            {
+                max = max.max(id);
             }
         }
         Ok(max)
@@ -141,6 +142,8 @@ impl<E: DomainEvent> MsgpackFileStore<E> {
                 aggregate_id: id,
                 sequence,
                 timestamp,
+                correlation_id: None,
+                causation_id: None,
                 payload,
             });
         }
@@ -153,7 +156,7 @@ impl<E: DomainEvent> MsgpackFileStore<E> {
         path: &std::path::Path,
         envelopes: &[EventEnvelope<E>],
     ) -> Result<(), StoreError> {
-        let bytes = rmp_serde::to_vec(envelopes)
+        let bytes = rmp_serde::encode::to_vec_named(envelopes)
             .map_err(|e| StoreError::Infrastructure(Box::new(e)))?;
 
         tokio::fs::create_dir_all(&self.dir)
@@ -231,7 +234,12 @@ impl<E: DomainEvent> EventStore for MsgpackFileStore<E> {
                 )))
             })?;
             *next = Some(after);
-            AggregateId::new(n)
+            let nz = NonZeroU64::new(n).ok_or_else(|| {
+                StoreError::Infrastructure(Box::new(io::Error::other(
+                    "aggregate ID must be non-zero",
+                )))
+            })?;
+            AggregateId::new(nz)
         };
 
         let envelopes = Self::build_envelopes(id, 0, events)?;
@@ -251,7 +259,7 @@ impl<E: DomainEvent> EventStore for MsgpackFileStore<E> {
             return Ok(Vec::new());
         }
 
-        let lock = self.get_lock(id.into_inner());
+        let lock = self.get_lock(id.get());
         let _guard = lock.lock().await;
 
         let path = self.aggregate_path(id);
@@ -289,6 +297,7 @@ impl<E: DomainEvent> EventStore for MsgpackFileStore<E> {
 mod tests {
     use super::*;
     use serde::{Deserialize, Serialize};
+    use std::num::NonZeroU64;
 
     #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
     enum TestEvent {
@@ -303,6 +312,11 @@ mod tests {
                 Self::Updated { .. } => "test.updated",
             }
         }
+    }
+
+    /// Helper to construct an `AggregateId` from a raw `u64` in tests.
+    fn agg_id(n: u64) -> AggregateId {
+        AggregateId::new(NonZeroU64::new(n).unwrap())
     }
 
     // ── create ──────────────────────────────────────────────────────
@@ -325,9 +339,9 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(id1, AggregateId::new(1));
-        assert_eq!(id2, AggregateId::new(2));
-        assert_eq!(id3, AggregateId::new(3));
+        assert_eq!(id1, agg_id(1));
+        assert_eq!(id2, agg_id(2));
+        assert_eq!(id3, agg_id(3));
     }
 
     #[tokio::test]
@@ -398,7 +412,7 @@ mod tests {
             .create(vec![TestEvent::Created { name: "c".into() }])
             .await
             .unwrap();
-        assert_eq!(id, AggregateId::new(3));
+        assert_eq!(id, agg_id(3));
     }
 
     #[tokio::test]
@@ -425,7 +439,7 @@ mod tests {
             .create(vec![TestEvent::Created { name: "b".into() }])
             .await
             .unwrap();
-        assert_eq!(id, AggregateId::new(2));
+        assert_eq!(id, agg_id(2));
     }
 
     // ── load ────────────────────────────────────────────────────────
@@ -436,7 +450,7 @@ mod tests {
         let store = MsgpackFileStore::new(dir.path());
 
         let events: Vec<EventEnvelope<TestEvent>> =
-            store.load(AggregateId::new(999)).await.unwrap();
+            store.load(agg_id(999)).await.unwrap();
         assert!(events.is_empty());
     }
 
@@ -452,7 +466,7 @@ mod tests {
 
         let store = MsgpackFileStore::new(dir.path());
         let result: Result<Vec<EventEnvelope<TestEvent>>, _> =
-            store.load(AggregateId::new(1)).await;
+            store.load(agg_id(1)).await;
         assert!(result.is_err());
         assert!(
             matches!(result.unwrap_err(), StoreError::Infrastructure(_)),
@@ -736,7 +750,7 @@ mod tests {
         // Loading a never-created aggregate returns empty — the bus
         // layer maps this to AggregateNotFound.
         let events: Vec<EventEnvelope<TestEvent>> =
-            store.load(AggregateId::new(42)).await.unwrap();
+            store.load(agg_id(42)).await.unwrap();
         assert!(events.is_empty());
     }
 
@@ -788,5 +802,100 @@ mod tests {
         // The concurrency check will fire first (actual_sequence=1 != u64::MAX),
         // but the overflow would also be caught in build_envelopes.
         assert!(result.is_err());
+    }
+
+    // ── backward compatibility ──────────────────────────────────────
+
+    #[tokio::test]
+    async fn deserializes_old_format_without_correlation_fields() {
+        // Simulate a msgpack file written before correlation_id and
+        // causation_id were added: serialize with named keys but
+        // without the new fields. The #[serde(default)] on
+        // EventEnvelope ensures missing fields default to None.
+        #[derive(Serialize)]
+        struct OldEnvelope {
+            event_id: uuid::Uuid,
+            aggregate_id: AggregateId,
+            sequence: u64,
+            timestamp: jiff::Timestamp,
+            payload: TestEvent,
+        }
+
+        let dir = tempfile::tempdir().unwrap();
+        tokio::fs::create_dir_all(dir.path()).await.unwrap();
+
+        let old = vec![OldEnvelope {
+            event_id: uuid::Uuid::now_v7(),
+            aggregate_id: agg_id(1),
+            sequence: 1,
+            timestamp: jiff::Timestamp::now(),
+            payload: TestEvent::Created { name: "old".into() },
+        }];
+
+        // Use named encoding (map format) — same as the store uses.
+        let bytes = rmp_serde::encode::to_vec_named(&old).unwrap();
+        tokio::fs::write(dir.path().join("1.msgpack"), &bytes)
+            .await
+            .unwrap();
+
+        let store = MsgpackFileStore::<TestEvent>::new(dir.path());
+        let loaded = store.load(agg_id(1)).await.unwrap();
+
+        assert_eq!(loaded.len(), 1);
+        assert_eq!(loaded[0].payload, TestEvent::Created { name: "old".into() });
+        assert!(loaded[0].correlation_id.is_none());
+        assert!(loaded[0].causation_id.is_none());
+    }
+
+    #[tokio::test]
+    async fn correlation_and_causation_ids_roundtrip() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = MsgpackFileStore::new(dir.path());
+
+        let (id, created) = store
+            .create(vec![TestEvent::Created { name: "traced".into() }])
+            .await
+            .unwrap();
+
+        // Verify initial creation has None for both fields.
+        assert!(created[0].correlation_id.is_none());
+        assert!(created[0].causation_id.is_none());
+
+        // Reload and verify None survives serialization roundtrip.
+        let loaded = store.load(id).await.unwrap();
+        assert!(loaded[0].correlation_id.is_none());
+        assert!(loaded[0].causation_id.is_none());
+    }
+
+    #[tokio::test]
+    async fn correlation_and_causation_some_values_roundtrip() {
+        // Verify that Some(uuid) values survive a write/load cycle
+        // by manually constructing an envelope with populated fields.
+        let dir = tempfile::tempdir().unwrap();
+        tokio::fs::create_dir_all(dir.path()).await.unwrap();
+
+        let corr = uuid::Uuid::now_v7();
+        let cause = uuid::Uuid::now_v7();
+        let envelopes = vec![EventEnvelope {
+            event_id: uuid::Uuid::now_v7(),
+            aggregate_id: agg_id(1),
+            sequence: 1,
+            timestamp: jiff::Timestamp::now(),
+            correlation_id: Some(corr),
+            causation_id: Some(cause),
+            payload: TestEvent::Created { name: "with-ids".into() },
+        }];
+
+        let bytes = rmp_serde::encode::to_vec_named(&envelopes).unwrap();
+        tokio::fs::write(dir.path().join("1.msgpack"), &bytes)
+            .await
+            .unwrap();
+
+        let store = MsgpackFileStore::<TestEvent>::new(dir.path());
+        let loaded = store.load(agg_id(1)).await.unwrap();
+
+        assert_eq!(loaded.len(), 1);
+        assert_eq!(loaded[0].correlation_id, Some(corr));
+        assert_eq!(loaded[0].causation_id, Some(cause));
     }
 }

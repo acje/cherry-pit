@@ -1,7 +1,7 @@
 # Build plan: cherry-pit crates
 
 Status: phases 1 and 4 (partial) implemented  
-Rust edition: 2024 · rust-version: 1.85 (minimum for edition 2024)  
+Rust edition: 2024 · rust-version: 1.95  
 Resolver: 3
 
 ## Design decisions
@@ -24,6 +24,8 @@ pub struct EventEnvelope<E: DomainEvent> {
     pub aggregate_id: AggregateId,
     pub sequence: u64,
     pub timestamp: jiff::Timestamp,
+    pub correlation_id: Option<Uuid>,
+    pub causation_id: Option<Uuid>,
     pub payload: E,
 }
 ```
@@ -112,7 +114,7 @@ on, so it ships first.
 - `Command` trait
 - `Aggregate` trait (with `type Event` associated type)
 - `HandleCommand<C>` trait (with `type Error` per command)
-- `EventEnvelope<E>` struct (UUID v7, `jiff::Timestamp`)
+- `EventEnvelope<E>` struct (UUID v7, `jiff::Timestamp`, correlation/causation IDs)
 - `Policy` trait (with `type Event`, `type Output`)
 - `Projection` trait (with `type Event`)
 - `CommandGateway` trait (async, RPITIT, `type Aggregate`)
@@ -337,8 +339,9 @@ pedantic = { level = "warn", priority = -1 }
 | Timestamp type                    | `jiff::Timestamp`                  | Modern Rust datetime, lossless serde roundtrips |
 | Event IDs                         | `uuid::Uuid` with v7 feature      | Time-ordered event IDs                          |
 | Port trait generics               | Associated types on ports          | Single-aggregate design for compile-time safety |
-| Aggregate identity                | `AggregateId(u64)` newtype         | Copy semantics, store-assigned, type-safe       |
+| Aggregate identity                | `AggregateId(NonZeroU64)` newtype  | Copy semantics, store-assigned, type-safe, niche-optimized |
 | Envelope construction             | Store creates envelopes            | Eliminates redundancy, impossible to malform    |
+| Envelope tracing                  | `correlation_id` + `causation_id`  | Causal chain across aggregates and policies     |
 | Aggregate lifecycle               | create/send split                  | ID not known until store assigns it             |
 | Error types                       | Manual `Display`/`Error` impls     | No thiserror dependency in pit-core             |
 | Async traits                      | RPITIT (`impl Future`)             | Zero-cost, no `Box<dyn Future>` allocation      |

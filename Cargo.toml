@@ -13,7 +13,7 @@ members = [
 
 [workspace.package]
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.95"
 license = "MIT"
 repository = "https://github.com/acje/cherry-pit"
 authors = ["Anders Jensen <anders.jensen@users.noreply.github.com>"]
