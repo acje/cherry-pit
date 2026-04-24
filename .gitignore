@@ -2,7 +2,10 @@
 target/
 
 # Non-authoritative reference code
-non-authorative/
+non-authoritative/
+
+# Local event store (MessagePack files)
+store/
 
 # macOS
 .DS_Store
