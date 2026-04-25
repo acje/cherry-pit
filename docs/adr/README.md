@@ -1,6 +1,6 @@
 # Architecture Decision Records
 
-This directory contains all ADRs for the cherry-pit event-sourcing framework.
+This directory contains all ADRs for the cherry-pit EDA framework.
 
 Numbering follows importance-weighted tiers (S → D). Post-1.0,
 new ADRs append monotonically — no further renumbering.
@@ -12,7 +12,7 @@ new ADRs append monotonically — no further renumbering.
 | 0001 | Design Priority Ordering                 | S    | Accepted | —                   |
 | 0002 | Make Illegal States Unrepresentable      | S    | Accepted | 0001                |
 | 0003 | Compile-Time Error Preference            | S    | Accepted | 0001, 0002          |
-| 0004 | Event Sourcing + DDD + Hexagonal         | S    | Accepted | 0001                |
+| 0004 | Event-Driven Architecture + DDD + Hexagonal | S    | Accepted | 0001                |
 | 0005 | Single Aggregate Design                  | S    | Accepted | 0004                |
 | 0006 | Single-Writer Assumption                 | S    | Accepted | 0004                |
 | 0007 | Forbid Unsafe Code                       | A    | Accepted | 0001                |
@@ -63,7 +63,7 @@ Tier S — Foundational
     │     └── 0003 Compile-Time Errors
     ├── 0007 Forbid Unsafe ──► 0026 Build Config
     └── 0025 RPITIT
-  0004 Event Sourcing + DDD + Hexagonal
+  0004 Event-Driven Architecture + DDD + Hexagonal
     ├── 0005 Single Aggregate
     │     ├── 0015 Error Type per Command ──► 0021 Non-Exhaustive Errors
     │     │                                └── 0027 Manual Error Impls
@@ -122,7 +122,7 @@ digraph adr {
     n0001 [label="0001\nDesign Priority"];
     n0002 [label="0002\nIllegal States"];
     n0003 [label="0003\nCompile-Time Errors"];
-    n0004 [label="0004\nES+DDD+Hex"];
+    n0004 [label="0004\nEDA+DDD+Hex"];
     n0005 [label="0005\nSingle Aggregate"];
     n0006 [label="0006\nSingle-Writer"];
   }
@@ -209,55 +209,6 @@ digraph adr {
   n0004 -> n0044; n0006 -> n0044; n0031 -> n0044;
 }
 ```
-
-## Old → New Mapping
-
-| Old # | New # | Title                                    |
-|-------|-------|------------------------------------------|
-| 0001  | 0004  | Event Sourcing + DDD + Hexagonal         |
-| 0002  | 0005  | Single Aggregate Design                  |
-| 0003  | 0006  | Single-Writer Assumption                 |
-| 0004  | 0025  | RPITIT over async-trait                  |
-| 0005  | 0016  | Store Created Envelopes                  |
-| 0006  | 0011  | Aggregate ID — NonZero u64               |
-| 0007  | 0009  | Infallible Apply                         |
-| 0008  | 0013  | Create / Send Split                      |
-| 0009  | 0029  | Cargo Workspace Crate DAG                |
-| 0010  | 0014  | Commands Not Serializable                |
-| 0011  | 0007  | Forbid Unsafe Code                       |
-| 0012  | 0031  | MessagePack Named Encoding               |
-| 0013  | 0021  | Non-Exhaustive Errors                    |
-| 0014  | 0032  | Atomic File Writes                       |
-| 0015  | 0035  | Two-Level Concurrency                    |
-| 0016  | 0008  | Pure Command Handling                    |
-| 0017  | 0015  | Error Type per Command                   |
-| 0018  | 0030  | Flat Public API                          |
-| 0019  | 0019  | Load Returns Empty, Not Error            |
-| 0020  | 0026  | Correctness-First Build Config           |
-| 0021  | 0010  | Domain Event Supertrait Bounds           |
-| 0022  | 0017  | Policy Output — Static Type              |
-| 0023  | 0001  | Design Priority Ordering                 |
-| 0024  | 0018  | Sync Domain, Async Infrastructure        |
-| 0025  | 0036  | File-Per-Stream Full-Rewrite Storage     |
-| 0026  | 0037  | No Snapshot Support                      |
-| 0027  | 0033  | UUID v7 Event Identity                   |
-| 0028  | 0034  | Jiff Timestamp                           |
-| 0029  | 0020  | Infrastructure-Owned Aggregate Identity  |
-| 0030  | 0027  | Manual Error Impls                       |
-| 0031  | 0012  | Aggregate Default Zero-State             |
-| 0032  | 0028  | Compile-Fail Type Contracts              |
-| —     | 0002  | Make Illegal States Unrepresentable (NEW)|
-| —     | 0003  | Compile-Time Error Preference (NEW)      |
-| —     | 0022  | Event Schema Evolution (NEW)             |
-| —     | 0023  | Aggregate Lifecycle States (NEW)         |
-| —     | 0024  | Event Delivery Model (NEW)               |
-| —     | 0038  | Testing Strategy (NEW)                   |
-| —     | 0039  | Correlation Context Propagation (NEW)    |
-| —     | 0040  | Saga and Compensation — Deferral (NEW)   |
-| —     | 0041  | Idempotency Strategy (NEW)               |
-| —     | 0042  | EventEnvelope Construction Invariants (NEW)|
-| —     | 0043  | Process-Level File Fencing (NEW)          |
-| —     | 0044  | Object Store Backend (NEW)                |
 
 ## ADR Template
 
