@@ -1,6 +1,8 @@
 use std::future::Future;
+use std::num::NonZeroU64;
 
 use crate::aggregate_id::AggregateId;
+use crate::correlation::CorrelationContext;
 use crate::error::StoreError;
 use crate::event::{DomainEvent, EventEnvelope};
 
@@ -15,12 +17,14 @@ use crate::event::{DomainEvent, EventEnvelope};
 /// every load/append operates on the correct event type — the caller
 /// cannot accidentally deserialize one aggregate's events as another's.
 ///
-/// # Envelope construction
-///
-/// The store creates [`EventEnvelope`]s — callers pass raw domain
-/// events. The store assigns `event_id` (UUID v7), `aggregate_id`,
-/// `sequence`, and `timestamp`. This eliminates redundancy and makes
-/// malformed envelopes impossible by construction.
+    /// # Envelope construction
+    ///
+    /// The store creates [`EventEnvelope`]s — callers pass raw domain
+    /// events and a [`CorrelationContext`]. The store assigns `event_id`
+    /// (UUID v7), `aggregate_id`, `sequence`, and `timestamp`, and
+    /// stamps `correlation_id`/`causation_id` from the context. This
+    /// eliminates redundancy and makes malformed envelopes impossible
+    /// by construction.
 ///
 /// # ID assignment
 ///
@@ -67,20 +71,27 @@ pub trait EventStore: Send + Sync + 'static {
     fn create(
         &self,
         events: Vec<Self::Event>,
+        context: CorrelationContext,
     ) -> impl Future<Output = Result<(AggregateId, Vec<EventEnvelope<Self::Event>>), StoreError>>
            + Send;
 
     /// Append new events to an existing aggregate's stream.
+    ///
+    /// The aggregate must have been created via [`create`](Self::create)
+    /// before calling `append`. Appending to a never-created aggregate
+    /// is an error — implementations return `StoreError::Infrastructure`.
     ///
     /// The store creates [`EventEnvelope`]s from the raw domain events
     /// (assigning `event_id`, `sequence`, and `timestamp`) and persists
     /// them. Returns the created envelopes.
     ///
     /// `expected_sequence` is the sequence number of the last event
-    /// the caller loaded (0 if the aggregate has no events yet — though
-    /// this should not happen since `create` always produces ≥1 event).
-    /// If the store's actual last sequence does not match, the append
-    /// is rejected with `StoreError::ConcurrencyConflict`.
+    /// the caller loaded, as a [`NonZeroU64`]. Since
+    /// [`create`](Self::create) always produces ≥1 event, the last
+    /// sequence is always ≥1 — the `NonZeroU64` type enforces this
+    /// invariant at compile time. If the store's actual last sequence
+    /// does not match, the append is rejected with
+    /// `StoreError::ConcurrencyConflict`.
     ///
     /// Empty `events` is a no-op — returns `Ok(vec![])`.
     ///
@@ -88,7 +99,8 @@ pub trait EventStore: Send + Sync + 'static {
     fn append(
         &self,
         id: AggregateId,
-        expected_sequence: u64,
+        expected_sequence: NonZeroU64,
         events: Vec<Self::Event>,
+        context: CorrelationContext,
     ) -> impl Future<Output = Result<Vec<EventEnvelope<Self::Event>>, StoreError>> + Send;
 }

@@ -1,10 +1,15 @@
-# 9. Cargo Workspace with Layered Crate DAG
+# 29. Cargo Workspace with Layered Crate DAG
 
 Date: 2026-04-24
+Last-reviewed: 2026-04-25
 
 ## Status
 
 Accepted
+
+## Related
+
+- Informs: ADR 0030
 
 ## Context
 

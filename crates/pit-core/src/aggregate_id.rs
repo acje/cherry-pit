@@ -226,4 +226,39 @@ mod tests {
             std::mem::size_of::<Option<AggregateId>>()
         );
     }
+
+    mod proptests {
+        use super::*;
+        use proptest::prelude::*;
+
+        proptest! {
+            #[test]
+            fn aggregate_id_u64_roundtrip(val in 1..=u64::MAX) {
+                let id = AggregateId::try_from(val).unwrap();
+                prop_assert_eq!(id.get(), val);
+
+                let nz: NonZeroU64 = id.into();
+                prop_assert_eq!(nz.get(), val);
+
+                let raw: u64 = id.into();
+                prop_assert_eq!(raw, val);
+            }
+
+            #[test]
+            fn aggregate_id_json_roundtrip(val in 1..=u64::MAX) {
+                let id = AggregateId::try_from(val).unwrap();
+                let json = serde_json::to_string(&id).unwrap();
+                let back: AggregateId = serde_json::from_str(&json).unwrap();
+                prop_assert_eq!(back, id);
+            }
+
+            #[test]
+            fn aggregate_id_msgpack_roundtrip(val in 1..=u64::MAX) {
+                let id = AggregateId::try_from(val).unwrap();
+                let bytes = rmp_serde::to_vec(&id).unwrap();
+                let back: AggregateId = rmp_serde::from_slice(&bytes).unwrap();
+                prop_assert_eq!(back, id);
+            }
+        }
+    }
 }

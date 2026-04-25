@@ -3,6 +3,7 @@ use std::future::Future;
 use crate::aggregate::HandleCommand;
 use crate::aggregate_id::AggregateId;
 use crate::command::Command;
+use crate::correlation::CorrelationContext;
 use crate::error::{BusError, CreateResult, DispatchResult};
 use crate::event::{DomainEvent, EventEnvelope};
 
@@ -37,6 +38,7 @@ pub trait CommandBus: Send + Sync + 'static {
     fn create<C>(
         &self,
         cmd: C,
+        context: CorrelationContext,
     ) -> impl Future<Output = CreateResult<Self::Aggregate, C>> + Send
     where
         Self::Aggregate: HandleCommand<C>,
@@ -51,6 +53,7 @@ pub trait CommandBus: Send + Sync + 'static {
         &self,
         id: AggregateId,
         cmd: C,
+        context: CorrelationContext,
     ) -> impl Future<Output = DispatchResult<Self::Aggregate, C>> + Send
     where
         Self::Aggregate: HandleCommand<C>,

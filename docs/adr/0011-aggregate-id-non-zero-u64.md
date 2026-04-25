@@ -1,10 +1,17 @@
-# 6. AggregateId as NonZeroU64 Newtype
+# 11. AggregateId as NonZeroU64 Newtype
 
 Date: 2026-04-24
+Last-reviewed: 2026-04-25
 
 ## Status
 
 Accepted (supersedes original u64 design)
+
+## Related
+
+- Depends on: ADR 0006
+- Informs: ADR 0013, ADR 0020
+- Referenced by: ADR 0005, ADR 0020
 
 ## Context
 

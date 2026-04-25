@@ -1,10 +1,16 @@
-# 1. Event Sourcing with DDD and Hexagonal Architecture
+# 4. Event Sourcing with DDD and Hexagonal Architecture
 
 Date: 2026-04-24
+Last-reviewed: 2026-04-25
 
 ## Status
 
 Accepted
+
+## Related
+
+- Depends on: ADR 0001
+- Informs: ADR 0005, ADR 0006, ADR 0008, ADR 0009, ADR 0010, ADR 0014, ADR 0016, ADR 0024, ADR 0039
 
 ## Context
 

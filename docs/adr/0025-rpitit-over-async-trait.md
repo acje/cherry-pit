@@ -1,10 +1,17 @@
-# 4. RPITIT Over async_trait
+# 25. RPITIT Over async_trait
 
 Date: 2026-04-24
+Last-reviewed: 2026-04-25
 
 ## Status
 
 Accepted
+
+## Related
+
+- Depends on: ADR 0001
+- Informs: ADR 0018
+- Referenced by: ADR 0001, ADR 0018
 
 ## Context
 

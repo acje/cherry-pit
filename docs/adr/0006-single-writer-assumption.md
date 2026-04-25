@@ -1,10 +1,16 @@
-# 3. Single-Writer Assumption Per Aggregate
+# 6. Single-Writer Assumption Per Aggregate
 
 Date: 2026-04-24
+Last-reviewed: 2026-04-25
 
 ## Status
 
 Accepted
+
+## Related
+
+- Depends on: ADR 0004
+- Informs: ADR 0011, ADR 0032, ADR 0033, ADR 0035, ADR 0043
 
 ## Context
 
@@ -38,6 +44,9 @@ within the single writer, not as a distributed coordination mechanism.
   cannot be sharded across processes.
 - No fencing mechanism exists at the storage level. If two processes
   accidentally share a store directory, data corruption is possible.
+  **Mitigated**: ADR 0043 adds process-level advisory file locking
+  (`flock`) that detects and rejects a second writer on the same
+  directory.
 - Multi-node deployment requires an external mechanism (NATS subject
   partitioning, process registry) to route commands to the owning
   process — this is currently undesigned.

@@ -14,6 +14,6 @@
 
 #![forbid(unsafe_code)]
 
-pub mod event_store;
+mod event_store;
 
 pub use event_store::MsgpackFileStore;

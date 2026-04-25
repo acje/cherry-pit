@@ -1,10 +1,17 @@
-# 8. Create/Send Split in CommandGateway and EventStore
+# 13. Create/Send Split in CommandGateway and EventStore
 
 Date: 2026-04-24
+Last-reviewed: 2026-04-25
 
 ## Status
 
 Accepted
+
+## Related
+
+- Depends on: ADR 0011
+- Informs: ADR 0019, ADR 0020, ADR 0023
+- Referenced by: ADR 0005, ADR 0012, ADR 0020
 
 ## Context
 

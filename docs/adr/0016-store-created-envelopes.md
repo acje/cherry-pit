@@ -1,10 +1,16 @@
-# 5. Store-Created Envelopes with Correlation and Causation Tracking
+# 16. Store-Created Envelopes with Correlation and Causation Tracking
 
 Date: 2026-04-24
+Last-reviewed: 2026-04-25
 
 ## Status
 
 Accepted
+
+## Related
+
+- Depends on: ADR 0004
+- Informs: ADR 0039, ADR 0042
 
 ## Context
 
@@ -52,7 +58,7 @@ propagated through policies or sagas.
   tracing context) requires no changes — fields default to `None`.
 - Adding tracing propagation to `CommandBus` and `CommandGateway`
   implementations is a future concern — the envelope schema is ready.
-- `EventEnvelope` fields are `pub`, so external construction via
-  struct literal syntax is technically possible. The safety guarantee
-  relies on convention (only the store constructs envelopes in
-  production code).
+- `EventEnvelope` fields are private (enforced by ADR 0042).
+  External construction via struct literal syntax is rejected at
+  compile time. The safety guarantee is structural, not
+  convention-based.

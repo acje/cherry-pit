@@ -50,9 +50,6 @@ bytes = "1"
 # === Stream utilities ===
 futures-util = "0.3"
 
-# === Logging / tracing ===
-tracing = "0.1"
-
 # === Error handling ===
 thiserror = "2"
 

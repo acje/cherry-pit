@@ -1,6 +1,6 @@
 /// Verifies that an EventStore typed for one event cannot be used
 /// to store events of a different type.
-use pit_core::{AggregateId, DomainEvent, EventEnvelope, EventStore, StoreError};
+use pit_core::{AggregateId, CorrelationContext, DomainEvent, EventEnvelope, EventStore, StoreError};
 use serde::{Deserialize, Serialize};
 use std::future::Future;
 use std::num::NonZeroU64;
@@ -42,6 +42,7 @@ impl EventStore for OrderStore {
     fn create(
         &self,
         _events: Vec<Self::Event>,
+        _context: CorrelationContext,
     ) -> impl Future<Output = Result<(AggregateId, Vec<EventEnvelope<Self::Event>>), StoreError>>
            + Send {
         async { Ok((AggregateId::new(NonZeroU64::new(1).unwrap()), vec![])) }
@@ -50,8 +51,9 @@ impl EventStore for OrderStore {
     fn append(
         &self,
         _id: AggregateId,
-        _seq: u64,
+        _seq: NonZeroU64,
         _events: Vec<Self::Event>,
+        _context: CorrelationContext,
     ) -> impl Future<Output = Result<Vec<EventEnvelope<Self::Event>>, StoreError>> + Send {
         async { Ok(vec![]) }
     }

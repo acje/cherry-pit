@@ -1,10 +1,17 @@
-# 2. Single-Aggregate Design with Compile-Time Type Safety
+# 5. Single-Aggregate Design with Compile-Time Type Safety
 
 Date: 2026-04-24
+Last-reviewed: 2026-04-25
 
 ## Status
 
 Accepted
+
+## Related
+
+- Depends on: ADR 0004
+- Informs: ADR 0015, ADR 0017, ADR 0028
+- Referenced by: ADR 0001
 
 ## Context
 

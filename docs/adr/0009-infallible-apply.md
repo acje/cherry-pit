@@ -1,10 +1,17 @@
-# 7. Infallible apply() on Aggregate and Projection
+# 9. Infallible apply() on Aggregate and Projection
 
 Date: 2026-04-24
+Last-reviewed: 2026-04-25
 
 ## Status
 
 Accepted
+
+## Related
+
+- Depends on: ADR 0004
+- Informs: ADR 0012, ADR 0022, ADR 0023, ADR 0037
+- Referenced by: ADR 0012
 
 ## Context
 

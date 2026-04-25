@@ -36,10 +36,12 @@
 //!
 //! - [`AggregateId`] — stream partition key (auto-assigned `u64`)
 //! - [`EventEnvelope`] — infrastructure wrapper around domain events
+//! - [`CorrelationContext`] — explicit correlation/causation propagation
 //! - [`DispatchError`] — typed command dispatch errors
 //! - [`DispatchResult`] — return type alias for bus/gateway dispatch
 //! - [`CreateResult`] — return type alias for aggregate creation
 //! - [`StoreError`] — event store operation errors
+//! - [`EnvelopeError`] — envelope construction/validation errors
 //! - [`BusError`] — event bus publication errors
 
 #![forbid(unsafe_code)]
@@ -48,6 +50,7 @@ mod aggregate;
 mod aggregate_id;
 mod bus;
 mod command;
+mod correlation;
 mod error;
 mod event;
 mod gateway;
@@ -59,7 +62,8 @@ pub use aggregate::{Aggregate, HandleCommand};
 pub use aggregate_id::AggregateId;
 pub use bus::{CommandBus, EventBus};
 pub use command::Command;
-pub use error::{BusError, CreateResult, DispatchError, DispatchResult, StoreError};
+pub use correlation::CorrelationContext;
+pub use error::{BusError, CreateResult, DispatchError, DispatchResult, EnvelopeError, StoreError};
 pub use event::{DomainEvent, EventEnvelope};
 pub use gateway::CommandGateway;
 pub use policy::Policy;

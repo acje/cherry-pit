@@ -3,6 +3,7 @@ use std::future::Future;
 use crate::aggregate::HandleCommand;
 use crate::aggregate_id::AggregateId;
 use crate::command::Command;
+use crate::correlation::CorrelationContext;
 use crate::error::{CreateResult, DispatchResult};
 
 /// The primary entry point for dispatching commands into the system.
@@ -33,6 +34,7 @@ pub trait CommandGateway: Send + Sync + 'static {
     fn create<C>(
         &self,
         cmd: C,
+        context: CorrelationContext,
     ) -> impl Future<Output = CreateResult<Self::Aggregate, C>> + Send
     where
         Self::Aggregate: HandleCommand<C>,
@@ -50,6 +52,7 @@ pub trait CommandGateway: Send + Sync + 'static {
         &self,
         id: AggregateId,
         cmd: C,
+        context: CorrelationContext,
     ) -> impl Future<Output = DispatchResult<Self::Aggregate, C>> + Send
     where
         Self::Aggregate: HandleCommand<C>,

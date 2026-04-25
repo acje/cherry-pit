@@ -458,6 +458,7 @@ pub trait EventStore: Send + Sync + 'static {
     fn create(
         &self,
         events: Vec<Self::Event>,
+        context: CorrelationContext,
     ) -> impl Future<Output = Result<(AggregateId,
                                       Vec<EventEnvelope<Self::Event>>),
                                      StoreError>> + Send;
@@ -470,8 +471,9 @@ pub trait EventStore: Send + Sync + 'static {
     fn append(
         &self,
         id: AggregateId,
-        expected_sequence: u64,
+        expected_sequence: NonZeroU64,
         events: Vec<Self::Event>,
+        context: CorrelationContext,
     ) -> impl Future<Output = Result<Vec<EventEnvelope<Self::Event>>,
                                      StoreError>> + Send;
 }
@@ -487,6 +489,7 @@ pub enum StoreError {
         actual_sequence: u64,
     },
     Infrastructure(Box<dyn Error + Send + Sync>),
+    StoreLocked { path: PathBuf },
 }
 ```
 
