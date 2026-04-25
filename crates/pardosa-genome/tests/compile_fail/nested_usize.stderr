@@ -1,0 +1,5 @@
+error: GenomeSafe: usize has platform-dependent size. Use u32/u64/i32/i64 for portable serialization.
+ --> tests/compile_fail/nested_usize.rs:5:17
+  |
+5 |     counts: Vec<usize>,
+  |                 ^^^^^

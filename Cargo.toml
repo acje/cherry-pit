@@ -2,13 +2,14 @@
 resolver = "3"
 members = [
     "crates/pit-core",
-    # "crates/pardosa-genome",
-    # "crates/pardosa-genome-derive",
-    # "crates/pardosa",
+    "crates/pardosa-genome",
+    "crates/pardosa-genome-derive",
+    "crates/pardosa",
     "crates/pit-gateway",
     # "crates/pit-web",
     # "crates/pit-projection",
     # "crates/pit-agent",
+    "crates/adr-fmt",
 ]
 
 [workspace.package]
@@ -67,6 +68,9 @@ async-nats = "0.47"
 syn = { version = "2", features = ["full", "extra-traits"] }
 quote = "1"
 proc-macro2 = "1"
+
+# === Text processing ===
+regex = "1"
 
 # === Dev dependencies ===
 proptest = "1"

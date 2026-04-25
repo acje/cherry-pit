@@ -46,7 +46,8 @@ What cannot compile:
 
 Active development. `pit-core` traits are implemented and stable.
 `pit-gateway` has a working `MsgpackFileStore` event store. Remaining
-infrastructure crates (pardosa, pit-web, pit-projection) are planned.
+infrastructure crates (pit-web, pit-projection) are planned. Pardosa
+(event storage layer and binary serialization) is in progress.
 
 ## Components
 
@@ -54,7 +55,9 @@ infrastructure crates (pardosa, pit-web, pit-projection) are planned.
 |----------------|-------------|-----------------------------------------------------|
 | **pit-core**   | implemented | Aggregate, command, event, policy, projection traits. Port traits: CommandGateway, CommandBus, EventStore, EventBus |
 | **pit-gateway**| in progress | Event store implementations (MsgpackFileStore)      |
-| **Pardosa**    | planned     | Event serialization, append-only logs, schema evolution |
+| **pardosa**    | in progress | EDA storage layer implementing fiber semantics      |
+| **pardosa-genome** | in progress | Binary serialization format with zero-copy reads and serde integration |
+| **pardosa-genome-derive** | in progress | Derive macro for pardosa-genome GenomeSafe trait |
 | **pit-web**    | planned     | Web serving adapter (axum)                          |
 | **pit-projection** | planned | Read model storage and query serving                |
 
@@ -74,9 +77,13 @@ infrastructure crates (pardosa, pit-web, pit-projection) are planned.
 cherry-pit/
 ├── crates/
 │   ├── pit-core/          # Aggregate, command, event, port traits
-│   └── pit-gateway/       # EventStore implementations
+│   ├── pit-gateway/       # EventStore implementations
+│   ├── pardosa/           # EDA storage layer (fiber semantics)
+│   ├── pardosa-genome/    # Binary serialization format
+│   ├── pardosa-genome-derive/ # GenomeSafe derive macro
+│   └── adr-fmt/           # ADR formatting tool
 ├── docs/
-└── Cargo.toml             # Workspace manifest (edition 2024, rust 1.85+)
+└── Cargo.toml             # Workspace manifest (edition 2024, rust 1.95+)
 ```
 
 Licensed under [MIT](LICENSE).

@@ -207,7 +207,7 @@ or append a new section.
 
 Date: YYYY-MM-DD
 Last-reviewed: YYYY-MM-DD
-Migration-Origin: (optional) original-repo/path/to/adr.md
+Tier: S | A | B | C | D
 
 ## Status
 
@@ -246,15 +246,13 @@ Include both positive and negative consequences.
 
 ### Required Fields
 
-All ADRs must have: Title, Date, Status, Related (may be empty with `—`),
+All ADRs must have: Title, Date, Tier, Status, Related (may be empty with `—`),
 Context, Decision, Consequences.
 
 ### Optional Fields
 
 - `Last-reviewed` — date of last review (recommended for all, required for
   S-tier and A-tier)
-- `Migration-Origin` — original file path for ADRs migrated from another
-  repository
 - `Alternatives Considered` — may be a subsection of Context or a separate
   section
 - `References` — links to design docs, issues, or external resources
@@ -349,34 +347,7 @@ Do **not** write an ADR for:
 
 ---
 
-## 11. Migration Provenance
-
-ADRs migrated from other repositories must include the `Migration-Origin`
-field with the original repository and file path:
-
-```markdown
-Migration-Origin: quicksilver/crates/pardosa/adr/0004-single-writer-per-stream.md
-```
-
-This preserves traceability to the original decision context. The
-original ADR number is retained within the new domain prefix:
-
-- Original: `quicksilver/crates/pardosa/adr/0004-...` → `PAR-0004-...`
-- Original: `quicksilver/crates/pardosa-genome/adr/0015-...` → `GEN-0015-...`
-
-Migrated ADRs are reformatted to this governance template. Content
-changes during migration are limited to:
-
-- Adding required fields (Date, Last-reviewed, Related with vocabulary)
-- Rewriting relative paths to new locations
-- Converting external doc references to cherry-pit `docs/` paths
-- Assigning a tier
-
-Substantive decision changes require a separate Amended entry or new ADR.
-
----
-
-## 12. Overlap Resolution
+## 11. Overlap Resolution
 
 When pardosa or genome ADRs cover the same concern as a framework ADR at
 a different abstraction level, the resolution is cross-referencing — not
@@ -398,7 +369,7 @@ the older one.
 
 ---
 
-## 13. Index Structure
+## 12. Index Structure
 
 Each domain directory contains a `README.md` with:
 

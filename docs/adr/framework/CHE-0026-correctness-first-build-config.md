@@ -2,6 +2,7 @@
 
 Date: 2026-04-25
 Last-reviewed: 2026-04-25
+Tier: C
 
 ## Status
 
@@ -10,7 +11,7 @@ Accepted
 ## Related
 
 - Depends on: CHE-0001, CHE-0007
-- Referenced by: CHE-0001
+- Illustrates: CHE-0001
 
 ## Context
 

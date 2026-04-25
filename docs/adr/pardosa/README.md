@@ -1,53 +1,47 @@
 # Pardosa Domain — Architecture Decision Records
 
-This directory will contain ADRs for the pardosa EDA storage layer:
-fiber semantics, stream management, NATS/JetStream transport,
-migration model, backpressure, and single-writer fencing at transport
-level.
+ADRs for the pardosa EDA storage layer: fiber semantics, stream
+management, NATS/JetStream transport, migration model, backpressure,
+and single-writer fencing at transport level.
 
 Governed by [GOVERNANCE.md](../GOVERNANCE.md).
 
-## Migration Status
+## Index
 
-**Pending.** 14 ADRs (PAR-0001 through PAR-0014) are awaiting
-migration from `quicksilver/crates/pardosa/adr/`. The migration will:
+| # | Title | Tier | Status |
+|---|-------|:----:|--------|
+| [PAR-0001](PAR-0001-fiber-state-machine-as-inspectable-data-table.md) | Fiber state machine as inspectable data table | B | Accepted |
+| [PAR-0002](PAR-0002-index-none-sentinel-replacing-option-index.md) | Index::NONE sentinel replacing Option\<Index\> | B | Accepted |
+| [PAR-0003](PAR-0003-event-immutability-private-fields-non-exhaustive.md) | Event immutability — private fields + non_exhaustive | A | Accepted |
+| [PAR-0004](PAR-0004-single-writer-per-stream.md) | Single-writer per stream | S | Accepted |
+| [PAR-0005](PAR-0005-new-stream-migration-model.md) | New-stream migration model | B | Accepted |
+| [PAR-0006](PAR-0006-genome-as-primary-serialization.md) | Genome as primary serialization | A | Amended 2026-04-01 |
+| [PAR-0007](PAR-0007-monotonic-event-id-for-idempotent-publish.md) | Monotonic event_id for idempotent publish | B | Accepted |
+| [PAR-0008](PAR-0008-publish-then-apply-with-durable-first-semantics.md) | Publish-then-apply with durable-first semantics | S | Amended 2026-04-01 |
+| [PAR-0009](PAR-0009-locked-rescue-policy-enum-replacing-bool.md) | LockedRescuePolicy enum replacing bool | B | Accepted |
+| [PAR-0010](PAR-0010-fallible-constructors-replacing-debug-assert.md) | Fallible constructors replacing debug_assert | B | Accepted |
+| [PAR-0011](PAR-0011-64-bit-target-requirement.md) | 64-bit target requirement | D | Accepted |
+| [PAR-0012](PAR-0012-precursor-chain-verification-on-startup.md) | Precursor chain verification on startup | D | Accepted |
+| [PAR-0013](PAR-0013-nats-kv-registry-for-atomic-stream-discovery.md) | NATS KV registry for atomic stream discovery | C | Amended 2026-04-01 |
+| [PAR-0014](PAR-0014-backpressure-and-circuit-breaker.md) | Backpressure and circuit breaker | D | Accepted |
 
-1. Reformat each ADR to the [governance template](../GOVERNANCE.md#7-adr-template)
-2. Assign tiers (S → D)
-3. Add Date / Last-reviewed / Migration-Origin fields
-4. Rewrite relative paths to cherry-pit locations
-5. Add cross-domain links to Framework ADRs (7 overlap pairs
-   documented in [framework/README.md](../framework/README.md#cross-domain-references))
+**Tier distribution:** 2S · 2A · 6B · 1C · 3D
 
-## Planned Index
-
-| #        | Title                                          | Status  |
-|----------|------------------------------------------------|---------|
-| PAR-0001 | Fiber state machine as inspectable data table  | Pending |
-| PAR-0002 | Index::NONE sentinel replacing Option\<Index\> | Pending |
-| PAR-0003 | Event immutability — private fields + non_exhaustive | Pending |
-| PAR-0004 | Single-writer per stream                       | Pending |
-| PAR-0005 | New-stream migration model                     | Pending |
-| PAR-0006 | Genome as primary serialization                | Pending |
-| PAR-0007 | Monotonic event_id for idempotent publish      | Pending |
-| PAR-0008 | Publish-then-apply with durable-first semantics | Pending |
-| PAR-0009 | LockedRescuePolicy enum replacing bool         | Pending |
-| PAR-0010 | Fallible constructors replacing debug_assert   | Pending |
-| PAR-0011 | 64-bit target requirement                      | Pending |
-| PAR-0012 | Precursor chain verification on startup        | Pending |
-| PAR-0013 | NATS KV registry for atomic stream discovery   | Pending |
-| PAR-0014 | Backpressure and circuit breaker               | Pending |
-
-## Cross-Domain References (Planned)
+## Cross-Domain References
 
 | Pardosa ADR | Framework ADR | Relationship |
 |-------------|---------------|--------------|
-| PAR-0004 | CHE-0006 (Single-Writer) | Illustrates |
-| PAR-0005 | CHE-0022 (Schema Evolution) | Extends |
-| PAR-0007 | CHE-0041 (Idempotency) | Illustrates |
 | PAR-0003 | CHE-0022 (Schema Evolution) | References |
+| PAR-0004 | CHE-0006 (Single-Writer) | Illustrates |
 | PAR-0004 | CHE-0043 (File Fencing) | Contrasts with |
+| PAR-0005 | CHE-0022 (Schema Evolution) | Extends |
 | PAR-0006 | CHE-0045 (Serialization Scope) | Scoped by |
+| PAR-0007 | CHE-0041 (Idempotency) | Illustrates |
+
+| Pardosa ADR | Genome ADR | Relationship |
+|-------------|------------|--------------|
+| PAR-0002 | GEN-0002, GEN-0007 | References |
+| PAR-0006 | GEN-0001, GEN-0006, GEN-0008, GEN-0012, GEN-0031 | References |
 
 ## Reference Documents
 

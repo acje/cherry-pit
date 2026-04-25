@@ -2,6 +2,7 @@
 
 Date: 2026-04-25
 Last-reviewed: 2026-04-25
+Tier: B
 
 ## Status
 
@@ -9,7 +10,7 @@ Accepted
 
 ## Related
 
-- Scopes: CHE-0031, PAR-0006 (pending migration)
+- Scopes: CHE-0031, PAR-0006
 - Depends on: CHE-0004, CHE-0029
 - References: CHE-0022
 
@@ -23,7 +24,7 @@ Two serialization decisions exist:
 1. **CHE-0031** — MessagePack named encoding for `pit-gateway`'s
    `MsgpackFileStore`. Optimised for forward-compatible event
    persistence with `#[serde(default)]` field evolution.
-2. **PAR-0006** (pending migration) — pardosa-genome as the primary
+2. **PAR-0006** — pardosa-genome as the primary
    serialization for the `pardosa` crate. Optimised for zero-copy
    reads, compile-time schema hashing, and integrated compression.
 
@@ -41,8 +42,8 @@ constrains another's.
 |-------|--------------|---------------|
 | `pit-core` | None — domain traits are format-agnostic. `DomainEvent: Serialize + DeserializeOwned` enables any serde backend. | CHE-0010 |
 | `pit-gateway` | MessagePack with named/map encoding (`rmp-serde`). Forward-compatible field evolution via `#[serde(default)]`. | CHE-0031 |
-| `pardosa` | pardosa-genome as primary. MsgPack and JSON as feature-gated fallbacks for debugging and interop. | PAR-0006 (pending migration) |
-| `pardosa-genome` | Defines the genome binary wire format. Serde-native with `GenomeSafe` marker trait. | GEN-0001 through GEN-0033 (pending migration) |
+| `pardosa` | pardosa-genome as primary. MsgPack and JSON as feature-gated fallbacks for debugging and interop. | PAR-0006 |
+| `pardosa-genome` | Defines the genome binary wire format. Serde-native with `GenomeSafe` marker trait. | GEN-0001 through GEN-0033 |
 | `pit-web` (planned) | JSON via `serde_json` for HTTP API responses. Format determined by web conventions, not event storage. | — |
 
 ### Boundary Rules
@@ -74,8 +75,8 @@ constrains another's.
   code changes.
 - **Schema evolution strategies differ by crate.** `pit-gateway` uses
   additive field evolution with `#[serde(default)]` (CHE-0022).
-  `pardosa` uses new-stream migration with log rewriting (PAR-0005,
-  pending migration). Both are valid within their scope.
+  `pardosa` uses new-stream migration with log rewriting (PAR-0005).
+  Both are valid within their scope.
 - **Increased surface area.** Two serialization strategies means two
   sets of golden-file tests, two sets of forward-compatibility
   guarantees, and two encoding-specific bug surfaces.

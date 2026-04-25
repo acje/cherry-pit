@@ -1,0 +1,18 @@
+[package]
+name = "adr-fmt"
+version = "0.1.0"
+description = "ADR template and link-integrity validator for cherry-pit"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+regex = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

@@ -1,0 +1,5 @@
+error: GenomeSafe: HashMap has non-deterministic iteration order. Use BTreeMap / BTreeSet for deterministic serialization.
+ --> tests/compile_fail/hashmap_field.rs:6:11
+  |
+6 |     data: HashMap<String, u32>,
+  |           ^^^^^^^^^^^^^^^^^^^^

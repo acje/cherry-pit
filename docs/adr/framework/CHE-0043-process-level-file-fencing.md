@@ -2,6 +2,7 @@
 
 Date: 2026-04-25
 Last-reviewed: 2026-04-25
+Tier: D
 
 ## Status
 
@@ -12,6 +13,8 @@ Accepted
 - Depends on: CHE-0006
 - Extends: CHE-0032, CHE-0035
 - References: CHE-0021
+- Referenced by: CHE-0044
+- Contrasts with: PAR-0004
 
 ## Context
 

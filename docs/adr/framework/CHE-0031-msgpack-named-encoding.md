@@ -2,6 +2,7 @@
 
 Date: 2026-04-25
 Last-reviewed: 2026-04-25
+Tier: D
 
 ## Status
 
@@ -9,8 +10,7 @@ Accepted
 
 ## Related
 
-- Informs: CHE-0022, CHE-0036
-- Referenced by: CHE-0036
+- Informs: CHE-0022, CHE-0036, CHE-0044
 - Scoped by: CHE-0045
 
 ## Context

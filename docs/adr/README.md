@@ -10,10 +10,10 @@ management, and MECE validation rules.
 | Domain | Prefix | Directory | ADRs | Scope |
 |--------|--------|-----------|------|-------|
 | [Framework](framework/README.md) | `CHE` | `framework/` | 45 | Design philosophy, EDA/DDD/hexagonal architecture, domain model traits, infrastructure ports, concurrency, storage, tooling, testing |
-| [Pardosa](pardosa/README.md) | `PAR` | `pardosa/` | 14 (pending migration) | EDA storage layer: fiber semantics, stream management, NATS transport, migration, backpressure |
-| [Genome](genome/README.md) | `GEN` | `genome/` | 33 (pending migration) | Binary serialization format: wire layout, schema hashing, zero-copy, compression, security limits |
+| [Pardosa](pardosa/README.md) | `PAR` | `pardosa/` | 14 | EDA storage layer: fiber semantics, stream management, NATS transport, migration, backpressure |
+| [Genome](genome/README.md) | `GEN` | `genome/` | 33 | Binary serialization format: wire layout, schema hashing, zero-copy, compression, security limits |
 
-**Total**: 92 ADRs (45 migrated, 47 pending migration)
+**Total**: 92 ADRs
 
 ## Quick Reference
 
