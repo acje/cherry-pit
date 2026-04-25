@@ -81,7 +81,7 @@ pub enum StoreError {
     /// Returned when a file-based store cannot acquire an exclusive
     /// advisory lock on its directory. This indicates another process
     /// is already using the same store directory, which violates the
-    /// single-writer assumption (ADR 0006).
+    /// single-writer assumption (CHE-0006).
     StoreLocked {
         /// The path to the store directory that is locked.
         path: PathBuf,

@@ -2,7 +2,7 @@
 
 Prescriptive guidance for agents and developers building domain
 systems on cherry-pit. These rules derive from the framework's design
-priorities (ADR 0001) and type-safety principles (ADR 0002, ADR 0003).
+priorities (CHE-0001) and type-safety principles (CHE-0002, CHE-0003).
 
 ## Make illegal states unrepresentable
 
@@ -32,7 +32,7 @@ When defining domain types, encode invariants in the type system.
 - Use `u64` directly where a newtype prevents confusion with other
   numeric values.
 - Use `#[non_exhaustive]` on domain event enums — exhaustive matching
-  in `apply` is required (ADR 0009, ADR 0022).
+  in `apply` is required (CHE-0009, CHE-0022).
 
 ## Prefer compile-time errors
 
@@ -47,7 +47,7 @@ When defining APIs and constraints, make the compiler do the checking.
 - **Associated types over generic parameters** — fix the relationship
   per instance, not per call. `EventStore::Event` is one type, not
   a generic parameter on every method.
-- **Domain errors per command** (ADR 0015) — callers match on
+- **Domain errors per command** (CHE-0015) — callers match on
   `ShipOrderError::NotConfirmed`, not `Box<dyn Error>`.
 
 ### Don't

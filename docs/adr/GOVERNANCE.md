@@ -1,0 +1,411 @@
+# ADR Governance
+
+Last-updated: 2026-04-25
+
+This document is the single source of truth for Architecture Decision Record
+management across the cherry-pit workspace. Changes to this document require
+a pull request with explicit review. Breaking changes to numbering, template,
+or domain taxonomy require a new ADR documenting the rationale.
+
+---
+
+## 1. Purpose and Scope
+
+ADRs record significant architectural decisions — choices that affect the
+structure, behaviour, or constraints of the codebase. They exist so that
+future contributors can understand *why* the code is shaped the way it is,
+not just *what* it does.
+
+**Scope**: All crates in the cherry-pit Cargo workspace:
+
+| Crate | Domain |
+|-------|--------|
+| `pit-core` | Framework |
+| `pit-gateway` | Framework |
+| `pardosa` | Pardosa |
+| `pardosa-genome` | Genome |
+| `pardosa-genome-derive` | Genome |
+| `pit-web` (planned) | Framework |
+| `pit-projection` (planned) | Framework |
+| `pit-agent` (planned) | Framework |
+
+---
+
+## 2. Domain Taxonomy (MECE)
+
+Every ADR belongs to exactly one domain. Cross-domain decisions get a
+primary home and cross-references to affected domains. A decision that
+spans two domains at equal weight triggers a scoping discussion and may
+result in a "Scopes" ADR that delineates boundaries.
+
+| Domain | Prefix | Directory | Scope |
+|--------|--------|-----------|-------|
+| **Framework** | `CHE` | `docs/adr/framework/` | Design philosophy, EDA/DDD/hexagonal architecture, domain model traits (aggregates, commands, events, policies), infrastructure ports, concurrency, delivery, storage backends, workspace tooling, testing strategy, build configuration |
+| **Pardosa** | `PAR` | `docs/adr/pardosa/` | EDA storage layer: fiber semantics, stream management, NATS/JetStream transport, migration model, backpressure, single-writer fencing at transport level |
+| **Genome** | `GEN` | `docs/adr/genome/` | Binary serialization format: wire layout, schema hashing, zero-copy deserialization, compression, security limits (DoS protection, decompression bombs), type validation, forward compatibility |
+
+### MECE Validation
+
+Before accepting any ADR, validate:
+
+1. The ADR belongs to exactly one domain
+2. No existing ADR in the same domain covers the same decision space
+3. If the decision affects another domain, cross-references are added
+   using the relationship vocabulary (§5)
+4. All `Depends on` targets exist and are `Accepted` (or `Amended`)
+5. Bidirectional links are maintained (every `Depends on` has a
+   corresponding `Informs`; every `Illustrates` has an `Illustrated by`)
+6. No circular dependencies are introduced in the DAG
+7. A tier (§4) is assigned with justification
+
+---
+
+## 3. Numbering
+
+Format: `{PREFIX}-{NNNN}`
+
+Examples: `CHE-0001`, `PAR-0006`, `GEN-0015`
+
+### Rules
+
+- Each domain maintains an independent monotonically increasing sequence
+- Numbers are never reused, even after deprecation or supersession
+- Current ranges:
+  - Framework: `CHE-0001` through `CHE-0045` (45 accepted/proposed)
+  - Pardosa: `PAR-0001` through `PAR-0014` (14 accepted, pending migration)
+  - Genome: `GEN-0001` through `GEN-0033` (33 accepted, pending migration)
+- New ADRs append to their domain's sequence: next Framework ADR is
+  `CHE-0046`, next Pardosa is `PAR-0015`, next Genome is `GEN-0034`
+- File naming: `{PREFIX}-{NNNN}-kebab-case-slug.md`
+  - Example: `CHE-0001-design-priority-ordering.md`
+
+### Cross-Domain References
+
+Use the full prefix in text references:
+
+```markdown
+- Depends on: CHE-0001
+- Illustrates: GEN-0006
+```
+
+Use relative paths for Markdown links:
+
+```markdown
+See [CHE-0006](../framework/CHE-0006-single-writer-assumption.md)
+See [GEN-0015](../genome/GEN-0015-forward-compatibility-contract.md)
+```
+
+Within the same domain, relative paths omit the parent traversal:
+
+```markdown
+See [CHE-0002](CHE-0002-illegal-states-unrepresentable.md)
+```
+
+---
+
+## 4. Tier System
+
+Tiers classify ADRs by architectural significance and stability
+expectations. Every ADR must be assigned a tier.
+
+| Tier | Name | Criteria | Stability |
+|------|------|----------|-----------|
+| **S** | Foundational | Design philosophy or architecture pattern — changing reverberates through every crate and every downstream consumer | Immutable post-1.0 |
+| **A** | Core | Core trait design or invariant — changing requires major refactoring across multiple crates | Near-immutable; changes require RFC-level discussion |
+| **B** | Behavioural | Behavioural contracts and API semantics — changing requires coordinated updates across call sites | Stable; changes documented via Amended status |
+| **C** | Tooling | Tooling, DX, and build decisions — changing is localized to configuration or test infrastructure | Flexible; changes append monotonically |
+| **D** | Detail | Implementation detail — changing affects one crate's internals | Mutable; may be superseded freely |
+
+### Assignment Guidelines
+
+- S-tier: "If this changed, would we need to rewrite the framework?"
+  → Yes = S-tier
+- A-tier: "If this changed, would trait signatures or type bounds change?"
+  → Yes = A-tier
+- B-tier: "If this changed, would call sites or runtime behaviour change?"
+  → Yes = B-tier
+- C-tier: "If this changed, would only CI, lints, or test setup change?"
+  → Yes = C-tier
+- D-tier: "If this changed, would only one crate's internal implementation
+  change?" → Yes = D-tier
+
+---
+
+## 5. Relationship Vocabulary
+
+ADRs are connected by typed, directional relationships. Bidirectional
+maintenance is mandatory: when adding a forward link, add the
+corresponding reverse link.
+
+| Verb | Meaning | Direction | Reverse |
+|------|---------|-----------|---------|
+| **Depends on** | Cannot be understood without the target | Child → Parent | Informs |
+| **Informs** | Target was influenced by this ADR | Parent → Child | Depends on |
+| **Extends** | Builds on target's pattern without superseding it | Newer → Older | Extended by |
+| **Extended by** | Target builds on this ADR's pattern | Older → Newer | Extends |
+| **Illustrates** | Demonstrates target's principle in practice | Concrete → Abstract | Illustrated by |
+| **Illustrated by** | Target demonstrates this ADR's principle | Abstract → Concrete | Illustrates |
+| **Referenced by** | Target mentions this ADR in context or consequences | Cited → Citing | References |
+| **References** | This ADR mentions the target in context or consequences | Citing → Cited | Referenced by |
+| **Contrasts with** | Deliberately different choice from target | Peer ↔ Peer | Contrasts with |
+| **Supersedes** | Replaces target entirely; target becomes Deprecated/Superseded | Newer → Older | Superseded by |
+| **Superseded by** | This ADR was replaced by the target | Older → Newer | Supersedes |
+| **Scopes** | Limits target's applicability to a specific domain or crate | Scoping → Scoped | Scoped by |
+| **Scoped by** | This ADR's applicability is limited by the target | Scoped → Scoping | Scopes |
+
+### Usage Rules
+
+1. Every `Depends on: X` in ADR A must have a corresponding
+   `Informs: A` in ADR X
+2. Every `Illustrates: X` must have `Illustrated by: A` in ADR X
+3. `Contrasts with` is symmetric — both ADRs list the relationship
+4. `Supersedes` requires setting the target's status to
+   `Superseded by {PREFIX}-{NNNN}`
+5. Cross-domain relationships are encouraged — they make the
+   architecture's cross-cutting concerns explicit
+
+---
+
+## 6. Lifecycle
+
+```
+Draft → Proposed → Accepted → Amended (with date log)
+                               ↓
+                           Deprecated → (optional) Superseded by X
+```
+
+| State | Meaning |
+|-------|---------|
+| **Draft** | Under development, not yet proposed for review. May be incomplete. |
+| **Proposed** | Ready for review. All required fields present. |
+| **Accepted** | Decision is binding. Implementation may be pending. |
+| **Amended** | Accepted with recorded modifications. The amendment date and summary are appended to the Status section. Previous text is preserved, not deleted. |
+| **Deprecated** | No longer applicable but preserved for historical context. Reason documented. |
+| **Superseded** | Replaced by another ADR. Status reads: `Superseded by {PREFIX}-{NNNN}`. |
+
+### Amendment Format
+
+When amending an accepted ADR, append to the Status section:
+
+```markdown
+## Status
+
+Accepted
+
+Amended 2026-04-25 — added fencing requirement (previously documented only)
+```
+
+Do not delete original text. Add new content inline with clear markers
+or append a new section.
+
+---
+
+## 7. ADR Template
+
+```markdown
+# {PREFIX}-{NNNN}. Title
+
+Date: YYYY-MM-DD
+Last-reviewed: YYYY-MM-DD
+Migration-Origin: (optional) original-repo/path/to/adr.md
+
+## Status
+
+Draft | Proposed | Accepted | Amended | Deprecated | Superseded by {PREFIX}-{NNNN}
+
+## Related
+
+- Depends on: {PREFIX}-{NNNN}
+- Informs: {PREFIX}-{NNNN}
+- Extends: {PREFIX}-{NNNN}
+- Extended by: {PREFIX}-{NNNN}
+- Illustrates: {PREFIX}-{NNNN}
+- Illustrated by: {PREFIX}-{NNNN}
+- References: {PREFIX}-{NNNN}
+- Referenced by: {PREFIX}-{NNNN}
+- Contrasts with: {PREFIX}-{NNNN}
+- Supersedes: {PREFIX}-{NNNN}
+- Scopes: {PREFIX}-{NNNN}
+- Scoped by: {PREFIX}-{NNNN}
+
+## Context
+
+What is the issue? Why does a decision need to be made?
+Include alternatives considered and why they were rejected.
+
+## Decision
+
+What is the change being proposed or decided?
+Be specific — name types, traits, crates, configuration.
+
+## Consequences
+
+What becomes easier or harder? Trade-offs and risks.
+Include both positive and negative consequences.
+```
+
+### Required Fields
+
+All ADRs must have: Title, Date, Status, Related (may be empty with `—`),
+Context, Decision, Consequences.
+
+### Optional Fields
+
+- `Last-reviewed` — date of last review (recommended for all, required for
+  S-tier and A-tier)
+- `Migration-Origin` — original file path for ADRs migrated from another
+  repository
+- `Alternatives Considered` — may be a subsection of Context or a separate
+  section
+- `References` — links to design docs, issues, or external resources
+
+---
+
+## 8. Cross-Domain Referencing
+
+### Within ADR Text
+
+Use the prefixed identifier inline:
+
+```markdown
+Cherry-pit's single-writer assumption (CHE-0006) is enforced at the
+transport level by pardosa's NATS sequence fencing (PAR-0004).
+```
+
+### In Related Sections
+
+Use the full prefix:
+
+```markdown
+## Related
+
+- Depends on: CHE-0004
+- Illustrates: CHE-0006
+```
+
+### Markdown Links
+
+Use relative paths from the ADR file:
+
+```markdown
+<!-- From docs/adr/pardosa/PAR-0004-... to a framework ADR -->
+See [CHE-0006](../framework/CHE-0006-single-writer-assumption.md)
+
+<!-- From docs/adr/framework/CHE-0022-... to a genome ADR -->
+See [GEN-0002](../genome/GEN-0002-no-schema-evolution-fixed-layout.md)
+
+<!-- Within the same domain -->
+See [CHE-0002](CHE-0002-illegal-states-unrepresentable.md)
+```
+
+### Reference Docs
+
+Design documents in `docs/` are referenced from ADRs using relative paths:
+
+```markdown
+See [pardosa design](../../pardosa-design.md)
+See [genome design](../../genome.md)
+```
+
+---
+
+## 9. When to Write an ADR
+
+Write an ADR when a decision:
+
+1. **Constrains future implementation** — the choice limits what can be
+   built or how it can be built
+2. **Has trade-offs** — reasonable alternatives exist and the choice is
+   not obvious
+3. **Crosses crate boundaries** — the decision affects more than one
+   crate's API or behaviour
+4. **Is hard to reverse** — undoing the decision would require
+   significant refactoring
+5. **Was debated** — multiple contributors or design sessions discussed
+   alternatives
+
+Do **not** write an ADR for:
+
+- Trivial implementation choices within a single function
+- Dependency version bumps (unless they change API surface)
+- Formatting or style decisions (covered by lints/rustfmt)
+
+---
+
+## 10. Review Process
+
+1. **Author** creates a Draft ADR in the appropriate domain directory
+2. **Author** validates the MECE checklist (§2)
+3. **Author** opens a PR moving the ADR from Draft to Proposed
+4. **Reviewer** verifies:
+   - Correct domain assignment
+   - Tier assignment with justification
+   - All bidirectional links present
+   - No circular dependencies
+   - Template conformance
+   - MECE compliance
+5. On approval, status changes to Accepted and the PR is merged
+6. Domain README index is updated in the same PR
+
+---
+
+## 11. Migration Provenance
+
+ADRs migrated from other repositories must include the `Migration-Origin`
+field with the original repository and file path:
+
+```markdown
+Migration-Origin: quicksilver/crates/pardosa/adr/0004-single-writer-per-stream.md
+```
+
+This preserves traceability to the original decision context. The
+original ADR number is retained within the new domain prefix:
+
+- Original: `quicksilver/crates/pardosa/adr/0004-...` → `PAR-0004-...`
+- Original: `quicksilver/crates/pardosa-genome/adr/0015-...` → `GEN-0015-...`
+
+Migrated ADRs are reformatted to this governance template. Content
+changes during migration are limited to:
+
+- Adding required fields (Date, Last-reviewed, Related with vocabulary)
+- Rewriting relative paths to new locations
+- Converting external doc references to cherry-pit `docs/` paths
+- Assigning a tier
+
+Substantive decision changes require a separate Amended entry or new ADR.
+
+---
+
+## 12. Overlap Resolution
+
+When pardosa or genome ADRs cover the same concern as a framework ADR at
+a different abstraction level, the resolution is cross-referencing — not
+merging:
+
+- The framework ADR is the **principle** (abstract, crate-agnostic)
+- The pardosa/genome ADR is the **implementation** (concrete,
+  crate-specific)
+- Both remain standalone with `Illustrates` / `Illustrated by` or
+  `Extends` / `Extended by` links
+
+Example: CHE-0006 (single-writer assumption) is the framework principle.
+PAR-0004 (single-writer per stream via NATS fencing) illustrates it
+at the transport level.
+
+Merging is reserved for cases where two ADRs in the **same domain**
+genuinely cover the same decision space — then the newer ADR supersedes
+the older one.
+
+---
+
+## 13. Index Structure
+
+Each domain directory contains a `README.md` with:
+
+1. **Domain description** — one-paragraph scope statement
+2. **Index table** — columns: `#`, `Title`, `Tier`, `Status`, `Depends on`
+3. **Dependency graph** — textual tree and/or Graphviz DOT
+4. **Cross-domain references** — links to related ADRs in other domains
+
+The top-level `docs/adr/README.md` is the hub linking to all domain
+READMEs and GOVERNANCE.md.
