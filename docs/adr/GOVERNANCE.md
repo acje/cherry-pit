@@ -36,7 +36,7 @@ not just *what* it does.
 Every ADR belongs to exactly one domain. Cross-domain decisions get a
 primary home and cross-references to affected domains. A decision that
 spans two domains at equal weight triggers a scoping discussion and may
-result in a "Scopes" ADR that delineates boundaries.
+result in a boundary-delineating ADR with cross-references.
 
 | Domain | Prefix | Directory | Scope |
 |--------|--------|-----------|-------|
@@ -53,8 +53,8 @@ Before accepting any ADR, validate:
 2. No existing ADR in the same domain covers the same decision space
 3. If the decision affects another domain, cross-references are added
    using the relationship vocabulary (§5)
-4. All `Depends on` targets exist and are `Accepted` (or `Amended`)
-5. No circular dependencies are introduced in the DAG
+4. All `References` targets exist and are `Accepted` (or `Amended`)
+5. No circular dependencies are introduced
 6. A tier (§4) is assigned with justification
 
 ---
@@ -85,8 +85,8 @@ Examples: `CHE-0001`, `PAR-0006`, `GEN-0015`
 Use the full prefix in text references:
 
 ```markdown
-- Depends on: CHE-0001
-- Illustrates: GEN-0006
+- References: CHE-0001
+- References: GEN-0006
 ```
 
 Use relative paths for Markdown links:
@@ -134,28 +134,49 @@ expectations. Every ADR must be assigned a tier.
 
 ## 5. Relationship Vocabulary
 
-ADRs link **toward the root** of the dependency graph — each ADR
-declares what it depends on, illustrates, extends, or references. Reverse
-links (parent listing children) are not stored; use `adr-fmt --report`
-to compute a children index on demand.
+ADRs link **toward the root** of the dependency graph using three
+permitted verbs. Reverse links (parent listing children) are not
+stored; use `adr-fmt --report` to compute a children index on demand.
 
 | Verb | Meaning | Direction |
 |------|---------|-----------|
-| **Depends on** | Cannot be understood without the target | Child → Parent |
-| **Extends** | Builds on target's pattern without superseding it | Newer → Older |
-| **Illustrates** | Demonstrates target's principle in practice | Concrete → Abstract |
-| **References** | This ADR mentions the target in context or consequences | Citing → Cited |
-| **Contrasts with** | Deliberately different choice from target | Peer ↔ Peer |
+| **Root** | Self-reference marking this ADR as a tree root (`- Root: CHE-0001` in CHE-0001's file) | Self |
+| **References** | This ADR cites the target in context or consequences | Citing → Cited |
 | **Supersedes** | Replaces target entirely; target becomes Deprecated/Superseded | Newer → Older |
-| **Scoped by** | This ADR's applicability is limited by the target | Constrained → Constrainer |
 
 ### Usage Rules
 
-1. `Contrasts with` is symmetric — both ADRs list the relationship
-2. `Supersedes` requires setting the target's status to
-   `Superseded by {PREFIX}-{NNNN}`
-3. Cross-domain relationships are encouraged — they make the
-   architecture's cross-cutting concerns explicit
+1. Every ADR must have at least one relationship — no orphans, no
+   placeholder dashes. Tree roots use `- Root: {OWN-ID}`.
+2. `Root` and `References` may not coexist — a root ADR does not
+   reference another ADR (it *is* the starting point). `Root` and
+   `Supersedes` may coexist (a root can supersede an older root).
+3. `Supersedes` requires setting the target's status to
+   `Superseded by {PREFIX}-{NNNN}`.
+4. Multiple roots per domain are permitted (multiple independent trees).
+5. Cross-domain references are encouraged — they make the
+   architecture's cross-cutting concerns explicit.
+
+### Legacy Verbs (L006)
+
+The following verbs were part of the original 12-verb vocabulary and
+are now deprecated. `adr-fmt` emits L006 warnings for these:
+
+| Legacy Verb | Migration |
+|-------------|-----------|
+| `Depends on` | → `References` |
+| `Extends` | → `References` |
+| `Illustrates` | → `References` |
+| `Contrasts with` | → `References` |
+| `Scoped by` | → `References` |
+| `Informs` | Remove (reverse verb) |
+| `Extended by` | Remove (reverse verb) |
+| `Illustrated by` | Remove (reverse verb) |
+| `Referenced by` | Remove (reverse verb) |
+| `Superseded by` | Remove (reverse verb) |
+| `Scopes` | Remove (reverse verb) |
+
+See `docs/adr/cleanup.md` for migration scripts.
 
 ---
 
@@ -163,8 +184,8 @@ to compute a children index on demand.
 
 ```
 Draft → Proposed → Accepted → Amended (with date log)
-                               ↓
-                           Deprecated → (optional) Superseded by X
+            ↓                      ↓
+         Rejected           Deprecated → (optional) Superseded by X
 ```
 
 | State | Meaning |
@@ -173,8 +194,16 @@ Draft → Proposed → Accepted → Amended (with date log)
 | **Proposed** | Ready for review. All required fields present. |
 | **Accepted** | Decision is binding. Implementation may be pending. |
 | **Amended** | Accepted with recorded modifications. The amendment date and summary are appended to the Status section. Previous text is preserved, not deleted. |
+| **Rejected** | Decision was proposed but deliberately not adopted. Remains in record for context. Requires a `## Rejection Rationale` section. |
 | **Deprecated** | No longer applicable but preserved for historical context. Reason documented. |
 | **Superseded** | Replaced by another ADR. Status reads: `Superseded by {PREFIX}-{NNNN}`. |
+
+### Terminal States
+
+`Rejected`, `Deprecated`, and `Superseded` are terminal states. ADRs in
+these states are moved to `docs/adr/stale/` and require a
+`## Retirement` section (≥10 words) explaining why the ADR left active
+service. Active ADRs must not have a Retirement section.
 
 ### Amendment Format
 
@@ -227,17 +256,13 @@ Tier: S | A | B | C | D
 
 ## Status
 
-Draft | Proposed | Accepted | Amended | Deprecated | Superseded by {PREFIX}-{NNNN}
+Draft | Proposed | Accepted | Amended | Rejected | Deprecated | Superseded by {PREFIX}-{NNNN}
 
 ## Related
 
-- Depends on: {PREFIX}-{NNNN}
-- Extends: {PREFIX}-{NNNN}
-- Illustrates: {PREFIX}-{NNNN}
+- Root: {OWN-PREFIX}-{OWN-NNNN}
 - References: {PREFIX}-{NNNN}
-- Contrasts with: {PREFIX}-{NNNN}
 - Supersedes: {PREFIX}-{NNNN}
-- Scoped by: {PREFIX}-{NNNN}
 
 ## Context
 
@@ -255,15 +280,36 @@ What becomes easier or harder? Trade-offs and risks.
 Include both positive and negative consequences.
 ```
 
+### Stale ADR Template Addition
+
+ADRs in `stale/` must append a Retirement section:
+
+```markdown
+## Retirement
+
+Why this ADR left active service. Must be ≥10 words.
+```
+
 ### Required Fields
 
-All ADRs must have: Title, Date, Tier, Status, Related (may be empty with `—`),
-Context, Decision, Consequences.
+All ADRs must have: Title, Date, Last-reviewed, Tier, Status,
+Related (with ≥1 relationship — no empty placeholder), Context,
+Decision, Consequences. Stale ADRs additionally require Retirement.
+
+### Section Ordering
+
+Sections must appear in canonical order: Status → Related → Context →
+Decision → Consequences (→ Retirement for stale). `adr-fmt` rule T014
+warns when sections are misordered.
+
+### Minimum Word Count
+
+Prose sections (Context, Decision, Consequences, Retirement) must each
+contain ≥10 words. The threshold is configurable via `adr-fmt.toml`
+rule T015 params.
 
 ### Optional Fields
 
-- `Last-reviewed` — date of last review (recommended for all, required for
-  S-tier and A-tier)
 - `Alternatives Considered` — may be a subsection of Context or a separate
   section
 - `References` — links to design docs, issues, or external resources
@@ -298,8 +344,8 @@ Use the full prefix:
 ```markdown
 ## Related
 
-- Depends on: CHE-0004
-- Illustrates: CHE-0006
+- References: CHE-0004
+- References: CHE-0006
 ```
 
 ### Markdown Links
@@ -359,9 +405,9 @@ Do **not** write an ADR for:
 4. **Reviewer** verifies:
    - Correct domain assignment
    - Tier assignment with justification
-   - `Contrasts with` links are symmetric
-   - No circular dependencies
-   - Template conformance
+   - Relationship vocabulary uses only permitted verbs (§5)
+   - Every ADR has ≥1 relationship (Root, References, or Supersedes)
+   - Template conformance (section order, word counts)
    - MECE compliance
 5. On approval, status changes to Accepted and the PR is merged
 6. Domain README index is updated in the same PR
@@ -377,8 +423,8 @@ merging:
 - The Cherry domain ADR is the **principle** (abstract, crate-agnostic)
 - The pardosa/genome ADR is the **implementation** (concrete,
   crate-specific)
-- Both remain standalone with `Illustrates` or `Extends` links
-  from the concrete ADR to the abstract one
+- Both remain standalone with `References` links from the concrete
+  ADR to the abstract one
 
 Example: CHE-0006 (single-writer assumption) is the Cherry domain principle.
 PAR-0004 (single-writer per stream via NATS fencing) illustrates it
@@ -395,7 +441,7 @@ the older one.
 Each domain directory contains a `README.md` with:
 
 1. **Domain description** — one-paragraph scope statement
-2. **Index table** — columns: `#`, `Title`, `Tier`, `Status`, `Depends on`
+2. **Index table** — columns: `#`, `Title`, `Tier`, `Status`, `References`
 3. **Dependency graph** — textual tree and/or Graphviz DOT
 4. **Cross-domain references** — links to related ADRs in other domains
 

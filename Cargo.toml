@@ -71,6 +71,7 @@ proc-macro2 = "1"
 
 # === Text processing ===
 regex = "1"
+toml = "1"
 
 # === Dev dependencies ===
 proptest = "1"

@@ -49,6 +49,7 @@ let timestamp = jiff::Timestamp::now();
 ```
 
 Workspace dependency:
+
 ```toml
 jiff = { version = "0.2", features = ["serde"] }
 ```

@@ -4,10 +4,12 @@
 //! rules defined in `docs/adr/GOVERNANCE.md`:
 //!
 //! - Template compliance (required fields, sections, tier, status format,
-//!   code block length)
-//! - Forward link integrity (7-verb relationship vocabulary, no reverse verbs)
+//!   code block length, section ordering, minimum word count)
+//! - Relationship integrity (3-verb vocabulary: References, Supersedes,
+//!   Root; legacy verb detection; supersedes-status consistency)
 //! - File naming conventions (`{PREFIX}-{NNNN}-kebab-slug.md`)
 //! - README index ↔ filesystem consistency
+//! - Structure rules (stale location/status, Retirement section)
 //!
 //! # Usage
 //!
@@ -15,15 +17,17 @@
 //! cargo run -p adr-fmt [-- [--report] [path/to/adr]]
 //! ```
 //!
-//! Exits 0 if all checks pass. Exits 1 if any errors are found.
-//! Cross-domain references to unmigrated PAR/GEN ADRs emit warnings,
-//! not errors.
+//! Exit codes:
+//!   0 — Lint complete (warnings may be present)
+//!   1 — Infrastructure error (missing config, unreadable directory)
 //!
 //! Use `--report` to print a computed children index (reverse-link
 //! navigation without stored backlinks).
 
 #![forbid(unsafe_code)]
 
+mod config;
+mod generate;
 mod model;
 mod nav;
 mod parser;
@@ -33,12 +37,22 @@ mod rules;
 use std::path::{Path, PathBuf};
 use std::process;
 
+use config::Config;
 use model::DomainDir;
 use report::Severity;
 
 fn main() {
     let (adr_root, report_mode) = resolve_args();
-    let domain_dirs = discover_domains(&adr_root);
+
+    let config = match config::load(&adr_root) {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("error: {e}");
+            process::exit(1);
+        }
+    };
+
+    let domain_dirs = discover_domains(&adr_root, &config);
 
     if domain_dirs.is_empty() {
         eprintln!("error: no domain directories found in {}", adr_root.display());
@@ -51,13 +65,23 @@ fn main() {
         all_records.extend(records);
     }
 
+    // Parse stale directory
+    let stale_dir = adr_root.join(&config.stale.directory);
+    if stale_dir.is_dir() {
+        let stale_records = parser::parse_stale(&stale_dir, &config);
+        all_records.extend(stale_records);
+    }
+
     // Report mode: compute and print children index
     if report_mode {
         let children = nav::compute_children(&all_records);
         nav::print_report(&all_records, &children);
     }
 
-    let diagnostics = rules::run_all(&all_records, &domain_dirs);
+    // Generate README files
+    generate::generate_all(&all_records, &domain_dirs, &adr_root, &config);
+
+    let diagnostics = rules::run_all(&all_records, &domain_dirs, &config);
 
     let mut errors = 0u32;
     let mut warnings = 0u32;
@@ -78,9 +102,8 @@ fn main() {
         all_records.len()
     );
 
-    if errors > 0 {
-        process::exit(1);
-    }
+    // Advisory tool: always exit 0 for lint findings.
+    // Only infrastructure errors (missing config, no domains) exit 1.
 }
 
 /// Parse CLI arguments. Returns (adr_root, report_mode).
@@ -148,23 +171,17 @@ fn resolve_adr_root_auto() -> PathBuf {
     process::exit(1);
 }
 
-fn discover_domains(root: &Path) -> Vec<DomainDir> {
-    // Hardcoded domain list matching GOVERNANCE.md §2 taxonomy.
-    // Adding a new domain requires updating this list.
-    let known = [
-        ("common", "COM"),
-        ("cherry", "CHE"),
-        ("pardosa", "PAR"),
-        ("genome", "GEN"),
-    ];
-
+/// Build domain directories from config.
+fn discover_domains(root: &Path, config: &Config) -> Vec<DomainDir> {
     let mut dirs = Vec::new();
-    for (dir_name, prefix) in &known {
-        let path = root.join(dir_name);
+    for domain in &config.domains {
+        let path = root.join(&domain.directory);
         if path.is_dir() {
             dirs.push(DomainDir {
                 path,
-                prefix: (*prefix).to_owned(),
+                prefix: domain.prefix.clone(),
+                name: domain.name.clone(),
+                description: domain.description.clone(),
             });
         }
     }
@@ -185,12 +202,14 @@ fn print_help() {
     eprintln!("    <adr-directory>    Path to ADR root (default: auto-discover docs/adr/)");
     eprintln!();
     eprintln!("EXIT CODES:");
-    eprintln!("    0    All checks passed (warnings may be present)");
-    eprintln!("    1    One or more errors found");
+    eprintln!("    0    Lint complete (warnings may be present)");
+    eprintln!("    1    Infrastructure error (missing config, no domains)");
     eprintln!();
     eprintln!("RULES:");
-    eprintln!("    T001-T011   Template compliance (fields, sections, status, code blocks)");
-    eprintln!("    L001,L003-5 Link integrity (dangling, symmetric, reverse verb, unmigrated)");
-    eprintln!("    N001-N003   File naming conventions");
-    eprintln!("    I001-I002   README index consistency");
+    eprintln!("    T001-T015   Template compliance");
+    eprintln!("    L001,L003   Link and relationship integrity");
+    eprintln!("    L006-L009   Verb vocabulary and Root validation");
+    eprintln!("    N001-N004   File naming conventions");
+    eprintln!("    S004-S005   Structure and stale archive rules");
+    eprintln!("    I001-I003   README index consistency");
 }

@@ -1,10 +1,12 @@
 //! ADR file parser — extracts metadata from markdown files.
 
+use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 
 use regex::Regex;
 
+use crate::config::Config;
 use crate::model::{
     parse_adr_id_from_str, AdrId, AdrRecord, DomainDir, RelVerb, Relationship, Status, Tier,
 };
@@ -31,7 +33,7 @@ pub fn parse_domain(dir: &DomainDir) -> Vec<AdrRecord> {
             continue;
         }
 
-        if let Some(record) = parse_adr_file(&entry.path(), &dir.prefix) {
+        if let Some(record) = parse_adr_file(&entry.path(), &dir.prefix, false) {
             records.push(record);
         }
     }
@@ -40,8 +42,46 @@ pub fn parse_domain(dir: &DomainDir) -> Vec<AdrRecord> {
     records
 }
 
+/// Parse all ADR files in the stale directory.
+///
+/// Stale files may belong to any domain, so we try all configured
+/// domain prefixes.
+pub fn parse_stale(stale_dir: &Path, config: &Config) -> Vec<AdrRecord> {
+    let mut records = Vec::new();
+
+    let Ok(entries) = fs::read_dir(stale_dir) else {
+        return records;
+    };
+
+    let prefixes: Vec<&str> = config.domains.iter().map(|d| d.prefix.as_str()).collect();
+
+    for entry in entries.flatten() {
+        let file_name = entry.file_name();
+        let name = file_name.to_string_lossy();
+
+        if !name.ends_with(".md") || name == "README.md" {
+            continue;
+        }
+
+        // Try each prefix to find which domain this stale ADR belongs to
+        for prefix in &prefixes {
+            let pattern = format!(r"^{}-\d{{4}}-[a-z0-9]+(?:-[a-z0-9]+)*\.md$", regex::escape(prefix));
+            let re = Regex::new(&pattern).expect("valid regex");
+            if re.is_match(&name) {
+                if let Some(record) = parse_adr_file(&entry.path(), prefix, true) {
+                    records.push(record);
+                }
+                break;
+            }
+        }
+    }
+
+    records.sort_by_key(|r| r.id.number);
+    records
+}
+
 /// Parse a single ADR file into an `AdrRecord`.
-pub fn parse_adr_file(path: &Path, expected_prefix: &str) -> Option<AdrRecord> {
+pub fn parse_adr_file(path: &Path, expected_prefix: &str, is_stale: bool) -> Option<AdrRecord> {
     let content = fs::read_to_string(path).ok()?;
     let lines: Vec<&str> = content.lines().collect();
 
@@ -64,10 +104,20 @@ pub fn parse_adr_file(path: &Path, expected_prefix: &str) -> Option<AdrRecord> {
     // --- Related ---
     let (relationships, has_related, related_has_placeholder) = find_relationships(&lines);
 
+    // --- Self-referencing detection (Root verb targeting own ID) ---
+    let is_self_referencing = relationships
+        .iter()
+        .any(|rel| rel.verb == RelVerb::Root && rel.target == id);
+
     // --- Required sections ---
     let has_context = has_heading(&lines, "Context");
     let has_decision = has_heading(&lines, "Decision");
     let has_consequences = has_heading(&lines, "Consequences");
+    let has_retirement = has_heading(&lines, "Retirement");
+    let has_rejection_rationale = has_heading(&lines, "Rejection Rationale");
+
+    // --- Section ordering and word counts ---
+    let (section_order, section_word_counts) = analyze_sections(&lines);
 
     // --- Code block metrics ---
     let (max_code_block_lines, code_block_count, max_code_block_line) =
@@ -92,11 +142,17 @@ pub fn parse_adr_file(path: &Path, expected_prefix: &str) -> Option<AdrRecord> {
         has_context,
         has_decision,
         has_consequences,
+        has_retirement,
+        has_rejection_rationale,
+        is_stale,
+        is_self_referencing,
         max_code_block_lines,
         max_code_block_line,
         code_block_count,
         amendment_dates,
         related_has_placeholder,
+        section_order,
+        section_word_counts,
     })
 }
 
@@ -248,6 +304,52 @@ fn find_relationships(lines: &[&str]) -> (Vec<Relationship>, bool, bool) {
     (rels, found_section, has_placeholder)
 }
 
+/// Analyze H2 sections: extract ordering and word counts.
+///
+/// Word counts exclude fenced code blocks.
+fn analyze_sections(lines: &[&str]) -> (Vec<String>, HashMap<String, usize>) {
+    let mut order = Vec::new();
+    let mut word_counts: HashMap<String, usize> = HashMap::new();
+
+    let mut current_section: Option<String> = None;
+    let mut current_words = 0usize;
+    let mut in_code_block = false;
+
+    for line in lines {
+        // Track code block boundaries
+        if line.starts_with("```") {
+            in_code_block = !in_code_block;
+            continue;
+        }
+
+        if in_code_block {
+            continue;
+        }
+
+        if let Some(heading) = line.strip_prefix("## ") {
+            // Flush previous section
+            if let Some(ref section) = current_section {
+                word_counts.insert(section.clone(), current_words);
+            }
+
+            let name = heading.trim().to_owned();
+            order.push(name.clone());
+            current_section = Some(name);
+            current_words = 0;
+        } else if current_section.is_some() && !line.is_empty() {
+            // Count words in non-empty, non-heading, non-code lines
+            current_words += line.split_whitespace().count();
+        }
+    }
+
+    // Flush last section
+    if let Some(ref section) = current_section {
+        word_counts.insert(section.clone(), current_words);
+    }
+
+    (order, word_counts)
+}
+
 /// Strip trailing annotations like ` (indirect)` or ` (\`#[non_exhaustive]\`)`.
 fn strip_annotation(s: &str) -> &str {
     let s = s.trim();
@@ -354,6 +456,13 @@ mod tests {
     }
 
     #[test]
+    fn find_status_parses_rejected() {
+        let lines = vec!["## Status", "", "Rejected", "", "## Related"];
+        let (status, _, _) = find_status(&lines);
+        assert_eq!(status, Some(Status::Rejected));
+    }
+
+    #[test]
     fn find_relationships_parses_multi_target() {
         let lines = vec![
             "## Related",
@@ -375,6 +484,23 @@ mod tests {
     }
 
     #[test]
+    fn find_relationships_parses_root_verb() {
+        let lines = vec![
+            "## Related",
+            "",
+            "- Root: CHE-0001",
+            "",
+            "## Context",
+        ];
+        let (rels, found, _) = find_relationships(&lines);
+        assert!(found);
+        assert_eq!(rels.len(), 1);
+        assert_eq!(rels[0].verb, RelVerb::Root);
+        assert_eq!(rels[0].target.prefix, "CHE");
+        assert_eq!(rels[0].target.number, 1);
+    }
+
+    #[test]
     fn strip_annotation_removes_parenthetical() {
         assert_eq!(strip_annotation("CHE-0036 (indirect)"), "CHE-0036");
         assert_eq!(strip_annotation("CHE-0021"), "CHE-0021");
@@ -389,6 +515,12 @@ mod tests {
         let lines = vec!["## Status", "", "Accepted", "", "## Context", "", "Some text."];
         assert!(has_heading(&lines, "Context"));
         assert!(!has_heading(&lines, "Decision"));
+    }
+
+    #[test]
+    fn has_heading_finds_retirement() {
+        let lines = vec!["## Retirement", "", "Deprecated because reasons."];
+        assert!(has_heading(&lines, "Retirement"));
     }
 
     #[test]
@@ -525,5 +657,109 @@ mod tests {
         assert!(found);
         assert_eq!(rels.len(), 1);
         assert!(!placeholder, "should not detect placeholder when rels exist");
+    }
+
+    #[test]
+    fn analyze_sections_correct_order() {
+        let lines = vec![
+            "# CHE-0001. Title",
+            "",
+            "## Status",
+            "",
+            "Accepted",
+            "",
+            "## Related",
+            "",
+            "- Root: CHE-0001",
+            "",
+            "## Context",
+            "",
+            "This is the context with enough words to pass validation easily.",
+            "",
+            "## Decision",
+            "",
+            "We decided to do this thing because it makes sense to us.",
+            "",
+            "## Consequences",
+            "",
+            "This makes testing easier and code more maintainable overall.",
+        ];
+        let (order, counts) = analyze_sections(&lines);
+        assert_eq!(order, vec!["Status", "Related", "Context", "Decision", "Consequences"]);
+        assert_eq!(counts["Context"], 11);
+        assert_eq!(counts["Decision"], 12);
+        assert_eq!(counts["Consequences"], 9);
+    }
+
+    #[test]
+    fn analyze_sections_excludes_code_blocks() {
+        let lines = vec![
+            "## Decision",
+            "",
+            "We decided to use this approach.",
+            "",
+            "```rust",
+            "fn main() {",
+            "    println!(\"hello\");",
+            "}",
+            "```",
+            "",
+            "That is all.",
+        ];
+        let (_, counts) = analyze_sections(&lines);
+        // Only prose words counted: "We decided to use this approach." (6) + "That is all." (3) = 9
+        assert_eq!(counts["Decision"], 9);
+    }
+
+    #[test]
+    fn analyze_sections_with_retirement() {
+        let lines = vec![
+            "## Status",
+            "",
+            "Deprecated",
+            "",
+            "## Retirement",
+            "",
+            "Deprecated because the transport layer moved to a different protocol entirely.",
+        ];
+        let (order, counts) = analyze_sections(&lines);
+        assert!(order.contains(&"Retirement".to_owned()));
+        assert_eq!(counts["Retirement"], 11);
+    }
+
+    #[test]
+    fn self_referencing_detected() {
+        let lines = vec![
+            "## Related",
+            "",
+            "- Root: CHE-0001",
+            "",
+            "## Context",
+        ];
+        let (rels, _, _) = find_relationships(&lines);
+        let id = AdrId {
+            prefix: "CHE".into(),
+            number: 1,
+        };
+        let is_self_ref = rels.iter().any(|rel| rel.verb == RelVerb::Root && rel.target == id);
+        assert!(is_self_ref);
+    }
+
+    #[test]
+    fn self_referencing_wrong_id_not_detected() {
+        let lines = vec![
+            "## Related",
+            "",
+            "- Root: CHE-0002",
+            "",
+            "## Context",
+        ];
+        let (rels, _, _) = find_relationships(&lines);
+        let id = AdrId {
+            prefix: "CHE".into(),
+            number: 1,
+        };
+        let is_self_ref = rels.iter().any(|rel| rel.verb == RelVerb::Root && rel.target == id);
+        assert!(!is_self_ref);
     }
 }

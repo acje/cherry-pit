@@ -1,15 +1,16 @@
-//! File naming rules (N001–N003).
+//! File naming rules (N001–N004).
 //!
 //! N001: Filename must match `PREFIX-NNNN-kebab-slug.md`
 //! N002: Number in filename must match H1 title ID
 //! N003: Slug must be lowercase kebab-case (a-z0-9, hyphens)
+//! N004: Prefix must match a configured domain
 
 use regex::Regex;
 
 use crate::model::{parse_adr_id_from_str, AdrRecord};
 use crate::report::Diagnostic;
 
-pub fn check(record: &AdrRecord, diags: &mut Vec<Diagnostic>) {
+pub fn check(record: &AdrRecord, domain_prefixes: &[&str], diags: &mut Vec<Diagnostic>) {
     let Some(file_name) = record.file_path.file_name().and_then(|f| f.to_str()) else {
         return;
     };
@@ -19,7 +20,7 @@ pub fn check(record: &AdrRecord, diags: &mut Vec<Diagnostic>) {
         .expect("valid regex");
 
     if !pattern.is_match(file_name) {
-        diags.push(Diagnostic::error(
+        diags.push(Diagnostic::warning(
             "N001",
             &record.file_path,
             0,
@@ -28,14 +29,14 @@ pub fn check(record: &AdrRecord, diags: &mut Vec<Diagnostic>) {
                  `PREFIX-NNNN-kebab-slug.md`"
             ),
         ));
-        return; // N002 and N003 depend on valid filename structure
+        return; // N002, N003, N004 depend on valid filename structure
     }
 
     // N002: Number in filename matches H1 ID
     if let Some(file_id) = parse_adr_id_from_str(&file_name[..file_name.len() - 3]) {
         // We need the first segment PREFIX-NNNN
         if file_id.prefix != record.id.prefix || file_id.number != record.id.number {
-            diags.push(Diagnostic::error(
+            diags.push(Diagnostic::warning(
                 "N002",
                 &record.file_path,
                 record.title_line,
@@ -56,11 +57,25 @@ pub fn check(record: &AdrRecord, diags: &mut Vec<Diagnostic>) {
 
     let kebab = Regex::new(r"^[a-z0-9]+(?:-[a-z0-9]+)*$").expect("valid regex");
     if !kebab.is_match(slug) {
-        diags.push(Diagnostic::error(
+        diags.push(Diagnostic::warning(
             "N003",
             &record.file_path,
             0,
             format!("slug `{slug}` is not valid kebab-case (a-z0-9, hyphens only)"),
+        ));
+    }
+
+    // N004: Prefix matches a configured domain
+    if !domain_prefixes.contains(&record.id.prefix.as_str()) {
+        diags.push(Diagnostic::warning(
+            "N004",
+            &record.file_path,
+            0,
+            format!(
+                "prefix `{}` does not match any configured domain (known: {})",
+                record.id.prefix,
+                domain_prefixes.join(", "),
+            ),
         ));
     }
 }
@@ -69,7 +84,10 @@ pub fn check(record: &AdrRecord, diags: &mut Vec<Diagnostic>) {
 mod tests {
     use super::*;
     use crate::model::{AdrId, Status, Tier};
+    use std::collections::HashMap;
     use std::path::PathBuf;
+
+    const TEST_PREFIXES: &[&str] = &["COM", "CHE", "PAR", "GEN"];
 
     fn make_record(filename: &str, prefix: &str, num: u16) -> AdrRecord {
         AdrRecord {
@@ -94,11 +112,17 @@ mod tests {
             has_context: true,
             has_decision: true,
             has_consequences: true,
+            has_retirement: false,
+            has_rejection_rationale: false,
+            is_stale: false,
+            is_self_referencing: false,
             max_code_block_lines: 0,
             max_code_block_line: 0,
             code_block_count: 0,
             amendment_dates: vec![],
             related_has_placeholder: false,
+            section_order: vec![],
+            section_word_counts: HashMap::new(),
         }
     }
 
@@ -106,7 +130,7 @@ mod tests {
     fn valid_filename_no_diagnostics() {
         let record = make_record("CHE-0001-design-priority-ordering.md", "CHE", 1);
         let mut diags = Vec::new();
-        check(&record, &mut diags);
+        check(&record, TEST_PREFIXES, &mut diags);
         assert!(diags.is_empty(), "expected no diags, got: {diags:?}");
     }
 
@@ -114,7 +138,7 @@ mod tests {
     fn uppercase_slug_produces_n001() {
         let record = make_record("CHE-0001-Design-Priority.md", "CHE", 1);
         let mut diags = Vec::new();
-        check(&record, &mut diags);
+        check(&record, TEST_PREFIXES, &mut diags);
         assert!(
             diags.iter().any(|d| d.rule == "N001"),
             "expected N001, got: {diags:?}"
@@ -125,10 +149,32 @@ mod tests {
     fn mismatched_number_produces_n002() {
         let record = make_record("CHE-0099-test.md", "CHE", 1);
         let mut diags = Vec::new();
-        check(&record, &mut diags);
+        check(&record, TEST_PREFIXES, &mut diags);
         assert!(
             diags.iter().any(|d| d.rule == "N002"),
             "expected N002, got: {diags:?}"
+        );
+    }
+
+    #[test]
+    fn unknown_prefix_produces_n004() {
+        let record = make_record("ZZZ-0001-test.md", "ZZZ", 1);
+        let mut diags = Vec::new();
+        check(&record, TEST_PREFIXES, &mut diags);
+        assert!(
+            diags.iter().any(|d| d.rule == "N004"),
+            "expected N004, got: {diags:?}"
+        );
+    }
+
+    #[test]
+    fn known_prefix_no_n004() {
+        let record = make_record("CHE-0001-test.md", "CHE", 1);
+        let mut diags = Vec::new();
+        check(&record, TEST_PREFIXES, &mut diags);
+        assert!(
+            !diags.iter().any(|d| d.rule == "N004"),
+            "known prefix should not trigger N004"
         );
     }
 }

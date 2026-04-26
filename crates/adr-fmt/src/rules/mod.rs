@@ -5,21 +5,24 @@ mod links;
 mod naming;
 mod template;
 
+use crate::config::Config;
 use crate::model::{AdrRecord, DomainDir};
 use crate::report::Diagnostic;
 
 /// Run all rule modules and collect diagnostics.
-pub fn run_all(records: &[AdrRecord], domain_dirs: &[DomainDir]) -> Vec<Diagnostic> {
+pub fn run_all(records: &[AdrRecord], domain_dirs: &[DomainDir], config: &Config) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
+
+    let domain_prefixes: Vec<&str> = config.domains.iter().map(|d| d.prefix.as_str()).collect();
 
     // Per-file rules
     for record in records {
-        template::check(record, &mut diagnostics);
-        naming::check(record, &mut diagnostics);
+        template::check(record, config, &mut diagnostics);
+        naming::check(record, &domain_prefixes, &mut diagnostics);
     }
 
     // Cross-file rules
-    links::check(records, &mut diagnostics);
+    links::check(records, &domain_prefixes, &mut diagnostics);
 
     // Index consistency (per domain)
     for dir in domain_dirs {

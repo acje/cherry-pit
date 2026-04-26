@@ -62,9 +62,11 @@ crates = ["pardosa-genome", "pardosa-genome-derive"]
 
 # ── Rule catalog ────────────────────────────────────────────────────
 #
-# All rules are warnings. adr-fmt is advisory and always exits 0.
+# All rules emit warnings. adr-fmt is advisory: exit 0 for lint
+# findings, exit 1 only for infrastructure errors (missing config,
+# no domains found).
 
-# Template rules (T001–T013)
+# Template rules (T001–T015)
 
 [[rules]]
 id = "T001"
@@ -79,7 +81,7 @@ description = "Date field present"
 [[rules]]
 id = "T003"
 category = "template"
-description = "Last-reviewed field present (recommended for all, required for S/A-tier)"
+description = "Last-reviewed field present (required for all tiers)"
 
 [[rules]]
 id = "T004"
@@ -99,7 +101,7 @@ description = "Status value is recognized; no parenthetical annotations"
 [[rules]]
 id = "T007"
 category = "template"
-description = "Related section present; empty section requires placeholder"
+description = "Related section has ≥1 relationship (no orphans, no placeholders)"
 
 [[rules]]
 id = "T008"
@@ -127,11 +129,19 @@ category = "template"
 description = "Amendment date >= creation date; valid ISO 8601"
 
 [[rules]]
-id = "T013"
+id = "T014"
 category = "template"
-description = "Rejected ADR missing Rejection Rationale section"
+description = "Section ordering: Status → Related → Context → Decision → Consequences (+ Retirement for stale)"
 
-# Link rules (L001, L004–L007)
+[[rules]]
+id = "T015"
+category = "template"
+description = "Prose section below minimum word count"
+
+[rules.params]
+min_words = 10
+
+# Link rules (L001–L009)
 
 [[rules]]
 id = "L001"
@@ -139,26 +149,36 @@ category = "link"
 description = "Dangling link — target ADR not found in any domain"
 
 [[rules]]
+id = "L003"
+category = "link"
+description = "Supersedes verb without matching Superseded-by status on target"
+
+[[rules]]
 id = "L004"
 category = "link"
 description = "Cross-domain reference to unmigrated ADR"
 
 [[rules]]
-id = "L005"
-category = "link"
-description = "Reverse verb used — only forward verbs permitted"
-
-[[rules]]
 id = "L006"
 category = "link"
-description = "Old relationship verb used (Depends on, Extends, etc.)"
+description = "Legacy relationship verb used (Depends on, Extends, Illustrates, Contrasts with, Scoped by, or any reverse verb)"
 
 [[rules]]
 id = "L007"
 category = "link"
 description = "Stale reference — target ADR is in stale archive"
 
-# Naming rules (N001–N003)
+[[rules]]
+id = "L008"
+category = "link"
+description = "Root verb target does not match the ADR's own ID (self-reference mismatch)"
+
+[[rules]]
+id = "L009"
+category = "link"
+description = "Root and References verbs coexist — Root ADRs may not also use References"
+
+# Naming rules (N001–N004)
 
 [[rules]]
 id = "N001"
@@ -175,19 +195,36 @@ id = "N003"
 category = "naming"
 description = "Slug is valid lowercase kebab-case"
 
-# Structure rules (S001–S003)
+[[rules]]
+id = "N004"
+category = "naming"
+description = "Domain prefix not found in configuration"
+
+# Structure rules (S004–S005)
 
 [[rules]]
-id = "S001"
+id = "S004"
 category = "structure"
-description = "File in stale/ has active status (location/status mismatch)"
+description = "Stale ADR missing required Retirement section (≥10 words)"
 
 [[rules]]
-id = "S002"
+id = "S005"
 category = "structure"
-description = "Active file has stale status (location/status mismatch)"
+description = "Active ADR has Retirement section (forbidden outside stale/)"
+
+# Index rules (I001–I003)
 
 [[rules]]
-id = "S003"
-category = "structure"
-description = "ADR has no References and no self-reference (missing tree root declaration)"
+id = "I001"
+category = "index"
+description = "Domain README exists"
+
+[[rules]]
+id = "I002"
+category = "index"
+description = "Domain README lists all ADRs in domain"
+
+[[rules]]
+id = "I003"
+category = "index"
+description = "Domain README contains no links to non-existent ADRs"

@@ -287,8 +287,7 @@ fn build_flat_forest(records: &[&AdrRecord]) -> String {
 
     // Detect cycles: walk each chain, mark visited.
     // Trade-off: all cycle participants become independent roots
-    // rather than showing partial structure.  Acceptable because
-    // cycles are governance violations (S003 warns about them).
+    // rather than showing partial structure.
     let mut acyclic_parents: HashMap<&AdrId, &AdrId> = HashMap::new();
     for record in records {
         let id = &record.id;
@@ -535,7 +534,7 @@ mod tests {
 
         let is_self_referencing = relationships
             .iter()
-            .any(|rel| rel.verb == RelVerb::References && rel.target == id);
+            .any(|rel| rel.verb == RelVerb::Root && rel.target == id);
 
         AdrRecord {
             id,
@@ -558,6 +557,7 @@ mod tests {
             has_context: true,
             has_decision: true,
             has_consequences: true,
+            has_retirement: false,
             has_rejection_rationale: false,
             is_self_referencing,
             is_stale: false,
@@ -566,28 +566,29 @@ mod tests {
             code_block_count: 0,
             amendment_dates: vec![],
             related_has_placeholder: false,
+            section_order: vec![],
+            section_word_counts: std::collections::HashMap::new(),
         }
     }
 
     #[test]
     fn self_referencing_adr_is_root() {
         let records = vec![
-            make_record("CHE", 1, "Root", vec![(RelVerb::References, "CHE", 1)]),
+            make_record("CHE", 1, "Root", vec![(RelVerb::Root, "CHE", 1)]),
             make_record("CHE", 2, "Child", vec![(RelVerb::References, "CHE", 1)]),
         ];
         let refs: Vec<&AdrRecord> = records.iter().collect();
         let tree = build_flat_forest(&refs);
-        // CHE-0001 self-references → explicit root, CHE-0002 is child
+        // CHE-0001 Root self-ref → explicit root, CHE-0002 is child
         assert!(tree.starts_with("CHE-0001"), "tree:\n{tree}");
         assert!(tree.contains("CHE-0002 Child"), "tree:\n{tree}");
-        // Should NOT be in Independent section
         assert!(!tree.contains("Independent:"), "tree:\n{tree}");
     }
 
     #[test]
     fn self_reference_only_adr_is_root_not_independent() {
         let records = vec![
-            make_record("CHE", 1, "Standalone Root", vec![(RelVerb::References, "CHE", 1)]),
+            make_record("CHE", 1, "Standalone Root", vec![(RelVerb::Root, "CHE", 1)]),
         ];
         let refs: Vec<&AdrRecord> = records.iter().collect();
         let tree = build_flat_forest(&refs);
@@ -759,7 +760,7 @@ mod tests {
 
     #[test]
     fn format_references_self_ref_shows_root() {
-        let record = make_record("CHE", 1, "Test", vec![(RelVerb::References, "CHE", 1)]);
+        let record = make_record("CHE", 1, "Test", vec![(RelVerb::Root, "CHE", 1)]);
         let refs = format_references(&record);
         assert_eq!(refs, "⊙ (root)");
     }
