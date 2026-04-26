@@ -25,6 +25,8 @@ Governed by [GOVERNANCE.md](../GOVERNANCE.md).
 | [COM-0013](COM-0013-evolutionary-design-over-predictive-architecture.md) | Evolutionary Design Over Predictive Architecture | A | Accepted | COM-0001 |
 | [COM-0014](COM-0014-modular-boundaries-aligned-to-rate-of-change.md) | Modular Boundaries Aligned to Rate of Change | A | Accepted | COM-0002 |
 | [COM-0015](COM-0015-communicate-architecture-through-structure.md) | Communicate Architecture Through Structure | B | Accepted | COM-0006 |
+| [COM-0016](COM-0016-dependencies-as-managed-liabilities.md) | Dependencies as Managed Liabilities | A | Accepted | COM-0001 |
+| [COM-0017](COM-0017-mechanized-invariant-enforcement.md) | Mechanized Invariant Enforcement | A | Accepted | COM-0009 |
 
 ## Dependency Tree
 
@@ -42,6 +44,8 @@ COM-0001 Complexity Budget — Strategic Investment
 │   └── COM-0015 Communicate Architecture Through Structure
 ├── COM-0008 Design It Twice
 ├── COM-0009 Consistency as Complexity Reducer
+│   └── COM-0017 Mechanized Invariant Enforcement
 ├── COM-0011 Trade-Off Analysis as First-Class Practice
-└── COM-0013 Evolutionary Design Over Predictive Architecture
+├── COM-0013 Evolutionary Design Over Predictive Architecture
+└── COM-0016 Dependencies as Managed Liabilities
 ```

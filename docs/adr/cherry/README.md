@@ -35,7 +35,7 @@ Governed by [GOVERNANCE.md](../GOVERNANCE.md).
 | [CHE-0023](CHE-0023-aggregate-lifecycle-states.md) | Aggregate Lifecycle States | B | Accepted | CHE-0009, CHE-0013 |
 | [CHE-0024](CHE-0024-event-delivery-model.md) | Event Delivery Model | B | Accepted | CHE-0004, CHE-0017 |
 | [CHE-0025](CHE-0025-rpitit-over-async-trait.md) | RPITIT Over async_trait | C | Accepted | CHE-0001 |
-| [CHE-0026](CHE-0026-correctness-first-build-config.md) | Correctness-First Build Configuration | C | Accepted | CHE-0001, CHE-0007 |
+| [CHE-0026](CHE-0026-correctness-first-build-config.md) | Correctness-First Build Configuration | C | Accepted | CHE-0001, CHE-0007, RST-0003 |
 | [CHE-0027](CHE-0027-manual-error-impls.md) | Manual Error Trait Implementations in cherry-pit-core | C | Accepted | CHE-0001, CHE-0015 |
 | [CHE-0028](CHE-0028-compile-fail-type-contracts.md) | Compile-Fail Tests as Type Safety Contracts | C | Accepted | CHE-0002, CHE-0003, CHE-0005 |
 | [CHE-0029](CHE-0029-cargo-workspace-crate-dag.md) | Cargo Workspace with Layered Crate DAG | C | Accepted | CHE-0004 |
@@ -118,6 +118,7 @@ CHE-0034 jiff::Timestamp as Temporal Foundation
 | CHE-0019 | COM-0005 | References |
 | CHE-0020 | COM-0003 | References |
 | CHE-0022 | GEN-0002 | References |
+| CHE-0026 | RST-0003 | References |
 | CHE-0030 | COM-0002 | References |
 | CHE-0035 | COM-0003 | References |
 | CHE-0038 | COM-0001 | References |

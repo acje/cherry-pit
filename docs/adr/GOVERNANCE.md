@@ -1,6 +1,6 @@
 # ADR Governance
 
-Last-updated: 2026-04-26
+Last-updated: 2026-04-27
 
 This document is the root of authority for Architecture Decision Record
 management across the cherry-pit workspace. It covers rationale, process,
@@ -31,25 +31,37 @@ space of the cherry-pit workspace.
 Domain definitions, prefixes, directories, and crate mappings are
 configured in `adr-fmt.toml`.
 
-### Foundation Domain
+### Foundation Domains
 
-The Common (COM) domain is a **foundation domain**. It contains
-cross-cutting software design principles informed by Ousterhout's
-"A Philosophy of Software Design" and complementary works on
-software architecture, evolutionary design, and organizational
-alignment (Martin, Ford, Evans, Skelton, Read, et al.). All
-COM principles are technology-agnostic.
+The workspace has two **foundation domains**:
 
-When querying ADRs for a specific domain (e.g., Cherry), the foundation
-domain's ADRs are always included — they provide the design principles
-that all other domains build upon. When querying COM directly, only
-COM ADRs are returned.
+1. **Common (COM)** contains cross-cutting software design principles
+   informed by Ousterhout's "A Philosophy of Software Design" and
+   complementary works on software architecture, evolutionary design,
+   and organizational alignment (Martin, Ford, Evans, Skelton, Read,
+   et al.). All COM principles are technology-agnostic.
+
+2. **Rust (RST)** contains Rust language and toolchain governance
+   decisions: toolchain pinning, MSRV policy, lint configuration,
+   dependency management, and platform evolution strategy. RST
+   decisions are Rust-specific but cross-cutting — they apply to all
+   Rust crates in the workspace. The separation from COM preserves
+   COM's technology-agnostic property while acknowledging that
+   platform-specific decisions deserve their own domain. If the
+   workspace ever includes non-Rust codebases, RST applies only to
+   Rust crates.
+
+When querying ADRs for a specific domain (e.g., Cherry), both
+foundation domains' ADRs are included — COM provides design
+principles, RST provides platform governance. When querying a
+foundation domain directly, only that domain's ADRs are returned.
 
 ### MECE Rationale
 
-The four-domain split reflects a clean architectural boundary:
+The domain split reflects clean architectural boundaries:
 
 - **Common** — *why* we design the way we do (principles)
+- **Rust** — *how* we use the Rust platform (toolchain)
 - **Cherry** — *what* the framework's architecture looks like (structure)
 - **Pardosa** — *how* events are stored and transported (infrastructure)
 - **Genome** — *how* data is serialized on the wire (format)
@@ -139,15 +151,24 @@ Do **not** write an ADR for:
 
 ## 6. Overlap Resolution
 
-When pardosa or genome ADRs cover the same concern as a Cherry domain ADR at
-a different abstraction level, the resolution is cross-referencing — not
-merging:
+When a domain-specific ADR covers the same concern as a foundation
+domain ADR (COM or RST) at a different abstraction level, the
+resolution is cross-referencing — not merging:
 
-- The Cherry domain ADR is the **principle** (abstract, crate-agnostic)
-- The pardosa/genome ADR is the **implementation** (concrete,
-  crate-specific)
+- The foundation ADR is the **principle** (COM) or **platform rule**
+  (RST) — abstract and cross-cutting
+- The domain ADR is the **implementation** (concrete, crate-specific)
 - Both remain standalone with `References` links from the concrete
   ADR to the abstract one
+
+Example: COM-0016 (Dependencies as Managed Liabilities) is the
+principle. RST-0004 (Cargo Dependency Governance) references it as the
+Rust-specific implementation. CHE-0026 (Correctness-first Build Config)
+references RST-0003 as the workspace-level lint governance it inherits.
+
+When pardosa or genome ADRs cover the same concern as a Cherry domain
+ADR at a different abstraction level, the same cross-referencing
+pattern applies:
 
 Example: CHE-0006 (single-writer assumption) is the Cherry domain principle.
 PAR-0004 (single-writer per stream via NATS fencing) references it as the

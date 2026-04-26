@@ -10,7 +10,7 @@ Accepted
 
 ## Related
 
-- References: CHE-0001, CHE-0007
+- References: CHE-0001, CHE-0007, RST-0003
 
 ## Context
 

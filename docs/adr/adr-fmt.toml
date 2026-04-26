@@ -65,6 +65,19 @@ description = """\
 crates = ["pardosa-genome", "pardosa-genome-derive"]
 
 [[domains]]
+prefix = "RST"
+name = "Rust Domain"
+directory = "rust"
+description = """\
+    Rust language and toolchain governance: toolchain pinning, \
+    MSRV policy, edition strategy, workspace lint and format \
+    configuration, dependency management, supply chain security, \
+    and conservative feature adoption. Platform-specific decisions \
+    that apply to all Rust crates in the workspace."""
+crates = []
+foundation = true
+
+[[domains]]
 prefix = "AFM"
 name = "adr-fmt Domain"
 directory = "adr-fmt"
