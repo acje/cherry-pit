@@ -51,7 +51,7 @@ Independent (no Depends-on):
 
 ## Cross-Domain References
 
-| Pardosa ADR | Framework ADR | Relationship |
+| Pardosa ADR | Cherry ADR | Relationship |
 |-------------|---------------|--------------|
 | PAR-0003 | CHE-0022 (Schema Evolution) | References |
 | PAR-0004 | CHE-0006 (Single-Writer) | Illustrates |
@@ -67,6 +67,6 @@ Independent (no Depends-on):
 
 ## Reference Documents
 
-- [pardosa-design.md](../../pardosa-design.md) — original design document
-- [pardosa-next.md](../../pardosa-next.md) — revised design with amendments
-- [automerge-ideas.md](../../automerge-ideas.md) — CRDT exploration notes
+- [pardosa-design.md](../../plans/pardosa-design.md) — original design document
+- [pardosa-next.md](../../plans/pardosa-next.md) — revised design with amendments
+- [automerge-ideas.md](../../plans/automerge-ideas.md) — CRDT exploration notes

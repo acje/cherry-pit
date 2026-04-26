@@ -48,7 +48,7 @@ must use `Arc<T>`.
 
 **Known limitation:** The current `Box<T>` and `Arc<T>` impls require `T: Sized`
 (implicit bound). `Box<str>` and `Arc<str>` — where `T` is unsized — are
-documented as hash-transparent in [genome.md](../../genome.md) but require a
+documented as hash-transparent in [genome.md](../../plans/genome.md) but require a
 `?Sized` bound adjustment to compile. This will be addressed in a follow-up change.
 
 ## Consequences

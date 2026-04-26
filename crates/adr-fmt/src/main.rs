@@ -153,7 +153,7 @@ fn discover_domains(root: &Path) -> Vec<DomainDir> {
     // Adding a new domain requires updating this list.
     let known = [
         ("common", "COM"),
-        ("framework", "CHE"),
+        ("cherry", "CHE"),
         ("pardosa", "PAR"),
         ("genome", "GEN"),
     ];

@@ -23,7 +23,7 @@ event appears — divergence between observed failure and durable state.
 Without an idempotency key, deduplication during replay is impossible. Adding
 this field after initial deployment is a breaking serialization change.
 
-The original design ([pardosa-design.md](../../pardosa-design.md)) did not
+The original design ([pardosa-design.md](../../plans/pardosa-design.md)) did not
 specify an event ID. The distributed systems review (§H2) identified this as
 high-risk.
 

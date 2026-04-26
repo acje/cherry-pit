@@ -65,6 +65,35 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9330f8b2ff13f34540b44e946ef35111825727b38d33286ef986142615121801"
 
 [[package]]
+name = "cherry-pit-core"
+version = "0.1.0"
+dependencies = [
+ "jiff",
+ "proptest",
+ "rmp-serde",
+ "serde",
+ "serde_json",
+ "trybuild",
+ "uuid",
+]
+
+[[package]]
+name = "cherry-pit-gateway"
+version = "0.1.0"
+dependencies = [
+ "cherry-pit-core",
+ "futures-util",
+ "jiff",
+ "proptest",
+ "rmp-serde",
+ "scc",
+ "serde",
+ "tempfile",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
 name = "equivalent"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -353,35 +382,6 @@ name = "pin-project-lite"
 version = "0.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a89322df9ebe1c1578d689c92318e070967d1042b512afbe49518723f4e6d5cd"
-
-[[package]]
-name = "pit-core"
-version = "0.1.0"
-dependencies = [
- "jiff",
- "proptest",
- "rmp-serde",
- "serde",
- "serde_json",
- "trybuild",
- "uuid",
-]
-
-[[package]]
-name = "pit-gateway"
-version = "0.1.0"
-dependencies = [
- "futures-util",
- "jiff",
- "pit-core",
- "proptest",
- "rmp-serde",
- "scc",
- "serde",
- "tempfile",
- "tokio",
- "uuid",
-]
 
 [[package]]
 name = "portable-atomic"

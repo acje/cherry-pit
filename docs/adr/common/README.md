@@ -3,7 +3,7 @@
 Cross-cutting software design principles informed by Ousterhout's
 *A Philosophy of Software Design*. Technology-agnostic guidance on
 module depth, complexity management, error design, and abstraction
-layering. Distinct from Framework's crate-specific architecture
+layering. Distinct from Cherry's crate-specific architecture
 decisions.
 
 Governed by [GOVERNANCE.md](../GOVERNANCE.md).

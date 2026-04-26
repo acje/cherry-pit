@@ -1,7 +1,7 @@
 use std::fmt;
 use std::path::PathBuf;
 
-/// A domain directory (e.g., `docs/adr/framework/` with prefix `CHE`).
+/// A domain directory (e.g., `docs/adr/cherry/` with prefix `CHE`).
 #[derive(Debug, Clone)]
 pub struct DomainDir {
     pub path: PathBuf,

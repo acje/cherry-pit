@@ -54,7 +54,7 @@ first post-migration `event_id` continues from the old stream's last
   snapshot.
 - **Negative:** Doubles storage during the grace period (old + new stream).
 - **Negative:** Consumers must handle stream cutover (see PAR-0013 and
-  [pardosa-next.md](../../pardosa-next.md) §Phase 6).
+  [pardosa-next.md](../../plans/pardosa-next.md) §Phase 6).
 - **Negative:** `Index` values are generation-scoped — code that caches
   indices must invalidate on generation change. `event_id` is the
   cross-generation stable identifier.

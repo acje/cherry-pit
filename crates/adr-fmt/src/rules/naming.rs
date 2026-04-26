@@ -77,7 +77,7 @@ mod tests {
                 prefix: prefix.into(),
                 number: num,
             },
-            file_path: PathBuf::from(format!("docs/adr/framework/{filename}")),
+            file_path: PathBuf::from(format!("docs/adr/cherry/{filename}")),
             title: Some("Test".into()),
             title_line: 1,
             date: Some("2026-04-25".into()),

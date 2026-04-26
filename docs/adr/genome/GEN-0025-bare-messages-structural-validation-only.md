@@ -64,5 +64,5 @@ protection.
   vulnerable to silent data corruption from network errors.
 - **Mitigation:** Use transport-level integrity (TLS, QUIC) for bare messages.
   Use the file format (with xxHash64 checksums) for persistent storage.
-- **Future:** [genome.md](../../genome.md) §Future Scope defines an optional
+- **Future:** [genome.md](../../plans/genome.md) §Future Scope defines an optional
   bare message checksum trailer behind a `checksum` feature flag for v2.

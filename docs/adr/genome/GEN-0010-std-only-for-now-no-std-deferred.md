@@ -28,7 +28,7 @@ No concrete `no_std` consumer existed or was planned.
 
 Remove the non-functional `alloc` feature from `Cargo.toml`. Document the crate as
 `std`-only. Retain the `std` feature flag (always required) for forward compatibility.
-Document the deferred `no_std` tiered model in [genome.md](../../genome.md) §Future:
+Document the deferred `no_std` tiered model in [genome.md](../../plans/genome.md) §Future:
 no_std Support for when an actual consumer exists.
 
 **Previous state (removed):**

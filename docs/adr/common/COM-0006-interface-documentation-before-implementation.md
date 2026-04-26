@@ -36,7 +36,7 @@ before getting lost in how it does it.
    from the comments alone, without reading the implementation. If
    the comments are unclear, the interface is unclear.
 
-Cherry-pit's 685-line `pit-core.md` trait design document was written
+Cherry-pit's 685-line `cherry-pit-core.md` trait design document was written
 before the trait implementations existed. It describes what each
 trait does, why it exists, and how traits relate — information that
 cannot be inferred from method signatures.
@@ -90,7 +90,7 @@ describe the abstraction ("what" and "why"), not the code ("how").
 - Public APIs without doc comments are flagged in review. The
   missing comment indicates either a missing design step or an
   interface that has not been thought through.
-- Design documents like `pit-core.md` are first-class artifacts, not
+- Design documents like `cherry-pit-core.md` are first-class artifacts, not
   optional supplements. They capture design intent that source code
   cannot express.
 - Comments that restate function names are refactored during review

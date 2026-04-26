@@ -1,0 +1,193 @@
+# adr-fmt configuration
+#
+# Single machine-readable source for domain definitions, crate mappings,
+# stale directory config, and validation rules.
+#
+# Referenced by GOVERNANCE.md §13.
+
+[stale]
+directory = "stale"
+
+# ── Domain definitions ──────────────────────────────────────────────
+
+[[domains]]
+prefix = "COM"
+name = "Common Domain"
+directory = "common"
+description = """\
+    Cross-cutting software design principles informed by Ousterhout's \
+    A Philosophy of Software Design. Technology-agnostic guidance on \
+    module depth, complexity management, error design, and abstraction \
+    layering. Distinct from Cherry's crate-specific architecture \
+    decisions."""
+crates = []
+
+[[domains]]
+prefix = "CHE"
+name = "Cherry Domain"
+directory = "cherry"
+description = """\
+    Design philosophy, EDA/DDD/hexagonal architecture, domain model \
+    traits (aggregates, commands, events, policies), infrastructure \
+    ports, concurrency, delivery, storage backends, workspace tooling, \
+    testing strategy, and build configuration."""
+crates = [
+    "cherry-pit-core",
+    "cherry-pit-gateway",
+    "cherry-pit-web",
+    "cherry-pit-projection",
+    "cherry-pit-agent",
+]
+
+[[domains]]
+prefix = "PAR"
+name = "Pardosa Domain"
+directory = "pardosa"
+description = """\
+    EDA storage layer: fiber semantics, stream management, \
+    NATS/JetStream transport, migration model, backpressure, and \
+    single-writer fencing at transport level."""
+crates = ["pardosa"]
+
+[[domains]]
+prefix = "GEN"
+name = "Genome Domain"
+directory = "genome"
+description = """\
+    Binary serialization format: wire layout, schema hashing, \
+    zero-copy deserialization, compression, security limits (DoS \
+    protection, decompression bombs), type validation, and forward \
+    compatibility."""
+crates = ["pardosa-genome", "pardosa-genome-derive"]
+
+# ── Rule catalog ────────────────────────────────────────────────────
+#
+# All rules are warnings. adr-fmt is advisory and always exits 0.
+
+# Template rules (T001–T013)
+
+[[rules]]
+id = "T001"
+category = "template"
+description = "H1 title present"
+
+[[rules]]
+id = "T002"
+category = "template"
+description = "Date field present"
+
+[[rules]]
+id = "T003"
+category = "template"
+description = "Last-reviewed field present (recommended for all, required for S/A-tier)"
+
+[[rules]]
+id = "T004"
+category = "template"
+description = "Tier field present"
+
+[[rules]]
+id = "T005"
+category = "template"
+description = "Status section with status line present"
+
+[[rules]]
+id = "T006"
+category = "template"
+description = "Status value is recognized; no parenthetical annotations"
+
+[[rules]]
+id = "T007"
+category = "template"
+description = "Related section present; empty section requires placeholder"
+
+[[rules]]
+id = "T008"
+category = "template"
+description = "Context section present"
+
+[[rules]]
+id = "T009"
+category = "template"
+description = "Decision section present"
+
+[[rules]]
+id = "T010"
+category = "template"
+description = "Consequences section present"
+
+[[rules]]
+id = "T011"
+category = "template"
+description = "Code block exceeds 20 lines"
+
+[[rules]]
+id = "T012"
+category = "template"
+description = "Amendment date >= creation date; valid ISO 8601"
+
+[[rules]]
+id = "T013"
+category = "template"
+description = "Rejected ADR missing Rejection Rationale section"
+
+# Link rules (L001, L004–L007)
+
+[[rules]]
+id = "L001"
+category = "link"
+description = "Dangling link — target ADR not found in any domain"
+
+[[rules]]
+id = "L004"
+category = "link"
+description = "Cross-domain reference to unmigrated ADR"
+
+[[rules]]
+id = "L005"
+category = "link"
+description = "Reverse verb used — only forward verbs permitted"
+
+[[rules]]
+id = "L006"
+category = "link"
+description = "Old relationship verb used (Depends on, Extends, etc.)"
+
+[[rules]]
+id = "L007"
+category = "link"
+description = "Stale reference — target ADR is in stale archive"
+
+# Naming rules (N001–N003)
+
+[[rules]]
+id = "N001"
+category = "naming"
+description = "Filename matches PREFIX-NNNN-kebab-slug.md pattern"
+
+[[rules]]
+id = "N002"
+category = "naming"
+description = "Number in filename matches H1 title ID"
+
+[[rules]]
+id = "N003"
+category = "naming"
+description = "Slug is valid lowercase kebab-case"
+
+# Structure rules (S001–S003)
+
+[[rules]]
+id = "S001"
+category = "structure"
+description = "File in stale/ has active status (location/status mismatch)"
+
+[[rules]]
+id = "S002"
+category = "structure"
+description = "Active file has stale status (location/status mismatch)"
+
+[[rules]]
+id = "S003"
+category = "structure"
+description = "ADR has no References and no self-reference (missing tree root declaration)"

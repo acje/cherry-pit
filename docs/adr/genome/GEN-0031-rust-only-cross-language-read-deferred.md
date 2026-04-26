@@ -23,7 +23,7 @@ Cross-language serialization formats (FlatBuffers, Cap'n Proto, Protocol Buffers
 language-neutral IDL files and code generators. pardosa-genome does not have an IDL —
 the Rust type definition _is_ the schema.
 
-[genome.md](../../genome.md) §Future Scope already identifies an "Exportable Schema
+[genome.md](../../plans/genome.md) §Future Scope already identifies an "Exportable Schema
 Definition Format" as a future direction.
 
 ## Decision

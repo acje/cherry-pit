@@ -1,14 +1,14 @@
 [workspace]
 resolver = "3"
 members = [
-    "crates/pit-core",
+    "crates/cherry-pit-core",
     "crates/pardosa-genome",
     "crates/pardosa-genome-derive",
     "crates/pardosa",
-    "crates/pit-gateway",
-    # "crates/pit-web",
-    # "crates/pit-projection",
-    # "crates/pit-agent",
+    "crates/cherry-pit-gateway",
+    # "crates/cherry-pit-web",
+    # "crates/cherry-pit-projection",
+    # "crates/cherry-pit-agent",
     "crates/adr-fmt",
 ]
 
@@ -21,8 +21,8 @@ authors = ["Anders Jensen <anders.jensen@users.noreply.github.com>"]
 
 [workspace.dependencies]
 # === Internal crates ===
-pit-core = { path = "crates/pit-core" }
-pit-gateway = { path = "crates/pit-gateway" }
+cherry-pit-core = { path = "crates/cherry-pit-core" }
+cherry-pit-gateway = { path = "crates/cherry-pit-gateway" }
 pardosa-genome = { path = "crates/pardosa-genome" }
 pardosa-genome-derive = { path = "crates/pardosa-genome-derive" }
 pardosa = { path = "crates/pardosa" }

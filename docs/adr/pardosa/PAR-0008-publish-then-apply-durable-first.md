@@ -26,7 +26,7 @@ Pardosa's single-writer model (PAR-0004) and idempotent replay via `event_id`
 (PAR-0007) make publish-then-apply safe: on any failure, the in-memory state
 can be reconstructed from the durable store.
 
-The original design ([pardosa-design.md](../../pardosa-design.md) §Design
+The original design ([pardosa-design.md](../../plans/pardosa-design.md) §Design
 Invariants, item 1) established durable-first as a core invariant. The
 `RwLock` contention analysis (§M1) identified write-lock duration as the
 primary throughput bottleneck.

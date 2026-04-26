@@ -10,7 +10,7 @@ management, and MECE validation rules.
 | Domain | Prefix | Directory | ADRs | Scope |
 |--------|--------|-----------|------|-------|
 | [Common](common/README.md) | `COM` | `common/` | 6 | Cross-cutting software design principles (Ousterhout): module depth, complexity management, error design, abstraction layering |
-| [Framework](framework/README.md) | `CHE` | `framework/` | 45 | Design philosophy, EDA/DDD/hexagonal architecture, domain model traits, infrastructure ports, concurrency, storage, tooling, testing |
+| [Cherry](cherry/README.md) | `CHE` | `cherry/` | 45 | Design philosophy, EDA/DDD/hexagonal architecture, domain model traits, infrastructure ports, concurrency, storage, tooling, testing |
 | [Pardosa](pardosa/README.md) | `PAR` | `pardosa/` | 14 | EDA storage layer: fiber semantics, stream management, NATS transport, migration, backpressure |
 | [Genome](genome/README.md) | `GEN` | `genome/` | 33 | Binary serialization format: wire layout, schema hashing, zero-copy, compression, security limits |
 
@@ -44,7 +44,7 @@ Common (COM) — Technology-agnostic principles
 │                              ──── illustrated by ──── CHE-0041 Idempotency Strategy
 └── COM-0006 Docs Before Impl
 
-Framework (CHE)
+Cherry (CHE)
 ├── CHE-0006 Single-Writer ──── illustrated by ──── PAR-0004 Single-Writer per Stream
 ├── CHE-0007 Forbid Unsafe ──── illustrated by ──── GEN-0006 Zero-Copy + Forbid Unsafe
 ├── CHE-0022 Schema Evolution ── extended by ────── PAR-0005 New-Stream Migration
@@ -52,7 +52,7 @@ Framework (CHE)
 ├── CHE-0041 Idempotency ────── illustrated by ──── PAR-0007 Monotonic Event ID
 ├── CHE-0043 File Fencing ───── contrasts with ──── PAR-0004 NATS Sequence Fencing
 └── CHE-0045 Serialization Scope
-    ├── scopes ── CHE-0031 MsgPack (pit-gateway)
+    ├── scopes ── CHE-0031 MsgPack (cherry-pit-gateway)
     └── scopes ── PAR-0006 Genome as Primary (pardosa)
 ```
 

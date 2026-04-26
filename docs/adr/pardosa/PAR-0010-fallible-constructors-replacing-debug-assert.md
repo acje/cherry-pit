@@ -23,7 +23,7 @@ Similarly, `Fiber::advance` had no bounds check — a caller could set
 `new_current` to a value less than `current`, violating the singly-linked-list
 invariant silently.
 
-The distributed systems review ([pardosa-design.md](../../pardosa-design.md)
+The distributed systems review ([pardosa-design.md](../../plans/pardosa-design.md)
 §H1, §H3) identified both as high-risk.
 
 ## Decision

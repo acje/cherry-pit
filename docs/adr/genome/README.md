@@ -86,11 +86,11 @@ Tier D — Detail
 
 ## Cross-Domain References
 
-Forward links from genome ADRs. Reverse links (pardosa/framework ADRs
+Forward links from genome ADRs. Reverse links (pardosa/cherry ADRs
 that reference genome) are listed in their respective domain READMEs and
 computable via `cargo run -p adr-fmt -- --report`.
 
-| Genome ADR | Framework ADR | Relationship |
+| Genome ADR | Cherry ADR | Relationship |
 |------------|---------------|--------------|
 | GEN-0002 | CHE-0022 (Schema Evolution) | Contrasts with |
 | GEN-0006 | CHE-0007 (Forbid Unsafe) | Illustrates |
@@ -101,4 +101,4 @@ computable via `cargo run -p adr-fmt -- --report`.
 
 ## Reference Documents
 
-- [genome.md](../../genome.md) — genome binary format design document
+- [genome.md](../../plans/genome.md) — genome binary format design document

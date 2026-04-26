@@ -135,7 +135,7 @@ mod tests {
         AdrRecord {
             id: make_id(prefix, num),
             file_path: PathBuf::from(format!(
-                "docs/adr/framework/{prefix}-{num:04}-test.md"
+                "docs/adr/cherry/{prefix}-{num:04}-test.md"
             )),
             title: Some("Test".into()),
             title_line: 1,
@@ -299,7 +299,7 @@ mod tests {
             5,
             vec![(RelVerb::Illustrates, make_id("COM", 2))],
         );
-        com.file_path = "docs/adr/framework/CHE-0005-test.md".into();
+        com.file_path = "docs/adr/cherry/CHE-0005-test.md".into();
 
         let mut com_target = make_record_with_rels("COM", 2, vec![]);
         com_target.file_path = "docs/adr/common/COM-0002-test.md".into();

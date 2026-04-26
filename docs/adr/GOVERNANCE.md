@@ -20,14 +20,14 @@ not just *what* it does.
 
 | Crate | Domain |
 |-------|--------|
-| `pit-core` | Framework, Common |
-| `pit-gateway` | Framework, Common |
+| `cherry-pit-core` | Cherry, Common |
+| `cherry-pit-gateway` | Cherry, Common |
 | `pardosa` | Pardosa, Common |
 | `pardosa-genome` | Genome, Common |
 | `pardosa-genome-derive` | Genome, Common |
-| `pit-web` (planned) | Framework, Common |
-| `pit-projection` (planned) | Framework, Common |
-| `pit-agent` (planned) | Framework, Common |
+| `cherry-pit-web` (planned) | Cherry, Common |
+| `cherry-pit-projection` (planned) | Cherry, Common |
+| `cherry-pit-agent` (planned) | Cherry, Common |
 
 ---
 
@@ -40,8 +40,8 @@ result in a "Scopes" ADR that delineates boundaries.
 
 | Domain | Prefix | Directory | Scope |
 |--------|--------|-----------|-------|
-| **Common** | `COM` | `docs/adr/common/` | Cross-cutting software design principles, informed by Ousterhout's "A Philosophy of Software Design." Technology-agnostic guidance on module depth, complexity management, error design, and abstraction layering. Distinct from Framework's crate-specific architecture decisions. |
-| **Framework** | `CHE` | `docs/adr/framework/` | Design philosophy, EDA/DDD/hexagonal architecture, domain model traits (aggregates, commands, events, policies), infrastructure ports, concurrency, delivery, storage backends, workspace tooling, testing strategy, build configuration |
+| **Common** | `COM` | `docs/adr/common/` | Cross-cutting software design principles, informed by Ousterhout's "A Philosophy of Software Design." Technology-agnostic guidance on module depth, complexity management, error design, and abstraction layering. Distinct from Cherry's crate-specific architecture decisions. |
+| **Cherry** | `CHE` | `docs/adr/cherry/` | Design philosophy, EDA/DDD/hexagonal architecture, domain model traits (aggregates, commands, events, policies), infrastructure ports, concurrency, delivery, storage backends, workspace tooling, testing strategy, build configuration |
 | **Pardosa** | `PAR` | `docs/adr/pardosa/` | EDA storage layer: fiber semantics, stream management, NATS/JetStream transport, migration model, backpressure, single-writer fencing at transport level |
 | **Genome** | `GEN` | `docs/adr/genome/` | Binary serialization format: wire layout, schema hashing, zero-copy deserialization, compression, security limits (DoS protection, decompression bombs), type validation, forward compatibility |
 
@@ -71,11 +71,11 @@ Examples: `CHE-0001`, `PAR-0006`, `GEN-0015`
 - Numbers are never reused, even after deprecation or supersession
 - Current ranges:
   - Common: `COM-0001` through `COM-0006` (6 accepted)
-  - Framework: `CHE-0001` through `CHE-0045` (45 accepted/proposed)
+  - Cherry: `CHE-0001` through `CHE-0045` (45 accepted/proposed)
   - Pardosa: `PAR-0001` through `PAR-0014` (14 accepted, pending migration)
   - Genome: `GEN-0001` through `GEN-0033` (33 accepted, pending migration)
 - New ADRs append to their domain's sequence: next Common ADR is
-  `COM-0007`, next Framework ADR is
+  `COM-0007`, next Cherry ADR is
   `CHE-0046`, next Pardosa is `PAR-0015`, next Genome is `GEN-0034`
 - File naming: `{PREFIX}-{NNNN}-kebab-case-slug.md`
   - Example: `CHE-0001-design-priority-ordering.md`
@@ -92,7 +92,7 @@ Use the full prefix in text references:
 Use relative paths for Markdown links:
 
 ```markdown
-See [CHE-0006](../framework/CHE-0006-single-writer-assumption.md)
+See [CHE-0006](../cherry/CHE-0006-single-writer-assumption.md)
 See [GEN-0015](../genome/GEN-0015-forward-compatibility-contract.md)
 ```
 
@@ -307,10 +307,10 @@ Use the full prefix:
 Use relative paths from the ADR file:
 
 ```markdown
-<!-- From docs/adr/pardosa/PAR-0004-... to a framework ADR -->
-See [CHE-0006](../framework/CHE-0006-single-writer-assumption.md)
+<!-- From docs/adr/pardosa/PAR-0004-... to a Cherry domain ADR -->
+See [CHE-0006](../cherry/CHE-0006-single-writer-assumption.md)
 
-<!-- From docs/adr/framework/CHE-0022-... to a genome ADR -->
+<!-- From docs/adr/cherry/CHE-0022-... to a genome ADR -->
 See [GEN-0002](../genome/GEN-0002-no-schema-evolution-fixed-layout.md)
 
 <!-- Within the same domain -->
@@ -322,8 +322,8 @@ See [CHE-0002](CHE-0002-illegal-states-unrepresentable.md)
 Design documents in `docs/` are referenced from ADRs using relative paths:
 
 ```markdown
-See [pardosa design](../../pardosa-design.md)
-See [genome design](../../genome.md)
+See [pardosa design](../plans/pardosa-design.md)
+See [genome design](../plans/genome.md)
 ```
 
 ---
@@ -370,17 +370,17 @@ Do **not** write an ADR for:
 
 ## 11. Overlap Resolution
 
-When pardosa or genome ADRs cover the same concern as a framework ADR at
+When pardosa or genome ADRs cover the same concern as a Cherry domain ADR at
 a different abstraction level, the resolution is cross-referencing — not
 merging:
 
-- The framework ADR is the **principle** (abstract, crate-agnostic)
+- The Cherry domain ADR is the **principle** (abstract, crate-agnostic)
 - The pardosa/genome ADR is the **implementation** (concrete,
   crate-specific)
 - Both remain standalone with `Illustrates` or `Extends` links
   from the concrete ADR to the abstract one
 
-Example: CHE-0006 (single-writer assumption) is the framework principle.
+Example: CHE-0006 (single-writer assumption) is the Cherry domain principle.
 PAR-0004 (single-writer per stream via NATS fencing) illustrates it
 at the transport level.
 

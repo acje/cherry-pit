@@ -44,40 +44,40 @@ What cannot compile:
 
 ## Status
 
-Active development. `pit-core` traits are implemented and stable.
-`pit-gateway` has a working `MsgpackFileStore` event store. Remaining
-infrastructure crates (pit-web, pit-projection) are planned. Pardosa
+Active development. `cherry-pit-core` traits are implemented and stable.
+`cherry-pit-gateway` has a working `MsgpackFileStore` event store. Remaining
+infrastructure crates (cherry-pit-web, cherry-pit-projection) are planned. Pardosa
 (event storage layer and binary serialization) is in progress.
 
 ## Components
 
 | Component      | Status      | Description                                         |
 |----------------|-------------|-----------------------------------------------------|
-| **pit-core**   | implemented | Aggregate, command, event, policy, projection traits. Port traits: CommandGateway, CommandBus, EventStore, EventBus |
-| **pit-gateway**| in progress | Event store implementations (MsgpackFileStore)      |
+| **cherry-pit-core**   | implemented | Aggregate, command, event, policy, projection traits. Port traits: CommandGateway, CommandBus, EventStore, EventBus |
+| **cherry-pit-gateway**| in progress | Event store implementations (MsgpackFileStore)      |
 | **pardosa**    | in progress | EDA storage layer implementing fiber semantics      |
 | **pardosa-genome** | in progress | Binary serialization format with zero-copy reads and serde integration |
 | **pardosa-genome-derive** | in progress | Derive macro for pardosa-genome GenomeSafe trait |
-| **pit-web**    | planned     | Web serving adapter (axum)                          |
-| **pit-projection** | planned | Read model storage and query serving                |
+| **cherry-pit-web**    | planned     | Web serving adapter (axum)                          |
+| **cherry-pit-projection** | planned | Read model storage and query serving                |
 
 ## Documentation
 
 | Document | Contents |
 |----------|----------|
-| [pit-core trait design](docs/pit-core.md) | All trait signatures, single-aggregate design rationale, type-safety guarantees |
-| [Build plan](docs/build-plan.md) | Crate dependency DAG, dependency mapping, design decisions |
-| [Pardosa](docs/pardosa.md) | Event serialization, append-only log format, schema evolution |
-| [Infrastructure](docs/infrastructure.md) | Infrastructure crate catalogue |
-| [Key concepts](docs/glossary.md) | Glossary of DDD and EDA terms |
+| [cherry-pit-core trait design](docs/plans/cherry-pit-core.md) | All trait signatures, single-aggregate design rationale, type-safety guarantees |
+| [Build plan](docs/plans/build-plan.md) | Crate dependency DAG, dependency mapping, design decisions |
+| [Pardosa](docs/plans/pardosa.md) | Event serialization, append-only log format, schema evolution |
+| [Infrastructure](docs/plans/infrastructure.md) | Infrastructure crate catalogue |
+| [Key concepts](docs/plans/glossary.md) | Glossary of DDD and EDA terms |
 
 ## Repository structure
 
 ```
 cherry-pit/
 ├── crates/
-│   ├── pit-core/          # Aggregate, command, event, port traits
-│   ├── pit-gateway/       # EventStore implementations
+│   ├── cherry-pit-core/          # Aggregate, command, event, port traits
+│   ├── cherry-pit-gateway/       # EventStore implementations
 │   ├── pardosa/           # EDA storage layer (fiber semantics)
 │   ├── pardosa-genome/    # Binary serialization format
 │   ├── pardosa-genome-derive/ # GenomeSafe derive macro

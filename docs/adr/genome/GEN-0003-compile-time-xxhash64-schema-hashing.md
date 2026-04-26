@@ -69,4 +69,4 @@ the str/String split: `&[u8]` supports zero-copy borrowing, `Vec<u8>` does not.
   seed, or input canonicalization is a breaking change affecting all persisted data.
 - **Negative:** `String` ≠ `&str` may surprise users expecting serde's transparent
   string serialization to imply hash equivalence. Documented in
-  [genome.md](../../genome.md) §String Type Identity.
+  [genome.md](../../plans/genome.md) §String Type Identity.
