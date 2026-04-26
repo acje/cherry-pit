@@ -12,7 +12,7 @@ Amended 2026-04-25 — added COM cross-reference
 
 ## Related
 
-- Illustrates: COM-0001
+- References: COM-0001
 
 ## Context
 

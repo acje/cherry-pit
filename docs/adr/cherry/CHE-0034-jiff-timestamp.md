@@ -10,7 +10,7 @@ Accepted
 
 ## Related
 
-- —
+- Root: CHE-0034
 
 ## Context
 
@@ -38,7 +38,9 @@ Candidates:
 
 ## Decision
 
-All temporal values use `jiff::Timestamp`.
+All temporal values use `jiff::Timestamp`, providing UTC-instant semantics
+with lossless RFC 9557/RFC 3339 serde roundtrips, DST-safe arithmetic, and
+built-in IANA timezone support without a separate crate.
 
 ```rust
 // EventEnvelope field

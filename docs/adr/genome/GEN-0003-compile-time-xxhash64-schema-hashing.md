@@ -12,7 +12,7 @@ Amended 2026-04-25 — hash stability contract documented
 
 ## Related
 
-- —
+- References: GEN-0001
 
 ## Context
 

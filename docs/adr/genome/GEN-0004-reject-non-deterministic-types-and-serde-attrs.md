@@ -14,7 +14,7 @@ Amended 2026-04-25 — serde(with) escape hatch documented
 
 ## Related
 
-- —
+- References: GEN-0001
 
 ## Context
 

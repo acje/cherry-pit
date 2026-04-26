@@ -12,7 +12,7 @@ Amended 2026-04-25 — no_std claims removed
 
 ## Related
 
-—
+- References: GEN-0008
 
 ## Context
 

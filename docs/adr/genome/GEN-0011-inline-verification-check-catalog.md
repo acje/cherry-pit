@@ -10,7 +10,7 @@ Accepted
 
 ## Related
 
-- Extends: GEN-0006
+- References: GEN-0006
 
 ## Context
 

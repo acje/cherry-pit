@@ -10,9 +10,7 @@ Accepted
 
 ## Related
 
-- Depends on: CHE-0004
-- Illustrates: CHE-0001
-- References: CHE-0014
+- References: CHE-0001, CHE-0004, CHE-0014
 
 ## Context
 

@@ -10,8 +10,7 @@ Accepted
 
 ## Related
 
-- Depends on: COM-0002
-- References: COM-0003
+- References: COM-0002, COM-0003
 
 ## Context
 

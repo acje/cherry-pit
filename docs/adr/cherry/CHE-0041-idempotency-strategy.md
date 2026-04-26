@@ -12,8 +12,7 @@ Amended 2026-04-25 — added COM cross-reference
 
 ## Related
 
-- Depends on: CHE-0008, CHE-0017, CHE-0039
-- Illustrates: COM-0005
+- References: CHE-0008, CHE-0017, CHE-0039, COM-0005
 
 ## Context
 

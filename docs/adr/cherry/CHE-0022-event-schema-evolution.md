@@ -10,8 +10,7 @@ Accepted
 
 ## Related
 
-- Depends on: CHE-0009, CHE-0010, CHE-0031
-- Contrasts with: CHE-0021, GEN-0002
+- References: CHE-0009, CHE-0010, CHE-0021, CHE-0031, GEN-0002
 
 ## Context
 

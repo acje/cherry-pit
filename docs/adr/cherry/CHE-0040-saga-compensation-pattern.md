@@ -10,8 +10,7 @@ Accepted
 
 ## Related
 
-- Depends on: CHE-0017, CHE-0024, CHE-0039
-- Contrasts with: CHE-0037 (No Snapshots — same deferral pattern)
+- References: CHE-0017, CHE-0024, CHE-0037, CHE-0039
 
 ## Context
 

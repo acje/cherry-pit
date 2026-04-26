@@ -10,8 +10,7 @@ Accepted
 
 ## Related
 
-- Extends: CHE-0022
-- References: PAR-0013
+- References: CHE-0022, PAR-0013
 
 ## Context
 

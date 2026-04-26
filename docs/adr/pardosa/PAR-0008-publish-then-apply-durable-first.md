@@ -12,8 +12,7 @@ Amended 2026-04-25 — write-lock timeout added
 
 ## Related
 
-- Depends on: PAR-0004
-- Depends on: PAR-0007
+- References: PAR-0004, PAR-0007
 
 ## Context
 

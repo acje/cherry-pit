@@ -10,8 +10,7 @@ Accepted
 
 ## Related
 
-- Depends on: PAR-0008
-- References: PAR-0004
+- References: PAR-0004, PAR-0008
 
 ## Context
 

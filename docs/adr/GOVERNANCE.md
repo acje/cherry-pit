@@ -176,8 +176,6 @@ are now deprecated. `adr-fmt` emits L006 warnings for these:
 | `Superseded by` | Remove (reverse verb) |
 | `Scopes` | Remove (reverse verb) |
 
-See `docs/adr/cleanup.md` for migration scripts.
-
 ---
 
 ## 6. Lifecycle
@@ -427,8 +425,8 @@ merging:
   ADR to the abstract one
 
 Example: CHE-0006 (single-writer assumption) is the Cherry domain principle.
-PAR-0004 (single-writer per stream via NATS fencing) illustrates it
-at the transport level.
+PAR-0004 (single-writer per stream via NATS fencing) references it as the
+concrete transport-level implementation.
 
 Merging is reserved for cases where two ADRs in the **same domain**
 genuinely cover the same decision space — then the newer ADR supersedes

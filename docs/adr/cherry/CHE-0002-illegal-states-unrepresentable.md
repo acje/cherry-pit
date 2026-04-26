@@ -10,7 +10,7 @@ Accepted
 
 ## Related
 
-- Depends on: CHE-0001
+- References: CHE-0001
 
 ## Context
 

@@ -10,8 +10,7 @@ Accepted
 
 ## Related
 
-- Contrasts with: CHE-0022
-- References: PAR-0002
+- References: CHE-0022, PAR-0002
 
 ## Context
 

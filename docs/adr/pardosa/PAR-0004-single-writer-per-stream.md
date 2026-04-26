@@ -12,8 +12,7 @@ Amended 2026-04-25 — fencing mandatory via Nats-Expected-Last-Subject-Sequence
 
 ## Related
 
-- Illustrates: CHE-0006
-- Contrasts with: CHE-0043
+- References: CHE-0006, CHE-0043
 
 ## Context
 

@@ -10,7 +10,7 @@ Accepted
 
 ## Related
 
-- —
+- References: CHE-0004
 
 ## Context
 

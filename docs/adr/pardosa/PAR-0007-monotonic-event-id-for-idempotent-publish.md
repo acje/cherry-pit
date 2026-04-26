@@ -10,8 +10,7 @@ Accepted
 
 ## Related
 
-- Illustrates: CHE-0041
-- Depends on: PAR-0004
+- References: CHE-0041, PAR-0004
 
 ## Context
 

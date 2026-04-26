@@ -10,7 +10,7 @@ Accepted
 
 ## Related
 
-- Scoped by: CHE-0045
+- References: CHE-0045
 
 ## Context
 

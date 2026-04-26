@@ -10,9 +10,7 @@ Proposed
 
 ## Related
 
-- Depends on: CHE-0004, CHE-0006, CHE-0031
-- Extends: CHE-0032, CHE-0035
-- References: CHE-0036, CHE-0037, CHE-0043
+- References: CHE-0004, CHE-0006, CHE-0031, CHE-0032, CHE-0035, CHE-0036, CHE-0037, CHE-0043
 
 ## Context
 
