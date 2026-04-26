@@ -1,9 +1,9 @@
-//! Link integrity rules (L001–L004).
+//! Link integrity rules (L001, L003–L005).
 //!
 //! L001: Dangling link — target ADR file does not exist
-//! L002: Missing backlink — A links to B, but B lacks the reverse link back to A
 //! L003: Symmetric verb mismatch — `Contrasts with` must be mirrored
 //! L004: Cross-domain reference to unmigrated ADR (warning only)
+//! L005: Reverse verb used — only forward (root-direction) verbs permitted
 
 use std::collections::{HashMap, HashSet};
 
@@ -11,7 +11,7 @@ use crate::model::{AdrId, AdrRecord, RelVerb, Relationship};
 use crate::report::Diagnostic;
 
 /// Known prefixes for domains that exist in this workspace.
-const KNOWN_PREFIXES: &[&str] = &["CHE", "PAR", "GEN"];
+const KNOWN_PREFIXES: &[&str] = &["COM", "CHE", "PAR", "GEN"];
 
 pub fn check(records: &[AdrRecord], diags: &mut Vec<Diagnostic>) {
     // Build a lookup: AdrId → &AdrRecord
@@ -41,6 +41,21 @@ fn check_single_link(
 ) {
     let target_id = &rel.target;
 
+    // L005: Reverse verb — only forward (root-direction) verbs permitted
+    if rel.verb.is_reverse() {
+        diags.push(Diagnostic::error(
+            "L005",
+            &source.file_path,
+            rel.line,
+            format!(
+                "{} -[{}]→ {target_id}: reverse verb not permitted — \
+                 use the forward verb in the target ADR instead",
+                source.id, rel.verb,
+            ),
+        ));
+        return; // Skip further checks on reverse verbs
+    }
+
     // L004: Cross-domain reference to unmigrated domain
     if target_id.prefix != source.id.prefix {
         if KNOWN_PREFIXES.contains(&target_id.prefix.as_str()) && !by_id.contains_key(target_id) {
@@ -53,7 +68,7 @@ fn check_single_link(
                     source.id,
                 ),
             ));
-            return; // Don't check backlinks for unmigrated ADRs
+            return;
         }
     }
 
@@ -68,27 +83,7 @@ fn check_single_link(
                 source.id,
             ),
         ));
-        return; // Can't check backlinks for non-existent targets
-    }
-
-    // L002: Missing backlink — target should have reverse verb → source
-    // Skip for symmetric verbs — L003 handles those exclusively.
-    let reverse_verb = rel.verb.reverse();
-    if !rel.verb.is_symmetric() {
-        let has_backlink = link_set.contains(&(target_id, reverse_verb, &source.id));
-
-        if !has_backlink {
-            diags.push(Diagnostic::error(
-                "L002",
-                &source.file_path,
-                rel.line,
-                format!(
-                    "{} -[{}]→ {target_id}: missing backlink \
-                     (expected `{reverse_verb}: {}` in {target_id})",
-                    source.id, rel.verb, source.id,
-                ),
-            ));
-        }
+        return;
     }
 
     // L003: Symmetric verb check — `Contrasts with` must be mirrored with same verb
@@ -158,32 +153,25 @@ mod tests {
             has_context: true,
             has_decision: true,
             has_consequences: true,
+            max_code_block_lines: 0,
+            max_code_block_line: 0,
+            code_block_count: 0,
+            amendment_dates: vec![],
+            related_has_placeholder: false,
         }
     }
 
     #[test]
-    fn matching_forward_and_back_links_no_errors() {
+    fn forward_link_without_backlink_no_errors() {
+        // After removing bidirectional enforcement, a forward link
+        // with no reciprocal backlink is accepted.
         let records = vec![
             make_record_with_rels("CHE", 1, vec![(RelVerb::DependsOn, make_id("CHE", 2))]),
-            make_record_with_rels("CHE", 2, vec![(RelVerb::Informs, make_id("CHE", 1))]),
+            make_record_with_rels("CHE", 2, vec![]),
         ];
         let mut diags = Vec::new();
         check(&records, &mut diags);
         assert!(diags.is_empty(), "expected no diags, got: {diags:?}");
-    }
-
-    #[test]
-    fn missing_backlink_produces_l002() {
-        let records = vec![
-            make_record_with_rels("CHE", 1, vec![(RelVerb::DependsOn, make_id("CHE", 2))]),
-            make_record_with_rels("CHE", 2, vec![]), // no Informs back
-        ];
-        let mut diags = Vec::new();
-        check(&records, &mut diags);
-        assert!(
-            diags.iter().any(|d| d.rule == "L002"),
-            "expected L002, got: {diags:?}"
-        );
     }
 
     #[test]
@@ -214,7 +202,6 @@ mod tests {
             diags.iter().any(|d| d.rule == "L004"),
             "expected L004, got: {diags:?}"
         );
-        // Should be warning, not error
         let l004 = diags.iter().find(|d| d.rule == "L004").unwrap();
         assert_eq!(l004.severity, crate::report::Severity::Warning);
     }
@@ -228,7 +215,7 @@ mod tests {
                 1,
                 vec![(RelVerb::ContrastsWith, make_id("CHE", 2))],
             ),
-            make_record_with_rels("CHE", 2, vec![]), // no ContrastsWith back
+            make_record_with_rels("CHE", 2, vec![]),
         ];
         let mut diags = Vec::new();
         check(&records, &mut diags);
@@ -252,6 +239,72 @@ mod tests {
                 vec![(RelVerb::ContrastsWith, make_id("CHE", 1))],
             ),
         ];
+        let mut diags = Vec::new();
+        check(&records, &mut diags);
+        assert!(diags.is_empty(), "expected no diags, got: {diags:?}");
+    }
+
+    #[test]
+    fn reverse_verb_produces_l005() {
+        let reverse_verbs = [
+            RelVerb::Informs,
+            RelVerb::ExtendedBy,
+            RelVerb::IllustratedBy,
+            RelVerb::ReferencedBy,
+            RelVerb::SupersededBy,
+            RelVerb::Scopes,
+        ];
+        for verb in reverse_verbs {
+            let records = vec![
+                make_record_with_rels("CHE", 1, vec![(verb, make_id("CHE", 2))]),
+                make_record_with_rels("CHE", 2, vec![]),
+            ];
+            let mut diags = Vec::new();
+            check(&records, &mut diags);
+            assert!(
+                diags.iter().any(|d| d.rule == "L005"),
+                "expected L005 for {verb}, got: {diags:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn forward_verbs_do_not_produce_l005() {
+        let forward_verbs = [
+            RelVerb::DependsOn,
+            RelVerb::Extends,
+            RelVerb::Illustrates,
+            RelVerb::References,
+            RelVerb::Supersedes,
+            RelVerb::ScopedBy,
+        ];
+        for verb in forward_verbs {
+            let records = vec![
+                make_record_with_rels("CHE", 1, vec![(verb, make_id("CHE", 2))]),
+                make_record_with_rels("CHE", 2, vec![]),
+            ];
+            let mut diags = Vec::new();
+            check(&records, &mut diags);
+            assert!(
+                !diags.iter().any(|d| d.rule == "L005"),
+                "forward verb {verb} should not trigger L005, got: {diags:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn cross_domain_forward_link_no_errors() {
+        let mut com = make_record_with_rels(
+            "CHE",
+            5,
+            vec![(RelVerb::Illustrates, make_id("COM", 2))],
+        );
+        com.file_path = "docs/adr/framework/CHE-0005-test.md".into();
+
+        let mut com_target = make_record_with_rels("COM", 2, vec![]);
+        com_target.file_path = "docs/adr/common/COM-0002-test.md".into();
+
+        let records = vec![com, com_target];
         let mut diags = Vec::new();
         check(&records, &mut diags);
         assert!(diags.is_empty(), "expected no diags, got: {diags:?}");

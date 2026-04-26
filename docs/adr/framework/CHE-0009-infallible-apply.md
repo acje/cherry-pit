@@ -8,11 +8,12 @@ Tier: A
 
 Accepted
 
+Amended 2026-04-25 — added COM cross-reference
+
 ## Related
 
 - Depends on: CHE-0004
-- Informs: CHE-0012, CHE-0022, CHE-0023, CHE-0037
-- Referenced by: CHE-0012
+- Illustrates: COM-0005
 
 ## Context
 

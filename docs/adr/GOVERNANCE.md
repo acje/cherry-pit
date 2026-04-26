@@ -20,14 +20,14 @@ not just *what* it does.
 
 | Crate | Domain |
 |-------|--------|
-| `pit-core` | Framework |
-| `pit-gateway` | Framework |
-| `pardosa` | Pardosa |
-| `pardosa-genome` | Genome |
-| `pardosa-genome-derive` | Genome |
-| `pit-web` (planned) | Framework |
-| `pit-projection` (planned) | Framework |
-| `pit-agent` (planned) | Framework |
+| `pit-core` | Framework, Common |
+| `pit-gateway` | Framework, Common |
+| `pardosa` | Pardosa, Common |
+| `pardosa-genome` | Genome, Common |
+| `pardosa-genome-derive` | Genome, Common |
+| `pit-web` (planned) | Framework, Common |
+| `pit-projection` (planned) | Framework, Common |
+| `pit-agent` (planned) | Framework, Common |
 
 ---
 
@@ -40,6 +40,7 @@ result in a "Scopes" ADR that delineates boundaries.
 
 | Domain | Prefix | Directory | Scope |
 |--------|--------|-----------|-------|
+| **Common** | `COM` | `docs/adr/common/` | Cross-cutting software design principles, informed by Ousterhout's "A Philosophy of Software Design." Technology-agnostic guidance on module depth, complexity management, error design, and abstraction layering. Distinct from Framework's crate-specific architecture decisions. |
 | **Framework** | `CHE` | `docs/adr/framework/` | Design philosophy, EDA/DDD/hexagonal architecture, domain model traits (aggregates, commands, events, policies), infrastructure ports, concurrency, delivery, storage backends, workspace tooling, testing strategy, build configuration |
 | **Pardosa** | `PAR` | `docs/adr/pardosa/` | EDA storage layer: fiber semantics, stream management, NATS/JetStream transport, migration model, backpressure, single-writer fencing at transport level |
 | **Genome** | `GEN` | `docs/adr/genome/` | Binary serialization format: wire layout, schema hashing, zero-copy deserialization, compression, security limits (DoS protection, decompression bombs), type validation, forward compatibility |
@@ -53,10 +54,8 @@ Before accepting any ADR, validate:
 3. If the decision affects another domain, cross-references are added
    using the relationship vocabulary (§5)
 4. All `Depends on` targets exist and are `Accepted` (or `Amended`)
-5. Bidirectional links are maintained (every `Depends on` has a
-   corresponding `Informs`; every `Illustrates` has an `Illustrated by`)
-6. No circular dependencies are introduced in the DAG
-7. A tier (§4) is assigned with justification
+5. No circular dependencies are introduced in the DAG
+6. A tier (§4) is assigned with justification
 
 ---
 
@@ -71,10 +70,12 @@ Examples: `CHE-0001`, `PAR-0006`, `GEN-0015`
 - Each domain maintains an independent monotonically increasing sequence
 - Numbers are never reused, even after deprecation or supersession
 - Current ranges:
+  - Common: `COM-0001` through `COM-0006` (6 accepted)
   - Framework: `CHE-0001` through `CHE-0045` (45 accepted/proposed)
   - Pardosa: `PAR-0001` through `PAR-0014` (14 accepted, pending migration)
   - Genome: `GEN-0001` through `GEN-0033` (33 accepted, pending migration)
-- New ADRs append to their domain's sequence: next Framework ADR is
+- New ADRs append to their domain's sequence: next Common ADR is
+  `COM-0007`, next Framework ADR is
   `CHE-0046`, next Pardosa is `PAR-0015`, next Genome is `GEN-0034`
 - File naming: `{PREFIX}-{NNNN}-kebab-case-slug.md`
   - Example: `CHE-0001-design-priority-ordering.md`
@@ -133,35 +134,27 @@ expectations. Every ADR must be assigned a tier.
 
 ## 5. Relationship Vocabulary
 
-ADRs are connected by typed, directional relationships. Bidirectional
-maintenance is mandatory: when adding a forward link, add the
-corresponding reverse link.
+ADRs link **toward the root** of the dependency graph — each ADR
+declares what it depends on, illustrates, extends, or references. Reverse
+links (parent listing children) are not stored; use `adr-fmt --report`
+to compute a children index on demand.
 
-| Verb | Meaning | Direction | Reverse |
-|------|---------|-----------|---------|
-| **Depends on** | Cannot be understood without the target | Child → Parent | Informs |
-| **Informs** | Target was influenced by this ADR | Parent → Child | Depends on |
-| **Extends** | Builds on target's pattern without superseding it | Newer → Older | Extended by |
-| **Extended by** | Target builds on this ADR's pattern | Older → Newer | Extends |
-| **Illustrates** | Demonstrates target's principle in practice | Concrete → Abstract | Illustrated by |
-| **Illustrated by** | Target demonstrates this ADR's principle | Abstract → Concrete | Illustrates |
-| **Referenced by** | Target mentions this ADR in context or consequences | Cited → Citing | References |
-| **References** | This ADR mentions the target in context or consequences | Citing → Cited | Referenced by |
-| **Contrasts with** | Deliberately different choice from target | Peer ↔ Peer | Contrasts with |
-| **Supersedes** | Replaces target entirely; target becomes Deprecated/Superseded | Newer → Older | Superseded by |
-| **Superseded by** | This ADR was replaced by the target | Older → Newer | Supersedes |
-| **Scopes** | Limits target's applicability to a specific domain or crate | Scoping → Scoped | Scoped by |
-| **Scoped by** | This ADR's applicability is limited by the target | Scoped → Scoping | Scopes |
+| Verb | Meaning | Direction |
+|------|---------|-----------|
+| **Depends on** | Cannot be understood without the target | Child → Parent |
+| **Extends** | Builds on target's pattern without superseding it | Newer → Older |
+| **Illustrates** | Demonstrates target's principle in practice | Concrete → Abstract |
+| **References** | This ADR mentions the target in context or consequences | Citing → Cited |
+| **Contrasts with** | Deliberately different choice from target | Peer ↔ Peer |
+| **Supersedes** | Replaces target entirely; target becomes Deprecated/Superseded | Newer → Older |
+| **Scoped by** | This ADR's applicability is limited by the target | Constrained → Constrainer |
 
 ### Usage Rules
 
-1. Every `Depends on: X` in ADR A must have a corresponding
-   `Informs: A` in ADR X
-2. Every `Illustrates: X` must have `Illustrated by: A` in ADR X
-3. `Contrasts with` is symmetric — both ADRs list the relationship
-4. `Supersedes` requires setting the target's status to
+1. `Contrasts with` is symmetric — both ADRs list the relationship
+2. `Supersedes` requires setting the target's status to
    `Superseded by {PREFIX}-{NNNN}`
-5. Cross-domain relationships are encouraged — they make the
+3. Cross-domain relationships are encouraged — they make the
    architecture's cross-cutting concerns explicit
 
 ---
@@ -198,6 +191,29 @@ Amended 2026-04-25 — added fencing requirement (previously documented only)
 Do not delete original text. Add new content inline with clear markers
 or append a new section.
 
+### Date Semantics
+
+- `Date:` is the formal authorship date — the date the ADR was first
+  written or accepted.
+- `Last-reviewed:` is the most recent review or audit date.
+- Amendment dates (in the Status section) must be ≥ `Date:`. An
+  amendment cannot predate the ADR's creation. `adr-fmt` enforces this
+  via rule T012.
+
+### Title and Intent Immutability
+
+Once an ADR reaches `Accepted` status:
+
+1. **Title**: The title line (`# {PREFIX}-{NNNN}. Title`) is immutable.
+   Renaming requires a new Superseding ADR.
+2. **Decision intent**: The core decision (the "what we chose" in the
+   Decision section) cannot be reversed or materially altered via
+   amendment. Amendments may add detail, clarify scope, or document
+   implementation refinements — but not change the fundamental choice.
+3. **Reversing a decision**: Requires a new ADR with `Supersedes:
+   {PREFIX}-{NNNN}` in its Related section and the original ADR's
+   status set to `Superseded by {PREFIX}-{NNNN}`.
+
 ---
 
 ## 7. ADR Template
@@ -216,16 +232,11 @@ Draft | Proposed | Accepted | Amended | Deprecated | Superseded by {PREFIX}-{NNN
 ## Related
 
 - Depends on: {PREFIX}-{NNNN}
-- Informs: {PREFIX}-{NNNN}
 - Extends: {PREFIX}-{NNNN}
-- Extended by: {PREFIX}-{NNNN}
 - Illustrates: {PREFIX}-{NNNN}
-- Illustrated by: {PREFIX}-{NNNN}
 - References: {PREFIX}-{NNNN}
-- Referenced by: {PREFIX}-{NNNN}
 - Contrasts with: {PREFIX}-{NNNN}
 - Supersedes: {PREFIX}-{NNNN}
-- Scopes: {PREFIX}-{NNNN}
 - Scoped by: {PREFIX}-{NNNN}
 
 ## Context
@@ -256,6 +267,16 @@ Context, Decision, Consequences.
 - `Alternatives Considered` — may be a subsection of Context or a separate
   section
 - `References` — links to design docs, issues, or external resources
+
+### Code Block Guidance
+
+Decision sections should use type signatures, trait bounds, or pseudocode.
+Reference source files for full implementations. Code blocks exceeding 20
+lines indicate implementation detail leaking into the ADR — `adr-fmt`
+emits a T011 warning for these.
+
+Acceptable: trait definitions, struct signatures, error enums.
+Avoid: full method implementations, accessor methods, test code.
 
 ---
 
@@ -338,7 +359,7 @@ Do **not** write an ADR for:
 4. **Reviewer** verifies:
    - Correct domain assignment
    - Tier assignment with justification
-   - All bidirectional links present
+   - `Contrasts with` links are symmetric
    - No circular dependencies
    - Template conformance
    - MECE compliance
@@ -356,8 +377,8 @@ merging:
 - The framework ADR is the **principle** (abstract, crate-agnostic)
 - The pardosa/genome ADR is the **implementation** (concrete,
   crate-specific)
-- Both remain standalone with `Illustrates` / `Illustrated by` or
-  `Extends` / `Extended by` links
+- Both remain standalone with `Illustrates` or `Extends` links
+  from the concrete ADR to the abstract one
 
 Example: CHE-0006 (single-writer assumption) is the framework principle.
 PAR-0004 (single-writer per stream via NATS fencing) illustrates it

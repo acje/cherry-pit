@@ -2,7 +2,7 @@
 
 Date: 2026-04-25
 Last-reviewed: 2026-04-25
-Tier: D
+Tier: A
 
 ## Status
 
@@ -11,7 +11,6 @@ Accepted
 ## Related
 
 - References: GEN-0004, GEN-0032
-- Referenced by: GEN-0032
 
 ## Context
 

@@ -11,7 +11,6 @@ Accepted
 ## Related
 
 - References: GEN-0011
-- Referenced by: GEN-0022, GEN-0032
 
 ## Context
 

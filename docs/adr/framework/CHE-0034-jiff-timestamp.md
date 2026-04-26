@@ -10,8 +10,7 @@ Accepted
 
 ## Related
 
-- Informs: CHE-0033
-- Referenced by: CHE-0033, CHE-0042
+- —
 
 ## Context
 

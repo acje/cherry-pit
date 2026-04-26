@@ -2,7 +2,7 @@
 
 Date: 2026-04-25
 Last-reviewed: 2026-04-25
-Tier: D
+Tier: B
 
 ## Status
 
@@ -11,7 +11,6 @@ Accepted
 ## Related
 
 - References: GEN-0006, GEN-0007, GEN-0024
-- Referenced by: PAR-0006, GEN-0024
 
 ## Context
 

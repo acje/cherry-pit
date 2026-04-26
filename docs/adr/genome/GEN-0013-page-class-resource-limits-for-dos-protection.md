@@ -10,7 +10,7 @@ Accepted
 
 ## Related
 
-- Referenced by: GEN-0014
+- —
 
 ## Context
 

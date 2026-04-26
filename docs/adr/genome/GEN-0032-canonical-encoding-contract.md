@@ -11,7 +11,6 @@ Accepted
 ## Related
 
 - References: GEN-0004, GEN-0018, GEN-0020, GEN-0021, GEN-0024, GEN-0029, GEN-0033
-- Referenced by: GEN-0033
 
 ## Context
 

@@ -10,7 +10,7 @@ Accepted
 
 ## Related
 
-- Informs: CHE-0030, CHE-0045
+- —
 
 ## Context
 

@@ -12,7 +12,6 @@ Accepted
 
 - Extends: CHE-0022
 - References: PAR-0013
-- Referenced by: PAR-0006, PAR-0009, PAR-0013
 
 ## Context
 

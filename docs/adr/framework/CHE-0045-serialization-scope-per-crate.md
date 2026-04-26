@@ -10,7 +10,6 @@ Accepted
 
 ## Related
 
-- Scopes: CHE-0031, PAR-0006
 - Depends on: CHE-0004, CHE-0029
 - References: CHE-0022
 

@@ -88,41 +88,11 @@ handled separately (see below).
 
 ### Validated constructor
 
-```rust
-impl<E: DomainEvent> EventEnvelope<E> {
-    /// Construct a new event envelope.
-    ///
-    /// Called by EventStore implementations during `create` and
-    /// `append`. The store provides all metadata; callers pass
-    /// raw domain events.
-    ///
-    /// # Errors
-    ///
-    /// Returns `EnvelopeError::NilEventId` if `event_id` is nil.
-    pub fn new(
-        event_id: uuid::Uuid,
-        aggregate_id: AggregateId,
-        sequence: NonZeroU64,
-        timestamp: jiff::Timestamp,
-        correlation_id: Option<uuid::Uuid>,
-        causation_id: Option<uuid::Uuid>,
-        payload: E,
-    ) -> Result<Self, EnvelopeError> {
-        if event_id.is_nil() {
-            return Err(EnvelopeError::NilEventId);
-        }
-        Ok(Self {
-            event_id,
-            aggregate_id,
-            sequence,
-            timestamp,
-            correlation_id,
-            causation_id,
-            payload,
-        })
-    }
-}
-```
+`EventEnvelope::new()` accepts all 7 fields as parameters and returns
+`Result<Self, EnvelopeError>`. It validates that `event_id` is non-nil
+(returns `EnvelopeError::NilEventId` otherwise), then assigns all
+fields. Zero sequence is impossible at the type level via `NonZeroU64`.
+See `pit-core/src/envelope.rs` for full implementation.
 
 The constructor is `pub` (not `pub(crate)`) because `pit-gateway`
 is a separate crate that must call it. The constructor is safe for

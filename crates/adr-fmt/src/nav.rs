@@ -1,0 +1,233 @@
+//! Computed children report — inverts forward links to produce a
+//! reverse-link index on demand.
+//!
+//! Replaces stored reverse verbs (Informs, Illustrated by, etc.) with
+//! a computed index that can be printed via `adr-fmt --report`.
+
+use std::collections::HashMap;
+
+use crate::model::{AdrId, AdrRecord, RelVerb};
+
+/// A child entry: the verb that the child uses (forward direction) and
+/// the child's ADR ID.
+#[derive(Debug, Clone)]
+pub struct ChildEntry {
+    /// The forward verb the child used (e.g., `DependsOn`).
+    pub verb: RelVerb,
+    /// The child ADR ID.
+    pub child: AdrId,
+}
+
+/// Compute a children index by inverting all forward relationships.
+///
+/// For each forward link `A -[verb]→ B`, inserts `B → (verb, A)`.
+/// Symmetric verbs (ContrastsWith) are included in both directions.
+pub fn compute_children(records: &[AdrRecord]) -> HashMap<AdrId, Vec<ChildEntry>> {
+    let mut children: HashMap<AdrId, Vec<ChildEntry>> = HashMap::new();
+
+    for record in records {
+        for rel in &record.relationships {
+            // Only invert forward verbs — reverse verbs are errors (L005)
+            if rel.verb.is_reverse() {
+                continue;
+            }
+
+            children
+                .entry(rel.target.clone())
+                .or_default()
+                .push(ChildEntry {
+                    verb: rel.verb,
+                    child: record.id.clone(),
+                });
+        }
+    }
+
+    // Sort children by ID for stable output
+    for entries in children.values_mut() {
+        entries.sort_by(|a, b| {
+            a.child
+                .prefix
+                .cmp(&b.child.prefix)
+                .then(a.child.number.cmp(&b.child.number))
+        });
+    }
+
+    children
+}
+
+/// Print the children report to stdout.
+pub fn print_report(records: &[AdrRecord], children: &HashMap<AdrId, Vec<ChildEntry>>) {
+    // Group records by domain prefix, sorted by number
+    let mut by_prefix: HashMap<&str, Vec<&AdrRecord>> = HashMap::new();
+    for record in records {
+        by_prefix
+            .entry(&record.id.prefix)
+            .or_default()
+            .push(record);
+    }
+
+    let mut prefixes: Vec<&&str> = by_prefix.keys().collect();
+    prefixes.sort();
+
+    println!("=== ADR Children Report ===");
+    println!();
+
+    for prefix in prefixes {
+        let domain_records = by_prefix.get(*prefix).unwrap();
+        let mut sorted = domain_records.clone();
+        sorted.sort_by_key(|r| r.id.number);
+
+        println!("--- {prefix} ---");
+        for record in &sorted {
+            if let Some(entries) = children.get(&record.id) {
+                let title = record.title.as_deref().unwrap_or("(untitled)");
+                println!("  {} {title}", record.id);
+                for entry in entries {
+                    println!("    ← {} {}", entry.verb, entry.child);
+                }
+            }
+        }
+        println!();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::model::{AdrId, Relationship, Status, Tier};
+    use std::path::PathBuf;
+
+    fn make_id(prefix: &str, num: u16) -> AdrId {
+        AdrId {
+            prefix: prefix.into(),
+            number: num,
+        }
+    }
+
+    fn make_record(prefix: &str, num: u16, rels: Vec<(RelVerb, AdrId)>) -> AdrRecord {
+        let relationships = rels
+            .into_iter()
+            .enumerate()
+            .map(|(i, (verb, target))| Relationship {
+                verb,
+                target,
+                line: 10 + i,
+            })
+            .collect();
+
+        AdrRecord {
+            id: make_id(prefix, num),
+            file_path: PathBuf::from(format!("docs/adr/test/{prefix}-{num:04}-test.md")),
+            title: Some(format!("Test {prefix}-{num:04}")),
+            title_line: 1,
+            date: Some("2026-04-25".into()),
+            date_line: 3,
+            last_reviewed: None,
+            last_reviewed_line: 0,
+            tier: Some(Tier::B),
+            tier_line: 5,
+            status: Some(Status::Accepted),
+            status_line: 8,
+            status_raw: Some("Accepted".into()),
+            relationships,
+            has_related: true,
+            has_context: true,
+            has_decision: true,
+            has_consequences: true,
+            max_code_block_lines: 0,
+            max_code_block_line: 0,
+            code_block_count: 0,
+            amendment_dates: vec![],
+            related_has_placeholder: false,
+        }
+    }
+
+    #[test]
+    fn depends_on_produces_child_entry() {
+        let records = vec![
+            make_record("CHE", 2, vec![(RelVerb::DependsOn, make_id("CHE", 1))]),
+            make_record("CHE", 1, vec![]),
+        ];
+        let children = compute_children(&records);
+
+        let che1_children = children.get(&make_id("CHE", 1)).unwrap();
+        assert_eq!(che1_children.len(), 1);
+        assert_eq!(che1_children[0].child, make_id("CHE", 2));
+        assert_eq!(che1_children[0].verb, RelVerb::DependsOn);
+    }
+
+    #[test]
+    fn illustrates_produces_child_entry() {
+        let records = vec![
+            make_record("CHE", 5, vec![(RelVerb::Illustrates, make_id("COM", 2))]),
+            make_record("COM", 2, vec![]),
+        ];
+        let children = compute_children(&records);
+
+        let com2_children = children.get(&make_id("COM", 2)).unwrap();
+        assert_eq!(com2_children.len(), 1);
+        assert_eq!(com2_children[0].child, make_id("CHE", 5));
+        assert_eq!(com2_children[0].verb, RelVerb::Illustrates);
+    }
+
+    #[test]
+    fn contrasts_with_produces_both_directions() {
+        let records = vec![
+            make_record(
+                "CHE",
+                1,
+                vec![(RelVerb::ContrastsWith, make_id("CHE", 2))],
+            ),
+            make_record(
+                "CHE",
+                2,
+                vec![(RelVerb::ContrastsWith, make_id("CHE", 1))],
+            ),
+        ];
+        let children = compute_children(&records);
+
+        let che1 = children.get(&make_id("CHE", 1)).unwrap();
+        assert_eq!(che1.len(), 1);
+        assert_eq!(che1[0].child, make_id("CHE", 2));
+
+        let che2 = children.get(&make_id("CHE", 2)).unwrap();
+        assert_eq!(che2.len(), 1);
+        assert_eq!(che2[0].child, make_id("CHE", 1));
+    }
+
+    #[test]
+    fn reverse_verbs_are_skipped() {
+        let records = vec![
+            make_record("CHE", 1, vec![(RelVerb::Informs, make_id("CHE", 2))]),
+            make_record("CHE", 2, vec![]),
+        ];
+        let children = compute_children(&records);
+        assert!(
+            children.is_empty(),
+            "reverse verb should not produce children"
+        );
+    }
+
+    #[test]
+    fn empty_records_produce_empty_children() {
+        let records: Vec<AdrRecord> = vec![];
+        let children = compute_children(&records);
+        assert!(children.is_empty());
+    }
+
+    #[test]
+    fn multiple_children_sorted_by_id() {
+        let records = vec![
+            make_record("CHE", 3, vec![(RelVerb::DependsOn, make_id("CHE", 1))]),
+            make_record("CHE", 2, vec![(RelVerb::DependsOn, make_id("CHE", 1))]),
+            make_record("CHE", 5, vec![(RelVerb::DependsOn, make_id("CHE", 1))]),
+            make_record("CHE", 1, vec![]),
+        ];
+        let children = compute_children(&records);
+        let che1 = children.get(&make_id("CHE", 1)).unwrap();
+        assert_eq!(che1.len(), 3);
+        assert_eq!(che1[0].child.number, 2);
+        assert_eq!(che1[1].child.number, 3);
+        assert_eq!(che1[2].child.number, 5);
+    }
+}

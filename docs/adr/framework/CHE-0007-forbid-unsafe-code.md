@@ -12,8 +12,6 @@ Accepted
 
 - Depends on: CHE-0001
 - Illustrates: CHE-0001
-- Informs: CHE-0026
-- Illustrated by: GEN-0006
 
 ## Context
 

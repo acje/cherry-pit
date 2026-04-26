@@ -45,6 +45,18 @@ pub struct AdrRecord {
     pub has_context: bool,
     pub has_decision: bool,
     pub has_consequences: bool,
+    pub max_code_block_lines: usize,
+    /// 1-indexed line number of the opening fence of the largest code
+    /// block. 0 if no code blocks exist.
+    pub max_code_block_line: usize,
+    #[allow(dead_code)] // reserved for future T-rules
+    pub code_block_count: usize,
+    /// All `Amended YYYY-MM-DD — note` dates found in the Status section,
+    /// paired with their 1-indexed line numbers.
+    pub amendment_dates: Vec<(String, usize)>,
+    /// True when the Related section contains a `—` placeholder (no
+    /// relationships).
+    pub related_has_placeholder: bool,
 }
 
 /// ADR tier classification.
@@ -151,6 +163,15 @@ pub struct Relationship {
 }
 
 /// The 12-verb relationship vocabulary from GOVERNANCE.md §5.
+///
+/// 7 forward verbs (child → parent direction) are the only verbs
+/// stored in ADR files: `DependsOn`, `Extends`, `Illustrates`,
+/// `References`, `ContrastsWith` (symmetric), `Supersedes`, `ScopedBy`.
+///
+/// 5 reverse variants (`Informs`, `ExtendedBy`, `IllustratedBy`,
+/// `ReferencedBy`, `SupersededBy`, `Scopes`) are retained so the
+/// parser can recognize them and L005 can produce clear rejection
+/// diagnostics. Use `is_reverse()` to distinguish.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum RelVerb {
     DependsOn,
@@ -171,6 +192,7 @@ pub enum RelVerb {
 impl RelVerb {
     /// Return the reverse verb. For every forward link A→B with this
     /// verb, B must have `reverse()` → A.
+    #[cfg(test)]
     pub fn reverse(self) -> Self {
         match self {
             Self::DependsOn => Self::Informs,
@@ -192,6 +214,21 @@ impl RelVerb {
     /// Symmetric verbs require the same verb in both directions.
     pub fn is_symmetric(self) -> bool {
         matches!(self, Self::ContrastsWith)
+    }
+
+    /// Reverse verbs point away from the dependency root (parent →
+    /// child). These are not stored in ADR files — use `adr-fmt
+    /// --report` to compute them on demand.
+    pub fn is_reverse(self) -> bool {
+        matches!(
+            self,
+            Self::Informs
+                | Self::ExtendedBy
+                | Self::IllustratedBy
+                | Self::ReferencedBy
+                | Self::SupersededBy
+                | Self::Scopes
+        )
     }
 
     /// Parse a verb string from the `## Related` section.
@@ -292,6 +329,37 @@ mod tests {
         assert!(!RelVerb::DependsOn.is_symmetric());
         assert!(!RelVerb::References.is_symmetric());
         assert!(!RelVerb::Scopes.is_symmetric());
+    }
+
+    #[test]
+    fn is_reverse_true_for_reverse_verbs() {
+        let reverse = [
+            RelVerb::Informs,
+            RelVerb::ExtendedBy,
+            RelVerb::IllustratedBy,
+            RelVerb::ReferencedBy,
+            RelVerb::SupersededBy,
+            RelVerb::Scopes,
+        ];
+        for verb in reverse {
+            assert!(verb.is_reverse(), "{verb} should be reverse");
+        }
+    }
+
+    #[test]
+    fn is_reverse_false_for_forward_verbs() {
+        let forward = [
+            RelVerb::DependsOn,
+            RelVerb::Extends,
+            RelVerb::Illustrates,
+            RelVerb::References,
+            RelVerb::ContrastsWith,
+            RelVerb::Supersedes,
+            RelVerb::ScopedBy,
+        ];
+        for verb in forward {
+            assert!(!verb.is_reverse(), "{verb} should not be reverse");
+        }
     }
 
     #[test]

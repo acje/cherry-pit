@@ -12,8 +12,6 @@ Accepted
 
 - Illustrates: CHE-0041
 - Depends on: PAR-0004
-- Informs: PAR-0008
-- Referenced by: PAR-0006, PAR-0013
 
 ## Context
 

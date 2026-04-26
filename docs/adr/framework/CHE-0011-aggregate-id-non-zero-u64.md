@@ -11,8 +11,6 @@ Accepted
 ## Related
 
 - Depends on: CHE-0002, CHE-0006
-- Informs: CHE-0013, CHE-0020
-- Referenced by: CHE-0005
 
 ## Context
 

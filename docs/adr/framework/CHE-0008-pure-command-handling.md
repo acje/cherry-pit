@@ -12,9 +12,7 @@ Accepted
 
 - Depends on: CHE-0004
 - Illustrates: CHE-0001
-- Informs: CHE-0018, CHE-0041
 - References: CHE-0014
-- Referenced by: CHE-0012, CHE-0018
 
 ## Context
 

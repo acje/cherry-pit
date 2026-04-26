@@ -41,34 +41,13 @@ convenience.
 `pit-core` uses manual `Display` and `Error` implementations. No
 `thiserror` dependency.
 
-```rust
-// Example: manual Display for DispatchError<E>
-impl<E: Error + Send + Sync> fmt::Display for DispatchError<E> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Rejected(e) => write!(f, "command rejected: {e}"),
-            Self::AggregateNotFound { aggregate_id } => {
-                write!(f, "aggregate not found: {aggregate_id}")
-            }
-            Self::ConcurrencyConflict { aggregate_id, expected_sequence, actual_sequence } => {
-                write!(f, "concurrency conflict on {aggregate_id}: expected sequence {expected_sequence}, actual {actual_sequence}")
-            }
-            Self::Infrastructure(e) => write!(f, "infrastructure error: {e}"),
-        }
-    }
-}
-
-// Example: manual Error for DispatchError<E>
-impl<E: Error + Send + Sync + 'static> Error for DispatchError<E> {
-    fn source(&self) -> Option<&(dyn Error + 'static)> {
-        match self {
-            Self::Rejected(e) => Some(e),
-            Self::Infrastructure(e) => Some(e.as_ref()),
-            Self::AggregateNotFound { .. } | Self::ConcurrencyConflict { .. } => None,
-        }
-    }
-}
-```
+Manual `Display::fmt` matches on all `DispatchError` variants with
+structured formatting (aggregate_id, expected/actual sequence in
+conflict messages). Manual `Error::source` chains to inner errors for
+`Rejected` and `Infrastructure` variants; returns `None` for
+`AggregateNotFound` and `ConcurrencyConflict`. Same pattern applies to
+`StoreError` and `BusError`. See `pit-core/src/error.rs` for full
+implementations.
 
 `thiserror` **is** available in the workspace for infrastructure
 crates (`pit-gateway`, `pardosa`, etc.) where dependency count is

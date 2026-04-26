@@ -94,6 +94,11 @@ mod tests {
             has_context: true,
             has_decision: true,
             has_consequences: true,
+            max_code_block_lines: 0,
+            max_code_block_line: 0,
+            code_block_count: 0,
+            amendment_dates: vec![],
+            related_has_placeholder: false,
         }
     }
 

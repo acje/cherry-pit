@@ -11,9 +11,7 @@ Accepted
 ## Related
 
 - Depends on: CHE-0009, CHE-0010, CHE-0031
-- Contrasts with: CHE-0021 (`#[non_exhaustive]` on errors, not events), GEN-0002
-- Extended by: PAR-0005
-- Referenced by: CHE-0045, PAR-0003
+- Contrasts with: CHE-0021, GEN-0002
 
 ## Context
 

@@ -1,4 +1,4 @@
-//! Template compliance rules (T001–T010).
+//! Template compliance rules (T001–T012).
 //!
 //! T001: H1 title present
 //! T002: Date field present
@@ -6,13 +6,31 @@
 //! T004: Tier field present
 //! T005: Status section present
 //! T006: Status value valid (no parentheticals, known variant)
-//! T007: Related section present
+//! T007: Related section present (empty section requires `—` placeholder)
 //! T008: Context section present
 //! T009: Decision section present
 //! T010: Consequences section present
+//! T011: Code block exceeds 20 lines (warning)
+//! T012: Amendment date ≥ Date (amendment cannot predate ADR creation)
 
 use crate::model::{AdrRecord, Status};
 use crate::report::Diagnostic;
+
+/// Maximum lines in a single fenced code block before T011 fires.
+const MAX_CODE_BLOCK_LINES: usize = 20;
+
+/// ISO 8601 date format: YYYY-MM-DD.
+fn is_valid_date_format(s: &str) -> bool {
+    if s.len() != 10 {
+        return false;
+    }
+    let bytes = s.as_bytes();
+    bytes[4] == b'-'
+        && bytes[7] == b'-'
+        && bytes[..4].iter().all(|b| b.is_ascii_digit())
+        && bytes[5..7].iter().all(|b| b.is_ascii_digit())
+        && bytes[8..10].iter().all(|b| b.is_ascii_digit())
+}
 
 pub fn check(record: &AdrRecord, diags: &mut Vec<Diagnostic>) {
     // T001: H1 title
@@ -115,6 +133,15 @@ pub fn check(record: &AdrRecord, diags: &mut Vec<Diagnostic>) {
             0,
             "missing `## Related` section".into(),
         ));
+    } else if record.relationships.is_empty() && !record.related_has_placeholder {
+        diags.push(Diagnostic::warning(
+            "T007",
+            &record.file_path,
+            0,
+            "Related section has no relationships and no `— ` placeholder — \
+             add `- —` for ADRs with no dependencies"
+                .into(),
+        ));
     }
 
     // T008: Context section
@@ -145,6 +172,51 @@ pub fn check(record: &AdrRecord, diags: &mut Vec<Diagnostic>) {
             0,
             "missing `## Consequences` section".into(),
         ));
+    }
+
+    // T011: Code block length
+    if record.max_code_block_lines > MAX_CODE_BLOCK_LINES {
+        diags.push(Diagnostic::warning(
+            "T011",
+            &record.file_path,
+            record.max_code_block_line,
+            format!(
+                "code block has {} lines (max {}). \
+                 Use signatures or pseudocode; reference source files \
+                 for full implementations.",
+                record.max_code_block_lines, MAX_CODE_BLOCK_LINES,
+            ),
+        ));
+    }
+
+    // T012: Amendment date ≥ Date
+    if let Some(ref date) = record.date {
+        for (amendment_date, line) in &record.amendment_dates {
+            if !is_valid_date_format(amendment_date) {
+                diags.push(Diagnostic::warning(
+                    "T012",
+                    &record.file_path,
+                    *line,
+                    format!(
+                        "amendment date `{amendment_date}` is not valid \
+                         ISO 8601 (expected YYYY-MM-DD)"
+                    ),
+                ));
+                continue;
+            }
+            if amendment_date.as_str() < date.as_str() {
+                diags.push(Diagnostic::error(
+                    "T012",
+                    &record.file_path,
+                    *line,
+                    format!(
+                        "amendment date `{amendment_date}` predates \
+                         ADR creation date `{date}` — amendment dates \
+                         must be ≥ Date"
+                    ),
+                ));
+            }
+        }
     }
 }
 
@@ -177,6 +249,11 @@ mod tests {
             has_context: true,
             has_decision: true,
             has_consequences: true,
+            max_code_block_lines: 0,
+            max_code_block_line: 0,
+            code_block_count: 0,
+            amendment_dates: vec![],
+            related_has_placeholder: true,
         }
     }
 
@@ -232,5 +309,112 @@ mod tests {
             diags.iter().any(|d| d.rule == "T006"),
             "expected T006, got: {diags:?}"
         );
+    }
+
+    #[test]
+    fn code_block_at_limit_no_t011() {
+        let mut record = make_record();
+        record.max_code_block_lines = 20;
+        let mut diags = Vec::new();
+        check(&record, &mut diags);
+        assert!(
+            !diags.iter().any(|d| d.rule == "T011"),
+            "20 lines should not trigger T011"
+        );
+    }
+
+    #[test]
+    fn code_block_over_limit_produces_t011() {
+        let mut record = make_record();
+        record.max_code_block_lines = 21;
+        record.max_code_block_line = 42;
+        let mut diags = Vec::new();
+        check(&record, &mut diags);
+        let t011 = diags.iter().find(|d| d.rule == "T011");
+        assert!(t011.is_some(), "expected T011, got: {diags:?}");
+        assert_eq!(
+            t011.unwrap().severity,
+            crate::report::Severity::Warning,
+            "T011 should be warning, not error"
+        );
+        assert_eq!(t011.unwrap().line, 42, "T011 should point to opening fence");
+    }
+
+    #[test]
+    fn empty_related_without_placeholder_produces_t007() {
+        let mut record = make_record();
+        record.has_related = true;
+        record.relationships = vec![];
+        record.related_has_placeholder = false;
+        let mut diags = Vec::new();
+        check(&record, &mut diags);
+        let t007 = diags.iter().find(|d| d.rule == "T007");
+        assert!(t007.is_some(), "expected T007, got: {diags:?}");
+        assert_eq!(t007.unwrap().severity, crate::report::Severity::Warning);
+    }
+
+    #[test]
+    fn empty_related_with_placeholder_no_t007() {
+        let mut record = make_record();
+        record.has_related = true;
+        record.relationships = vec![];
+        record.related_has_placeholder = true;
+        let mut diags = Vec::new();
+        check(&record, &mut diags);
+        assert!(
+            !diags.iter().any(|d| d.rule == "T007"),
+            "placeholder should suppress T007"
+        );
+    }
+
+    #[test]
+    fn amendment_date_before_creation_produces_t012() {
+        let mut record = make_record();
+        record.date = Some("2026-04-25".into());
+        record.amendment_dates = vec![("2026-04-01".into(), 12)];
+        let mut diags = Vec::new();
+        check(&record, &mut diags);
+        let t012 = diags.iter().find(|d| d.rule == "T012");
+        assert!(t012.is_some(), "expected T012, got: {diags:?}");
+        assert_eq!(t012.unwrap().severity, crate::report::Severity::Error);
+        assert_eq!(t012.unwrap().line, 12);
+    }
+
+    #[test]
+    fn amendment_date_equal_to_creation_no_t012() {
+        let mut record = make_record();
+        record.date = Some("2026-04-25".into());
+        record.amendment_dates = vec![("2026-04-25".into(), 12)];
+        let mut diags = Vec::new();
+        check(&record, &mut diags);
+        assert!(
+            !diags.iter().any(|d| d.rule == "T012"),
+            "same-day amendment should not trigger T012"
+        );
+    }
+
+    #[test]
+    fn amendment_date_after_creation_no_t012() {
+        let mut record = make_record();
+        record.date = Some("2026-04-25".into());
+        record.amendment_dates = vec![("2026-05-01".into(), 12)];
+        let mut diags = Vec::new();
+        check(&record, &mut diags);
+        assert!(
+            !diags.iter().any(|d| d.rule == "T012"),
+            "future amendment should not trigger T012"
+        );
+    }
+
+    #[test]
+    fn malformed_amendment_date_produces_t012_warning() {
+        let mut record = make_record();
+        record.date = Some("2026-04-25".into());
+        record.amendment_dates = vec![("not-a-date".into(), 12)];
+        let mut diags = Vec::new();
+        check(&record, &mut diags);
+        let t012 = diags.iter().find(|d| d.rule == "T012");
+        assert!(t012.is_some(), "expected T012 for malformed date");
+        assert_eq!(t012.unwrap().severity, crate::report::Severity::Warning);
     }
 }

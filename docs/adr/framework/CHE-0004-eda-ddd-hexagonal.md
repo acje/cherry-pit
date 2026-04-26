@@ -11,7 +11,6 @@ Accepted
 ## Related
 
 - Depends on: CHE-0001
-- Informs: CHE-0005, CHE-0006, CHE-0008, CHE-0009, CHE-0010, CHE-0014, CHE-0016, CHE-0024, CHE-0039, CHE-0044, CHE-0045
 
 ## Context
 

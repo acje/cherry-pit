@@ -8,7 +8,7 @@ Tier: C
 
 Accepted
 
-Amended 2025-04-01 — no_std claims removed
+Amended 2026-04-25 — no_std claims removed
 
 ## Related
 

@@ -8,14 +8,12 @@ Tier: S
 
 Accepted
 
-Amended 2026-04-01 — fencing mandatory via Nats-Expected-Last-Subject-Sequence
+Amended 2026-04-25 — fencing mandatory via Nats-Expected-Last-Subject-Sequence
 
 ## Related
 
 - Illustrates: CHE-0006
 - Contrasts with: CHE-0043
-- Informs: PAR-0007, PAR-0008
-- Referenced by: PAR-0014
 
 ## Context
 

@@ -8,11 +8,11 @@ Tier: A
 
 Accepted
 
-Amended 2025-04-01 — hash stability contract documented
+Amended 2026-04-25 — hash stability contract documented
 
 ## Related
 
-- Referenced by: GEN-0016, GEN-0028, GEN-0031
+- —
 
 ## Context
 

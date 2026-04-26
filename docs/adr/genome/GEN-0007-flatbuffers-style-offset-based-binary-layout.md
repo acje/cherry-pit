@@ -10,8 +10,7 @@ Accepted
 
 ## Related
 
-- Extended by: GEN-0022
-- Referenced by: PAR-0002, GEN-0012
+- —
 
 ## Context
 

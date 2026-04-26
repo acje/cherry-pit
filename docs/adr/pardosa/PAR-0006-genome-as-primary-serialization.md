@@ -8,12 +8,12 @@ Tier: B
 
 Accepted
 
-Amended 2026-04-01 — alternatives analysis added
+Amended 2026-04-25 — alternatives analysis added
 
 ## Related
 
-- Scoped by: CHE-0045
 - References: PAR-0005, PAR-0007, GEN-0001, GEN-0006, GEN-0008, GEN-0012, GEN-0031
+- Scoped by: CHE-0045
 
 ## Context
 

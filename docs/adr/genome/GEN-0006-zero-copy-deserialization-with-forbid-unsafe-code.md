@@ -11,8 +11,6 @@ Accepted
 ## Related
 
 - Illustrates: CHE-0007
-- Extended by: GEN-0011
-- Referenced by: PAR-0006, GEN-0012
 
 ## Context
 

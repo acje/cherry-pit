@@ -1,0 +1,20 @@
+# Common Domain — Architecture Decision Records
+
+Cross-cutting software design principles informed by Ousterhout's
+*A Philosophy of Software Design*. Technology-agnostic guidance on
+module depth, complexity management, error design, and abstraction
+layering. Distinct from Framework's crate-specific architecture
+decisions.
+
+Governed by [GOVERNANCE.md](../GOVERNANCE.md).
+
+## Index
+
+| #        | Title                                     | Tier | Status   | Depends on |
+|----------|-------------------------------------------|------|----------|------------|
+| [COM-0001](COM-0001-complexity-budget-strategic-investment.md) | Complexity Budget — Strategic Investment  | S    | Accepted | —          |
+| [COM-0002](COM-0002-deep-modules-over-shallow-abstractions.md) | Deep Modules Over Shallow Abstractions    | S    | Accepted | COM-0001   |
+| [COM-0003](COM-0003-pull-complexity-downward.md) | Pull Complexity Downward                  | A    | Accepted | COM-0002   |
+| [COM-0004](COM-0004-different-layer-different-abstraction.md) | Different Layer, Different Abstraction    | A    | Accepted | COM-0002   |
+| [COM-0005](COM-0005-define-errors-out-of-existence.md) | Define Errors Out of Existence            | A    | Accepted | COM-0002   |
+| [COM-0006](COM-0006-interface-documentation-before-implementation.md) | Interface Documentation Before Implementation | C | Accepted | COM-0001   |

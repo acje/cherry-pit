@@ -8,13 +8,13 @@ Tier: A
 
 Accepted
 
-Amended 2025-04-01 — structured parsing and extended type recursion
+Amended 2026-04-25 — structured parsing and extended type recursion
 
-Amended 2026-04-01 — serde(with) escape hatch documented
+Amended 2026-04-25 — serde(with) escape hatch documented
 
 ## Related
 
-- Referenced by: GEN-0022, GEN-0027, GEN-0029, GEN-0032, GEN-0033
+- —
 
 ## Context
 

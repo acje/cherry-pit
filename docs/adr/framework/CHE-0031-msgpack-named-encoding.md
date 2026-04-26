@@ -10,7 +10,6 @@ Accepted
 
 ## Related
 
-- Informs: CHE-0022, CHE-0036, CHE-0044
 - Scoped by: CHE-0045
 
 ## Context

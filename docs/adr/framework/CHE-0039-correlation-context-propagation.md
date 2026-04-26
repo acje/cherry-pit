@@ -2,7 +2,7 @@
 
 Date: 2026-04-25
 Last-reviewed: 2026-04-25
-Tier: B
+Tier: A
 
 ## Status
 
@@ -11,7 +11,6 @@ Accepted
 ## Related
 
 - Depends on: CHE-0016, CHE-0004, CHE-0017
-- Informs: CHE-0040, CHE-0041, CHE-0042
 
 ## Context
 
@@ -60,49 +59,13 @@ produce `EventEnvelope`s.
 
 ### Type definition
 
-```rust
-/// Context for correlating events across aggregates and bounded
-/// contexts.
-///
-/// Passed explicitly through CommandGateway → CommandBus → EventStore.
-/// The store stamps these values onto every EventEnvelope it creates.
-///
-/// Does not implement Default — callers must explicitly choose
-/// `CorrelationContext::none()`, `::correlated(id)`, or
-/// `::new(corr, cause)`. The name communicates intent.
-#[derive(Debug, Clone)]
-pub struct CorrelationContext {
-    /// Groups related events into a single logical operation.
-    pub correlation_id: Option<uuid::Uuid>,
-    /// The event_id of the event that caused this command.
-    pub causation_id: Option<uuid::Uuid>,
-}
-
-impl CorrelationContext {
-    /// No correlation context — user-initiated command, no tracing.
-    pub fn none() -> Self {
-        Self { correlation_id: None, causation_id: None }
-    }
-
-    /// Full correlation context — typically propagated from a policy
-    /// reacting to a prior event.
-    pub fn new(correlation_id: uuid::Uuid, causation_id: uuid::Uuid) -> Self {
-        Self {
-            correlation_id: Some(correlation_id),
-            causation_id: Some(causation_id),
-        }
-    }
-
-    /// Correlation only — first command in a logical operation chain,
-    /// no causation event yet.
-    pub fn correlated(correlation_id: uuid::Uuid) -> Self {
-        Self {
-            correlation_id: Some(correlation_id),
-            causation_id: None,
-        }
-    }
-}
-```
+`CorrelationContext` is a struct in `pit-core` with two fields:
+`correlation_id: Option<uuid::Uuid>` (groups related events) and
+`causation_id: Option<uuid::Uuid>` (the event_id that caused this
+command). Three named constructors: `none()` (user-initiated, no
+tracing), `correlated(id)` (first command in a chain), and
+`new(corr, cause)` (policy-propagated from a prior event). Does not
+implement `Default`. See `pit-core/src/correlation.rs`.
 
 `CorrelationContext` does not implement `Default`. Every call site
 must explicitly choose `none()`, `correlated(id)`, or
@@ -112,91 +75,22 @@ omission, not an accidental default.
 
 ### Port trait signature changes
 
-```rust
-// EventStore::create — adds context parameter
-fn create(
-    &self,
-    events: Vec<Self::Event>,
-    context: CorrelationContext,
-) -> impl Future<Output = Result<(...), StoreError>> + Send;
-
-// EventStore::append — adds context parameter
-fn append(
-    &self,
-    id: AggregateId,
-    expected_sequence: NonZeroU64,
-    events: Vec<Self::Event>,
-    context: CorrelationContext,
-) -> impl Future<Output = Result<Vec<EventEnvelope<Self::Event>>,
-                                 StoreError>> + Send;
-
-// CommandBus::create — adds context parameter
-fn create<C>(
-    &self,
-    cmd: C,
-    context: CorrelationContext,
-) -> impl Future<Output = CreateResult<Self::Aggregate, C>> + Send
-where ...;
-
-// CommandBus::dispatch — adds context parameter
-fn dispatch<C>(
-    &self,
-    id: AggregateId,
-    cmd: C,
-    context: CorrelationContext,
-) -> impl Future<Output = DispatchResult<Self::Aggregate, C>> + Send
-where ...;
-
-// CommandGateway::create — adds context parameter
-fn create<C>(
-    &self,
-    cmd: C,
-    context: CorrelationContext,
-) -> impl Future<Output = CreateResult<Self::Aggregate, C>> + Send
-where ...;
-
-// CommandGateway::send — adds context parameter
-fn send<C>(
-    &self,
-    id: AggregateId,
-    cmd: C,
-    context: CorrelationContext,
-) -> impl Future<Output = DispatchResult<Self::Aggregate, C>> + Send
-where ...;
-```
+All port trait methods that produce `EventEnvelope`s gain a
+`context: CorrelationContext` parameter: `EventStore::create`,
+`EventStore::append`, `CommandBus::create`, `CommandBus::dispatch`,
+`CommandGateway::create`, `CommandGateway::send`. See
+`pit-core/src/lib.rs` for full trait definitions.
 
 ### Propagation flow
 
-```
-User/Adapter
-  │
-  │ gateway.send(id, cmd, CorrelationContext::correlated(op_id))
-  ▼
-CommandGateway::send
-  │
-  │ passes context to bus
-  ▼
-CommandBus::dispatch
-  │
-  │ passes context to store
-  ▼
-EventStore::append(id, seq, events, context)
-  │
-  │ build_envelopes stamps correlation_id and causation_id
-  ▼
-EventEnvelope { correlation_id: context.correlation_id,
-                causation_id: context.causation_id, ... }
-  │
-  │ published to EventBus
-  ▼
-Policy::react(&self, &EventEnvelope)
-  │
-  │ policy reads envelope.event_id and envelope.correlation_id
-  │ constructs CorrelationContext::new(envelope.correlation_id, envelope.event_id)
-  ▼
-CommandGateway::send(target_id, cmd, context)
-  │ ... chain continues with preserved correlation
-```
+Propagation is linear: adapter calls `CommandGateway::send` with a
+`CorrelationContext`, which passes it to `CommandBus::dispatch`, which
+passes it to `EventStore::append`. The store stamps `correlation_id`
+and `causation_id` from the context onto each `EventEnvelope`. After
+publication via `EventBus`, a `Policy::react` handler reads the
+envelope's `event_id` and `correlation_id` to construct a new
+`CorrelationContext::new(envelope.correlation_id, envelope.event_id)`
+for downstream commands, preserving the causal chain.
 
 ### Relationship to tracing
 

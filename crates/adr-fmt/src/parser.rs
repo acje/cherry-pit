@@ -59,14 +59,19 @@ pub fn parse_adr_file(path: &Path, expected_prefix: &str) -> Option<AdrRecord> {
 
     // --- Status ---
     let (status, status_line, status_raw) = find_status(&lines);
+    let amendment_dates = find_amendment_dates(&lines);
 
     // --- Related ---
-    let (relationships, has_related) = find_relationships(&lines);
+    let (relationships, has_related, related_has_placeholder) = find_relationships(&lines);
 
     // --- Required sections ---
     let has_context = has_heading(&lines, "Context");
     let has_decision = has_heading(&lines, "Decision");
     let has_consequences = has_heading(&lines, "Consequences");
+
+    // --- Code block metrics ---
+    let (max_code_block_lines, code_block_count, max_code_block_line) =
+        measure_code_blocks(&lines);
 
     Some(AdrRecord {
         id,
@@ -87,6 +92,11 @@ pub fn parse_adr_file(path: &Path, expected_prefix: &str) -> Option<AdrRecord> {
         has_context,
         has_decision,
         has_consequences,
+        max_code_block_lines,
+        max_code_block_line,
+        code_block_count,
+        amendment_dates,
+        related_has_placeholder,
     })
 }
 
@@ -158,11 +168,39 @@ fn find_status(lines: &[&str]) -> (Option<Status>, usize, Option<String>) {
     (None, 0, None)
 }
 
+/// Find all `Amended YYYY-MM-DD` dates in the Status section.
+fn find_amendment_dates(lines: &[&str]) -> Vec<(String, usize)> {
+    let mut dates = Vec::new();
+    let mut in_status = false;
+
+    for (i, line) in lines.iter().enumerate() {
+        if *line == "## Status" {
+            in_status = true;
+            continue;
+        }
+        if in_status {
+            if line.starts_with("## ") {
+                break;
+            }
+            if let Some(rest) = line.strip_prefix("Amended ") {
+                // Extract date: "YYYY-MM-DD — note" or just "YYYY-MM-DD"
+                let date_part = rest.splitn(2, " — ").next().unwrap_or("").trim();
+                if !date_part.is_empty() {
+                    dates.push((date_part.to_owned(), i + 1));
+                }
+            }
+        }
+    }
+
+    dates
+}
+
 /// Find all relationships in the `## Related` section.
-fn find_relationships(lines: &[&str]) -> (Vec<Relationship>, bool) {
+fn find_relationships(lines: &[&str]) -> (Vec<Relationship>, bool, bool) {
     let mut rels = Vec::new();
     let mut in_related = false;
     let mut found_section = false;
+    let mut has_placeholder = false;
 
     for (i, line) in lines.iter().enumerate() {
         if *line == "## Related" {
@@ -176,6 +214,12 @@ fn find_relationships(lines: &[&str]) -> (Vec<Relationship>, bool) {
             }
             if line.starts_with("## ") {
                 break;
+            }
+            // Detect `—` or `- —` placeholder for empty Related
+            let trimmed = line.trim();
+            if trimmed == "—" || trimmed == "- —" {
+                has_placeholder = true;
+                continue;
             }
             // Parse "- Verb: TARGET1, TARGET2"
             if let Some(rest) = line.strip_prefix("- ") {
@@ -201,7 +245,7 @@ fn find_relationships(lines: &[&str]) -> (Vec<Relationship>, bool) {
         }
     }
 
-    (rels, found_section)
+    (rels, found_section, has_placeholder)
 }
 
 /// Strip trailing annotations like ` (indirect)` or ` (\`#[non_exhaustive]\`)`.
@@ -212,6 +256,54 @@ fn strip_annotation(s: &str) -> &str {
     } else {
         s
     }
+}
+
+/// Measure fenced code blocks (triple-backtick delimiters).
+///
+/// Returns `(max_lines, block_count, max_block_start_line)` where
+/// `max_block_start_line` is the 1-indexed line number of the opening
+/// fence of the largest block (0 if no blocks or all blocks are empty).
+/// Fence lines themselves are excluded from the count. Language
+/// annotations on opening fences (e.g., ` ```rust `) are ignored.
+///
+/// Known limitation: nested backticks (markdown documenting markdown)
+/// cause false open/close toggling. Acceptable for ADR content.
+fn measure_code_blocks(lines: &[&str]) -> (usize, usize, usize) {
+    let mut in_block = false;
+    let mut current_lines = 0usize;
+    let mut current_start = 0usize; // 1-indexed
+    let mut max_lines = 0usize;
+    let mut max_start = 0usize;
+    let mut block_count = 0usize;
+
+    for (i, line) in lines.iter().enumerate() {
+        if line.starts_with("```") {
+            if in_block {
+                // Closing fence
+                if current_lines > max_lines {
+                    max_lines = current_lines;
+                    max_start = current_start;
+                }
+                in_block = false;
+            } else {
+                // Opening fence
+                in_block = true;
+                current_lines = 0;
+                current_start = i + 1; // 1-indexed
+                block_count += 1;
+            }
+        } else if in_block {
+            current_lines += 1;
+        }
+    }
+
+    // Unclosed block — count what we have
+    if in_block && current_lines > max_lines {
+        max_lines = current_lines;
+        max_start = current_start;
+    }
+
+    (max_lines, block_count, max_start)
 }
 
 /// Check if a `## Heading` exists.
@@ -271,7 +363,7 @@ mod tests {
             "",
             "## Context",
         ];
-        let (rels, found) = find_relationships(&lines);
+        let (rels, found, _placeholder) = find_relationships(&lines);
         assert!(found);
         assert_eq!(rels.len(), 4);
         assert_eq!(rels[0].verb, RelVerb::DependsOn);
@@ -297,5 +389,141 @@ mod tests {
         let lines = vec!["## Status", "", "Accepted", "", "## Context", "", "Some text."];
         assert!(has_heading(&lines, "Context"));
         assert!(!has_heading(&lines, "Decision"));
+    }
+
+    #[test]
+    fn measure_code_blocks_counts_lines() {
+        let lines = vec![
+            "some text",
+            "```rust",
+            "fn main() {}",
+            "let x = 1;",
+            "let y = 2;",
+            "```",
+            "more text",
+        ];
+        let (max, count, start) = measure_code_blocks(&lines);
+        assert_eq!(max, 3, "3 lines between fences");
+        assert_eq!(count, 1);
+        assert_eq!(start, 2, "opening fence is line 2 (1-indexed)");
+    }
+
+    #[test]
+    fn measure_code_blocks_multiple_blocks() {
+        let lines = vec![
+            "```",
+            "line1",
+            "```",
+            "text",
+            "```rust",
+            "a",
+            "b",
+            "c",
+            "d",
+            "e",
+            "```",
+        ];
+        let (max, count, start) = measure_code_blocks(&lines);
+        assert_eq!(max, 5, "second block has 5 lines");
+        assert_eq!(count, 2);
+        assert_eq!(start, 5, "second block opens at line 5 (1-indexed)");
+    }
+
+    #[test]
+    fn measure_code_blocks_empty_block() {
+        let lines = vec!["```", "```"];
+        let (max, count, start) = measure_code_blocks(&lines);
+        assert_eq!(max, 0);
+        assert_eq!(count, 1);
+        // Empty block has 0 content lines — no "largest block" to point to
+        assert_eq!(start, 0);
+    }
+
+    #[test]
+    fn measure_code_blocks_no_blocks() {
+        let lines = vec!["some text", "more text"];
+        let (max, count, start) = measure_code_blocks(&lines);
+        assert_eq!(max, 0);
+        assert_eq!(count, 0);
+        assert_eq!(start, 0, "no blocks means start line 0");
+    }
+
+    #[test]
+    fn measure_code_blocks_fence_lines_excluded() {
+        // Opening and closing fence lines should not be counted
+        let lines = vec!["```", "only_this", "```"];
+        let (max, count, start) = measure_code_blocks(&lines);
+        assert_eq!(max, 1, "only content line counted, not fences");
+        assert_eq!(count, 1);
+        assert_eq!(start, 1);
+    }
+
+    #[test]
+    fn measure_code_blocks_unclosed_block() {
+        let lines = vec!["text", "```rust", "fn main() {}", "let x = 1;"];
+        let (max, count, start) = measure_code_blocks(&lines);
+        assert_eq!(max, 2, "unclosed block has 2 content lines");
+        assert_eq!(count, 1);
+        assert_eq!(start, 2, "opening fence at line 2 (1-indexed)");
+    }
+
+    #[test]
+    fn find_amendment_dates_extracts_dates() {
+        let lines = vec![
+            "## Status",
+            "",
+            "Accepted",
+            "",
+            "Amended 2026-04-25 — fencing mandatory",
+            "Amended 2026-05-01 — CAS guard added",
+            "",
+            "## Related",
+        ];
+        let dates = find_amendment_dates(&lines);
+        assert_eq!(dates.len(), 2);
+        assert_eq!(dates[0].0, "2026-04-25");
+        assert_eq!(dates[0].1, 5); // 1-indexed
+        assert_eq!(dates[1].0, "2026-05-01");
+        assert_eq!(dates[1].1, 6);
+    }
+
+    #[test]
+    fn find_amendment_dates_none_when_no_amendments() {
+        let lines = vec!["## Status", "", "Accepted", "", "## Related"];
+        let dates = find_amendment_dates(&lines);
+        assert!(dates.is_empty());
+    }
+
+    #[test]
+    fn find_relationships_detects_placeholder() {
+        let lines = vec!["## Related", "", "- —", "", "## Context"];
+        let (rels, found, placeholder) = find_relationships(&lines);
+        assert!(found);
+        assert!(rels.is_empty());
+        assert!(placeholder, "should detect `- —` as placeholder");
+    }
+
+    #[test]
+    fn find_relationships_detects_bare_dash_placeholder() {
+        let lines = vec!["## Related", "", "—", "", "## Context"];
+        let (rels, found, placeholder) = find_relationships(&lines);
+        assert!(found);
+        assert!(rels.is_empty());
+        assert!(placeholder, "should detect bare `—` as placeholder");
+    }
+
+    #[test]
+    fn find_relationships_no_placeholder_with_rels() {
+        let lines = vec![
+            "## Related",
+            "",
+            "- Depends on: CHE-0001",
+            "",
+            "## Context",
+        ];
+        let (rels, found, placeholder) = find_relationships(&lines);
+        assert!(found);
+        assert_eq!(rels.len(), 1);
+        assert!(!placeholder, "should not detect placeholder when rels exist");
     }
 }

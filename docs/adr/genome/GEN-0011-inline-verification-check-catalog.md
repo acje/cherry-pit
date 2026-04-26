@@ -11,7 +11,6 @@ Accepted
 ## Related
 
 - Extends: GEN-0006
-- Referenced by: GEN-0018, GEN-0021, GEN-0025, GEN-0028
 
 ## Context
 

@@ -13,7 +13,6 @@ Accepted
 - Depends on: CHE-0009
 - Contrasts with: CHE-0040
 - References: CHE-0010
-- Referenced by: CHE-0012, CHE-0044
 
 ## Context
 

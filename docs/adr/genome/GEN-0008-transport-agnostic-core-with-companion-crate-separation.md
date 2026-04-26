@@ -10,7 +10,7 @@ Accepted
 
 ## Related
 
-- Referenced by: PAR-0006, GEN-0026
+- —
 
 ## Context
 

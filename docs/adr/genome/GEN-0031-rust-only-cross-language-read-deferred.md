@@ -11,7 +11,6 @@ Accepted
 ## Related
 
 - References: GEN-0003, GEN-0009
-- Referenced by: PAR-0006
 
 ## Context
 

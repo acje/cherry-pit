@@ -8,12 +8,11 @@ Tier: B
 
 Accepted
 
-Amended 2026-04-01 — CAS guard added
+Amended 2026-04-25 — CAS guard added
 
 ## Related
 
 - References: PAR-0005, PAR-0007
-- Referenced by: PAR-0005
 
 ## Context
 
