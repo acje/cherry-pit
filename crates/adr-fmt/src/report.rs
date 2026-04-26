@@ -27,9 +27,13 @@ pub struct Diagnostic {
     pub file: String,
     pub line: usize,
     pub message: String,
+    /// Internal diagnostics are self-checks (e.g., I001-I003 verifying
+    /// generated README consistency). They are not shown to users.
+    pub internal: bool,
 }
 
 impl Diagnostic {
+    #[allow(dead_code)] // Symmetric with warning(); used by I003 internal_error
     pub fn error(rule: &'static str, file: &Path, line: usize, message: String) -> Self {
         Self {
             severity: Severity::Error,
@@ -37,6 +41,7 @@ impl Diagnostic {
             file: file.display().to_string(),
             line,
             message,
+            internal: false,
         }
     }
 
@@ -47,6 +52,39 @@ impl Diagnostic {
             file: file.display().to_string(),
             line,
             message,
+            internal: false,
+        }
+    }
+
+    pub fn internal_warning(
+        rule: &'static str,
+        file: &Path,
+        line: usize,
+        message: String,
+    ) -> Self {
+        Self {
+            severity: Severity::Warning,
+            rule,
+            file: file.display().to_string(),
+            line,
+            message,
+            internal: true,
+        }
+    }
+
+    pub fn internal_error(
+        rule: &'static str,
+        file: &Path,
+        line: usize,
+        message: String,
+    ) -> Self {
+        Self {
+            severity: Severity::Error,
+            rule,
+            file: file.display().to_string(),
+            line,
+            message,
+            internal: true,
         }
     }
 }

@@ -1,5 +1,9 @@
 //! README index consistency rules (I001–I003).
 //!
+//! These are internal assertions verifying that adr-fmt's own README
+//! generation produced consistent output. They are not user-facing
+//! governance rules — the generated READMEs are the source of truth.
+//!
 //! I001: ADR file exists on disk but is missing from README.md index
 //! I002: README.md references an ADR that does not exist on disk
 //! I003: README.md hyperlink target does not resolve to a file on disk
@@ -25,7 +29,7 @@ pub fn check(dir: &DomainDir, records: &[&AdrRecord], diags: &mut Vec<Diagnostic
     // I001: file exists but not in README
     for record in records {
         if !readme_ids.contains(&record.id) {
-            diags.push(Diagnostic::warning(
+            diags.push(Diagnostic::internal_warning(
                 "I001",
                 &record.file_path,
                 0,
@@ -41,7 +45,7 @@ pub fn check(dir: &DomainDir, records: &[&AdrRecord], diags: &mut Vec<Diagnostic
     // I002: README references non-existent ADR
     for (readme_id, line) in &readme_ids {
         if !file_ids.contains(&readme_id) {
-            diags.push(Diagnostic::warning(
+            diags.push(Diagnostic::internal_warning(
                 "I002",
                 &readme_path,
                 *line,
@@ -61,7 +65,7 @@ pub fn check(dir: &DomainDir, records: &[&AdrRecord], diags: &mut Vec<Diagnostic
         }
         let target_path = dir.path.join(target);
         if !target_path.exists() {
-            diags.push(Diagnostic::error(
+            diags.push(Diagnostic::internal_error(
                 "I003",
                 &readme_path,
                 *line,

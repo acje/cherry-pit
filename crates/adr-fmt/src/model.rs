@@ -49,6 +49,7 @@ pub struct AdrRecord {
     pub has_decision: bool,
     pub has_consequences: bool,
     pub has_retirement: bool,
+    #[allow(dead_code)] // Parsed but unused — all terminal states use Retirement
     pub has_rejection_rationale: bool,
     /// True when the ADR file lives in the stale archive directory.
     pub is_stale: bool,
@@ -95,9 +96,57 @@ impl Tier {
         }
     }
 
-    /// S and A tier ADRs require `Last-reviewed`.
-    pub fn requires_last_reviewed(self) -> bool {
-        matches!(self, Self::S | Self::A)
+    /// Human-readable tier name.
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::S => "Foundational",
+            Self::A => "Core",
+            Self::B => "Behavioural",
+            Self::C => "Tooling",
+            Self::D => "Detail",
+        }
+    }
+
+    /// Tier meaning and scope description.
+    pub fn description(self) -> &'static str {
+        match self {
+            Self::S => "Design philosophy or architecture pattern — changing \
+                        reverberates through every crate and every downstream consumer.",
+            Self::A => "Core trait design or invariant — changing requires major \
+                        refactoring across multiple crates.",
+            Self::B => "Behavioural contracts and API semantics — changing requires \
+                        coordinated updates across call sites.",
+            Self::C => "Tooling, DX, and build decisions — changing is localized to \
+                        configuration or test infrastructure.",
+            Self::D => "Implementation detail — changing affects one crate's internals.",
+        }
+    }
+
+    /// Stability expectation for this tier.
+    pub fn stability(self) -> &'static str {
+        match self {
+            Self::S => "Immutable post-1.0",
+            Self::A => "Near-immutable; changes require RFC-level discussion",
+            Self::B => "Stable; changes documented via Amended status",
+            Self::C => "Flexible; changes append monotonically",
+            Self::D => "Mutable; may be superseded freely",
+        }
+    }
+
+    /// Assignment guide — the question to ask when choosing a tier.
+    pub fn assignment_guide(self) -> &'static str {
+        match self {
+            Self::S => "If this changed, would we need to rewrite the framework?",
+            Self::A => "If this changed, would trait signatures or type bounds change?",
+            Self::B => "If this changed, would call sites or runtime behaviour change?",
+            Self::C => "If this changed, would only CI, lints, or test setup change?",
+            Self::D => "If this changed, would only one crate's internal implementation change?",
+        }
+    }
+
+    /// All tier variants in order.
+    pub fn all() -> &'static [Self] {
+        &[Self::S, Self::A, Self::B, Self::C, Self::D]
     }
 }
 
@@ -164,11 +213,50 @@ impl Status {
     }
 
     /// Returns true if the raw status line has parenthetical content
-    /// (e.g., `Accepted (note)`), which violates governance §6.
+    /// (e.g., `Accepted (note)`), which is not a valid status format.
     pub fn has_parenthetical(raw: &str) -> bool {
         let trimmed = raw.trim();
         // Check for `(` after the status keyword
         trimmed.contains('(') && trimmed.contains(')')
+    }
+
+    /// Returns true for terminal lifecycle states: Rejected, Deprecated,
+    /// Superseded. Terminal-state ADRs must be in the stale directory
+    /// and have a `## Retirement` section.
+    pub fn is_terminal(&self) -> bool {
+        matches!(
+            self,
+            Self::Rejected | Self::Deprecated | Self::SupersededBy(_)
+        )
+    }
+
+    /// Human-readable description of this lifecycle state.
+    pub fn description(&self) -> &'static str {
+        match self {
+            Self::Draft => "Under development, not yet proposed for review. May be incomplete.",
+            Self::Proposed => "Ready for review. All required fields present.",
+            Self::Accepted => "Decision is binding. Implementation may be pending.",
+            Self::Amended { .. } => "Accepted with recorded modifications. Previous text preserved.",
+            Self::Rejected => "Decision was proposed but deliberately not adopted. \
+                              Remains in record for context.",
+            Self::Deprecated => "No longer applicable but preserved for historical context.",
+            Self::SupersededBy(_) => "Replaced by another ADR. The superseding ADR is authoritative.",
+            Self::Invalid(_) => "Unrecognized status value.",
+        }
+    }
+
+    /// All recognized status variant names for documentation.
+    #[allow(dead_code)] // Used by --guidelines
+    pub fn all_variant_names() -> &'static [&'static str] {
+        &[
+            "Draft",
+            "Proposed",
+            "Accepted",
+            "Amended [YYYY-MM-DD — note]",
+            "Rejected",
+            "Deprecated",
+            "Superseded by PREFIX-NNNN",
+        ]
     }
 }
 
@@ -229,6 +317,56 @@ impl RelVerb {
                 | Self::SupersededBy
                 | Self::Scopes
         )
+    }
+
+    /// Human-readable description of the verb's meaning.
+    pub fn description(self) -> &'static str {
+        match self {
+            Self::Root => "Self-reference marking this ADR as a tree root",
+            Self::References => "This ADR cites the target in context or consequences",
+            Self::Supersedes => "Replaces target entirely; target becomes Deprecated/Superseded",
+            _ => "Legacy verb — migrate to a permitted verb",
+        }
+    }
+
+    /// Migration guidance for legacy verbs. Returns None for permitted verbs.
+    pub fn migration(self) -> Option<&'static str> {
+        match self {
+            Self::DependsOn => Some("use References"),
+            Self::Extends => Some("use References"),
+            Self::Illustrates => Some("use References"),
+            Self::ContrastsWith => Some("use References"),
+            Self::ScopedBy => Some("use References"),
+            Self::Informs => Some("remove (reverse verb)"),
+            Self::ExtendedBy => Some("remove (reverse verb)"),
+            Self::IllustratedBy => Some("remove (reverse verb)"),
+            Self::ReferencedBy => Some("remove (reverse verb)"),
+            Self::SupersededBy => Some("remove (reverse verb)"),
+            Self::Scopes => Some("remove (reverse verb)"),
+            _ => None,
+        }
+    }
+
+    /// All permitted verb variants.
+    pub fn permitted() -> &'static [Self] {
+        &[Self::Root, Self::References, Self::Supersedes]
+    }
+
+    /// All legacy verb variants.
+    pub fn legacy() -> &'static [Self] {
+        &[
+            Self::DependsOn,
+            Self::Extends,
+            Self::Illustrates,
+            Self::ContrastsWith,
+            Self::ScopedBy,
+            Self::Informs,
+            Self::ExtendedBy,
+            Self::IllustratedBy,
+            Self::ReferencedBy,
+            Self::SupersededBy,
+            Self::Scopes,
+        ]
     }
 
     /// Parse a verb string from the `## Related` section.
@@ -436,6 +574,85 @@ mod tests {
         for (text, verb) in verbs {
             assert_eq!(RelVerb::parse(text), Some(verb), "parse({text})");
             assert_eq!(verb.to_string(), text, "display({verb:?})");
+        }
+    }
+
+    #[test]
+    fn tier_descriptions_non_empty() {
+        for tier in Tier::all() {
+            assert!(!tier.name().is_empty(), "{tier:?} name");
+            assert!(!tier.description().is_empty(), "{tier:?} description");
+            assert!(!tier.stability().is_empty(), "{tier:?} stability");
+            assert!(!tier.assignment_guide().is_empty(), "{tier:?} guide");
+        }
+    }
+
+    #[test]
+    fn status_is_terminal() {
+        assert!(!Status::Draft.is_terminal());
+        assert!(!Status::Proposed.is_terminal());
+        assert!(!Status::Accepted.is_terminal());
+        assert!(
+            !Status::Amended {
+                date: None,
+                note: None
+            }
+            .is_terminal()
+        );
+        assert!(Status::Rejected.is_terminal());
+        assert!(Status::Deprecated.is_terminal());
+        assert!(
+            Status::SupersededBy(AdrId {
+                prefix: "CHE".into(),
+                number: 1
+            })
+            .is_terminal()
+        );
+    }
+
+    #[test]
+    fn status_descriptions_non_empty() {
+        let variants = [
+            Status::Draft,
+            Status::Proposed,
+            Status::Accepted,
+            Status::Amended {
+                date: None,
+                note: None,
+            },
+            Status::Rejected,
+            Status::Deprecated,
+            Status::SupersededBy(AdrId {
+                prefix: "CHE".into(),
+                number: 1,
+            }),
+            Status::Invalid("bad".into()),
+        ];
+        for status in &variants {
+            assert!(
+                !status.description().is_empty(),
+                "{status:?} description is empty"
+            );
+        }
+    }
+
+    #[test]
+    fn verb_migration_for_legacy() {
+        for verb in RelVerb::legacy() {
+            assert!(
+                verb.migration().is_some(),
+                "{verb:?} should have migration guidance"
+            );
+        }
+    }
+
+    #[test]
+    fn verb_migration_none_for_permitted() {
+        for verb in RelVerb::permitted() {
+            assert!(
+                verb.migration().is_none(),
+                "{verb:?} should not have migration guidance"
+            );
         }
     }
 }

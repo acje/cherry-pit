@@ -1,4 +1,4 @@
-//! Template compliance rules (T001–T015) and structure rules (S004–S005).
+//! Template compliance rules (T001–T015) and structure rules (S004–S006).
 //!
 //! T001: H1 title present
 //! T002: Date field present
@@ -12,11 +12,12 @@
 //! T010: Consequences section present
 //! T011: Code block exceeds 20 lines (warning)
 //! T012: Amendment date ≥ Date (amendment cannot predate ADR creation)
-//! T013: (reserved — Rejected ADR missing Rejection Rationale; not yet implemented)
+//! T013: (reserved — Retirement section covers all terminal states)
 //! T014: Section ordering — H2 sections in canonical order
 //! T015: Section minimum word count (parameterized via TOML)
 //! S004: Stale ADR missing Retirement section
 //! S005: Active ADR has Retirement section (location/status mismatch)
+//! S006: Terminal-status ADR not in stale directory
 
 use crate::config::Config;
 use crate::model::{AdrRecord, Status};
@@ -261,6 +262,31 @@ pub fn check(record: &AdrRecord, config: &Config, diags: &mut Vec<Diagnostic>) {
              only for stale ADRs"
                 .into(),
         ));
+    }
+
+    // S006: Terminal-status ADR not in stale directory
+    if let Some(ref status) = record.status {
+        if status.is_terminal() && !record.is_stale {
+            let status_display = match status {
+                Status::Rejected => "Rejected".to_string(),
+                Status::Deprecated => "Deprecated".to_string(),
+                Status::SupersededBy(id) => format!("Superseded by {id}"),
+                _ => format!("{status:?}"),
+            };
+            diags.push(Diagnostic::warning(
+                "S006",
+                &record.file_path,
+                record.status_line,
+                format!(
+                    "{} has terminal status '{status_display}' but is not in the \
+                     stale directory. Action: move this file to {stale_dir}/ and add a \
+                     `## Retirement` section (≥{min_words} words) explaining why this \
+                     ADR left active service.",
+                    record.id,
+                    stale_dir = config.stale.directory,
+                ),
+            ));
+        }
     }
 }
 
@@ -660,5 +686,103 @@ params = { min_words = 10 }
             diags.iter().any(|d| d.rule == "S005"),
             "active with Retirement should trigger S005, got: {diags:?}"
         );
+    }
+
+    #[test]
+    fn rejected_in_active_dir_produces_s006() {
+        let mut record = make_record();
+        record.status = Some(Status::Rejected);
+        record.status_raw = Some("Rejected".into());
+        record.is_stale = false;
+        let config = make_config();
+        let mut diags = Vec::new();
+        check(&record, &config, &mut diags);
+        let s006 = diags.iter().find(|d| d.rule == "S006");
+        assert!(s006.is_some(), "Rejected in active dir should trigger S006");
+        assert!(
+            s006.unwrap().message.contains("Action:"),
+            "S006 message must contain actionable instructions"
+        );
+    }
+
+    #[test]
+    fn deprecated_in_active_dir_produces_s006() {
+        let mut record = make_record();
+        record.status = Some(Status::Deprecated);
+        record.status_raw = Some("Deprecated".into());
+        record.is_stale = false;
+        let config = make_config();
+        let mut diags = Vec::new();
+        check(&record, &config, &mut diags);
+        assert!(
+            diags.iter().any(|d| d.rule == "S006"),
+            "Deprecated in active dir should trigger S006"
+        );
+    }
+
+    #[test]
+    fn superseded_in_active_dir_produces_s006() {
+        let mut record = make_record();
+        record.status = Some(Status::SupersededBy(AdrId {
+            prefix: "CHE".into(),
+            number: 99,
+        }));
+        record.status_raw = Some("Superseded by CHE-0099".into());
+        record.is_stale = false;
+        let config = make_config();
+        let mut diags = Vec::new();
+        check(&record, &config, &mut diags);
+        let s006 = diags.iter().find(|d| d.rule == "S006");
+        assert!(s006.is_some(), "Superseded in active dir should trigger S006");
+        assert!(
+            s006.unwrap().message.contains("Superseded by CHE-0099"),
+            "S006 message should name the superseding ADR"
+        );
+    }
+
+    #[test]
+    fn accepted_in_active_dir_no_s006() {
+        let record = make_record(); // status = Accepted, is_stale = false
+        let config = make_config();
+        let mut diags = Vec::new();
+        check(&record, &config, &mut diags);
+        assert!(
+            !diags.iter().any(|d| d.rule == "S006"),
+            "Accepted in active dir should NOT trigger S006"
+        );
+    }
+
+    #[test]
+    fn rejected_in_stale_dir_no_s006() {
+        let mut record = make_record();
+        record.status = Some(Status::Rejected);
+        record.status_raw = Some("Rejected".into());
+        record.is_stale = true;
+        record.has_retirement = true;
+        record.section_word_counts.insert("Retirement".into(), 15);
+        record.section_order.push("Retirement".into());
+        let config = make_config();
+        let mut diags = Vec::new();
+        check(&record, &config, &mut diags);
+        assert!(
+            !diags.iter().any(|d| d.rule == "S006"),
+            "Rejected in stale dir should NOT trigger S006"
+        );
+    }
+
+    #[test]
+    fn s006_message_is_llm_actionable() {
+        let mut record = make_record();
+        record.status = Some(Status::Rejected);
+        record.status_raw = Some("Rejected".into());
+        record.is_stale = false;
+        let config = make_config();
+        let mut diags = Vec::new();
+        check(&record, &config, &mut diags);
+        let s006 = diags.iter().find(|d| d.rule == "S006").unwrap();
+        assert!(s006.message.contains("move this file to"), "must say what to do");
+        assert!(s006.message.contains("stale/"), "must name target directory");
+        assert!(s006.message.contains("## Retirement"), "must name required section");
+        assert!(s006.message.contains("≥10 words"), "must specify word count");
     }
 }

@@ -1,20 +1,19 @@
 //! ADR template and link-integrity validator for cherry-pit.
 //!
-//! Validates Architecture Decision Records against the governance
-//! rules defined in `docs/adr/GOVERNANCE.md`:
+//! Single source of truth for all invariant ADR governance rules.
+//! Validates Architecture Decision Records against the rule catalog:
 //!
 //! - Template compliance (required fields, sections, tier, status format,
 //!   code block length, section ordering, minimum word count)
 //! - Relationship integrity (3-verb vocabulary: References, Supersedes,
 //!   Root; legacy verb detection; supersedes-status consistency)
 //! - File naming conventions (`{PREFIX}-{NNNN}-kebab-slug.md`)
-//! - README index ↔ filesystem consistency
 //! - Structure rules (stale location/status, Retirement section)
 //!
 //! # Usage
 //!
 //! ```text
-//! cargo run -p adr-fmt [-- [--report] [path/to/adr]]
+//! cargo run -p adr-fmt [-- [--report | --guidelines] [path/to/adr]]
 //! ```
 //!
 //! Exit codes:
@@ -23,11 +22,15 @@
 //!
 //! Use `--report` to print a computed children index (reverse-link
 //! navigation without stored backlinks).
+//!
+//! Use `--guidelines` to print the complete ADR guidelines document
+//! generated from the rule catalog and configuration.
 
 #![forbid(unsafe_code)]
 
 mod config;
 mod generate;
+mod guidelines;
 mod model;
 mod nav;
 mod parser;
@@ -41,8 +44,15 @@ use config::Config;
 use model::DomainDir;
 use report::Severity;
 
+/// CLI mode of operation.
+enum Mode {
+    Lint,
+    Report,
+    Guidelines,
+}
+
 fn main() {
-    let (adr_root, report_mode) = resolve_args();
+    let (adr_root, mode) = resolve_args();
 
     let config = match config::load(&adr_root) {
         Ok(c) => c,
@@ -51,6 +61,12 @@ fn main() {
             process::exit(1);
         }
     };
+
+    // --guidelines: print guidelines to stdout and exit
+    if matches!(mode, Mode::Guidelines) {
+        guidelines::print(&config);
+        return;
+    }
 
     let domain_dirs = discover_domains(&adr_root, &config);
 
@@ -73,7 +89,7 @@ fn main() {
     }
 
     // Report mode: compute and print children index
-    if report_mode {
+    if matches!(mode, Mode::Report) {
         let children = nav::compute_children(&all_records);
         nav::print_report(&all_records, &children);
     }
@@ -85,8 +101,13 @@ fn main() {
 
     let mut errors = 0u32;
     let mut warnings = 0u32;
+    let mut internal_count = 0u32;
 
     for d in &diagnostics {
+        if d.internal {
+            internal_count += 1;
+            continue;
+        }
         match d.severity {
             Severity::Error => errors += 1,
             Severity::Warning => warnings += 1,
@@ -97,23 +118,28 @@ fn main() {
     if errors > 0 || warnings > 0 {
         eprintln!();
     }
-    eprintln!(
+    let mut summary = format!(
         "adr-fmt: {errors} error(s), {warnings} warning(s) across {} ADR(s)",
         all_records.len()
     );
+    if internal_count > 0 {
+        summary.push_str(&format!(" [{internal_count} internal assertion(s)]"));
+    }
+    eprintln!("{summary}");
 
     // Advisory tool: always exit 0 for lint findings.
     // Only infrastructure errors (missing config, no domains) exit 1.
 }
 
-/// Parse CLI arguments. Returns (adr_root, report_mode).
+/// Parse CLI arguments. Returns (adr_root, mode).
 ///
-/// Extracts `--report` flag and optional positional path argument.
+/// Extracts `--report` / `--guidelines` flags and optional positional path.
+/// `--report` and `--guidelines` are mutually exclusive.
 /// No dependency on clap — manual flag extraction.
-fn resolve_args() -> (PathBuf, bool) {
+fn resolve_args() -> (PathBuf, Mode) {
     let args: Vec<String> = std::env::args().collect();
 
-    let mut report_mode = false;
+    let mut mode = Mode::Lint;
     let mut positional: Option<String> = None;
 
     for arg in &args[1..] {
@@ -123,7 +149,18 @@ fn resolve_args() -> (PathBuf, bool) {
                 process::exit(0);
             }
             "--report" => {
-                report_mode = true;
+                if matches!(mode, Mode::Guidelines) {
+                    eprintln!("error: --report and --guidelines are mutually exclusive");
+                    process::exit(1);
+                }
+                mode = Mode::Report;
+            }
+            "--guidelines" => {
+                if matches!(mode, Mode::Report) {
+                    eprintln!("error: --report and --guidelines are mutually exclusive");
+                    process::exit(1);
+                }
+                mode = Mode::Guidelines;
             }
             _ => {
                 if positional.is_some() {
@@ -147,7 +184,7 @@ fn resolve_args() -> (PathBuf, bool) {
         resolve_adr_root_auto()
     };
 
-    (adr_root, report_mode)
+    (adr_root, mode)
 }
 
 /// Walk up from CWD looking for `docs/adr/GOVERNANCE.md`.
@@ -196,7 +233,10 @@ fn print_help() {
     eprintln!();
     eprintln!("OPTIONS:");
     eprintln!("    --report            Print computed children report (reverse-link index)");
+    eprintln!("    --guidelines        Print complete ADR guidelines (plain text to stdout)");
     eprintln!("    -h, --help          Print this help message");
+    eprintln!();
+    eprintln!("    --report and --guidelines are mutually exclusive.");
     eprintln!();
     eprintln!("ARGS:");
     eprintln!("    <adr-directory>    Path to ADR root (default: auto-discover docs/adr/)");
@@ -210,6 +250,6 @@ fn print_help() {
     eprintln!("    L001,L003   Link and relationship integrity");
     eprintln!("    L006-L009   Verb vocabulary and Root validation");
     eprintln!("    N001-N004   File naming conventions");
-    eprintln!("    S004-S005   Structure and stale archive rules");
-    eprintln!("    I001-I003   README index consistency");
+    eprintln!("    S004-S006   Structure and stale archive rules");
+    eprintln!("    I001-I003   README index consistency (internal)");
 }

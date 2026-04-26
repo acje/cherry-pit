@@ -4,9 +4,10 @@
 
 | Domain | Prefix | ADRs | Directory |
 |--------|--------|------|-----------|
-| Common Domain | COM | 6 | [common](common/) |
+| Common Domain | COM | 15 | [common](common/) |
 | Cherry Domain | CHE | 45 | [cherry](cherry/) |
 | Pardosa Domain | PAR | 14 | [pardosa](pardosa/) |
 | Genome Domain | GEN | 33 | [genome](genome/) |
+| adr-fmt Domain | AFM | 10 | [adr-fmt](adr-fmt/) |
 
 Governed by [GOVERNANCE.md](GOVERNANCE.md).

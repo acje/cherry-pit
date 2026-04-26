@@ -32,18 +32,24 @@ pub struct DomainConfig {
     pub description: String,
     #[allow(dead_code)]
     pub crates: Vec<String>,
+    /// Foundation domains are included with every domain query.
+    /// COM is the canonical foundation domain.
+    #[serde(default)]
+    pub foundation: bool,
 }
 
 /// Rule definition with optional parameters.
 #[derive(Debug, Deserialize)]
 pub struct RuleConfig {
     pub id: String,
-    #[allow(dead_code)]
     pub category: String,
     pub description: String,
     /// Optional rule parameters (e.g., `min_words = 10`).
     #[serde(default)]
     pub params: HashMap<String, toml::Value>,
+    /// Internal rules are self-checks, not user-facing governance.
+    #[serde(default)]
+    pub internal: bool,
 }
 
 impl Config {
@@ -208,6 +214,96 @@ name = "Cherry"
 "#;
         let result: Result<Config, _> = toml::from_str(toml_str);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn foundation_flag_defaults_to_false() {
+        let toml_str = r#"
+[stale]
+directory = "stale"
+
+[[domains]]
+prefix = "CHE"
+name = "Cherry"
+directory = "cherry"
+description = "Test"
+crates = []
+
+[[rules]]
+id = "T001"
+category = "template"
+description = "H1 title present"
+"#;
+        let config: Config = toml::from_str(toml_str).unwrap();
+        assert!(!config.domains[0].foundation);
+    }
+
+    #[test]
+    fn foundation_flag_true_deserializes() {
+        let toml_str = r#"
+[stale]
+directory = "stale"
+
+[[domains]]
+prefix = "COM"
+name = "Common"
+directory = "common"
+description = "Cross-cutting"
+crates = []
+foundation = true
+
+[[rules]]
+id = "T001"
+category = "template"
+description = "H1 title present"
+"#;
+        let config: Config = toml::from_str(toml_str).unwrap();
+        assert!(config.domains[0].foundation);
+    }
+
+    #[test]
+    fn internal_flag_defaults_to_false() {
+        let toml_str = r#"
+[stale]
+directory = "stale"
+
+[[domains]]
+prefix = "CHE"
+name = "Cherry"
+directory = "cherry"
+description = "Test"
+crates = []
+
+[[rules]]
+id = "T001"
+category = "template"
+description = "H1 title present"
+"#;
+        let config: Config = toml::from_str(toml_str).unwrap();
+        assert!(!config.rules[0].internal);
+    }
+
+    #[test]
+    fn internal_flag_true_deserializes() {
+        let toml_str = r#"
+[stale]
+directory = "stale"
+
+[[domains]]
+prefix = "CHE"
+name = "Cherry"
+directory = "cherry"
+description = "Test"
+crates = []
+
+[[rules]]
+id = "I001"
+category = "index"
+description = "ADR file exists but not in README"
+internal = true
+"#;
+        let config: Config = toml::from_str(toml_str).unwrap();
+        assert!(config.rules[0].internal);
     }
 
     #[test]

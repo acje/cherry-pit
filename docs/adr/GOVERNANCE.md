@@ -1,378 +1,98 @@
 # ADR Governance
 
-Last-updated: 2026-04-25
+Last-updated: 2026-04-26
 
-This document is the single source of truth for Architecture Decision Record
-management across the cherry-pit workspace. Changes to this document require
-a pull request with explicit review. Breaking changes to numbering, template,
-or domain taxonomy require a new ADR documenting the rationale.
+This document is the root of authority for Architecture Decision Record
+management across the cherry-pit workspace. It covers rationale, process,
+and judgment-based guidance. All invariant rules are enforced by `adr-fmt`
+and documented via `cargo run -p adr-fmt -- --guidelines`.
 
----
+**Single source of truth architecture:**
 
-## 1. Purpose and Scope
+- **`adr-fmt` (code)** — invariant rules: template requirements, naming
+  conventions, relationship vocabulary, lifecycle states, link integrity
+- **`adr-fmt.toml`** — configurable aspects: domain definitions, crate
+  mappings, rule parameters, stale directory path
+- **`--guidelines` output** — generated complete reference combining
+  code invariants and configuration
+- **ADRs** — architectural decisions, validated by `adr-fmt`
+- **This document** — rationale, process, judgment
 
-ADRs record significant architectural decisions — choices that affect the
-structure, behaviour, or constraints of the codebase. They exist so that
-future contributors can understand *why* the code is shaped the way it is,
-not just *what* it does.
-
-**Scope**: All crates in the cherry-pit Cargo workspace:
-
-| Crate | Domain |
-|-------|--------|
-| `cherry-pit-core` | Cherry, Common |
-| `cherry-pit-gateway` | Cherry, Common |
-| `pardosa` | Pardosa, Common |
-| `pardosa-genome` | Genome, Common |
-| `pardosa-genome-derive` | Genome, Common |
-| `cherry-pit-web` (planned) | Cherry, Common |
-| `cherry-pit-projection` (planned) | Cherry, Common |
-| `cherry-pit-agent` (planned) | Cherry, Common |
+Changes to this document require a pull request with explicit review.
 
 ---
 
-## 2. Domain Taxonomy (MECE)
+## 1. Domain Taxonomy
 
-Every ADR belongs to exactly one domain. Cross-domain decisions get a
-primary home and cross-references to affected domains. A decision that
-spans two domains at equal weight triggers a scoping discussion and may
-result in a boundary-delineating ADR with cross-references.
+Every ADR belongs to exactly one domain. Domains are mutually exclusive
+and collectively exhaustive (MECE) across the architectural decision
+space of the cherry-pit workspace.
 
-| Domain | Prefix | Directory | Scope |
-|--------|--------|-----------|-------|
-| **Common** | `COM` | `docs/adr/common/` | Cross-cutting software design principles, informed by Ousterhout's "A Philosophy of Software Design." Technology-agnostic guidance on module depth, complexity management, error design, and abstraction layering. Distinct from Cherry's crate-specific architecture decisions. |
-| **Cherry** | `CHE` | `docs/adr/cherry/` | Design philosophy, EDA/DDD/hexagonal architecture, domain model traits (aggregates, commands, events, policies), infrastructure ports, concurrency, delivery, storage backends, workspace tooling, testing strategy, build configuration |
-| **Pardosa** | `PAR` | `docs/adr/pardosa/` | EDA storage layer: fiber semantics, stream management, NATS/JetStream transport, migration model, backpressure, single-writer fencing at transport level |
-| **Genome** | `GEN` | `docs/adr/genome/` | Binary serialization format: wire layout, schema hashing, zero-copy deserialization, compression, security limits (DoS protection, decompression bombs), type validation, forward compatibility |
+Domain definitions, prefixes, directories, and crate mappings are
+configured in `adr-fmt.toml`.
 
-### MECE Validation
+### Foundation Domain
 
-Before accepting any ADR, validate:
+The Common (COM) domain is a **foundation domain**. It contains
+cross-cutting software design principles informed by Ousterhout's
+"A Philosophy of Software Design" and complementary works on
+software architecture, evolutionary design, and organizational
+alignment (Martin, Ford, Evans, Skelton, Read, et al.). All
+COM principles are technology-agnostic.
 
-1. The ADR belongs to exactly one domain
-2. No existing ADR in the same domain covers the same decision space
-3. If the decision affects another domain, cross-references are added
-   using the relationship vocabulary (§5)
-4. All `References` targets exist and are `Accepted` (or `Amended`)
-5. No circular dependencies are introduced
-6. A tier (§4) is assigned with justification
+When querying ADRs for a specific domain (e.g., Cherry), the foundation
+domain's ADRs are always included — they provide the design principles
+that all other domains build upon. When querying COM directly, only
+COM ADRs are returned.
 
----
+### MECE Rationale
 
-## 3. Numbering
+The four-domain split reflects a clean architectural boundary:
 
-Format: `{PREFIX}-{NNNN}`
+- **Common** — *why* we design the way we do (principles)
+- **Cherry** — *what* the framework's architecture looks like (structure)
+- **Pardosa** — *how* events are stored and transported (infrastructure)
+- **Genome** — *how* data is serialized on the wire (format)
 
-Examples: `CHE-0001`, `PAR-0006`, `GEN-0015`
-
-### Rules
-
-- Each domain maintains an independent monotonically increasing sequence
-- Numbers are never reused, even after deprecation or supersession
-- Current ranges:
-  - Common: `COM-0001` through `COM-0006` (6 accepted)
-  - Cherry: `CHE-0001` through `CHE-0045` (45 accepted/proposed)
-  - Pardosa: `PAR-0001` through `PAR-0014` (14 accepted, pending migration)
-  - Genome: `GEN-0001` through `GEN-0033` (33 accepted, pending migration)
-- New ADRs append to their domain's sequence: next Common ADR is
-  `COM-0007`, next Cherry ADR is
-  `CHE-0046`, next Pardosa is `PAR-0015`, next Genome is `GEN-0034`
-- File naming: `{PREFIX}-{NNNN}-kebab-case-slug.md`
-  - Example: `CHE-0001-design-priority-ordering.md`
-
-### Cross-Domain References
-
-Use the full prefix in text references:
-
-```markdown
-- References: CHE-0001
-- References: GEN-0006
-```
-
-Use relative paths for Markdown links:
-
-```markdown
-See [CHE-0006](../cherry/CHE-0006-single-writer-assumption.md)
-See [GEN-0015](../genome/GEN-0015-forward-compatibility-contract.md)
-```
-
-Within the same domain, relative paths omit the parent traversal:
-
-```markdown
-See [CHE-0002](CHE-0002-illegal-states-unrepresentable.md)
-```
+Each domain has a distinct rate of change, audience, and abstraction
+level. A decision that spans two domains at equal weight triggers a
+scoping discussion and may result in a boundary-delineating ADR with
+cross-references.
 
 ---
 
-## 4. Tier System
+## 2. Tier System
 
 Tiers classify ADRs by architectural significance and stability
 expectations. Every ADR must be assigned a tier.
 
-| Tier | Name | Criteria | Stability |
-|------|------|----------|-----------|
-| **S** | Foundational | Design philosophy or architecture pattern — changing reverberates through every crate and every downstream consumer | Immutable post-1.0 |
-| **A** | Core | Core trait design or invariant — changing requires major refactoring across multiple crates | Near-immutable; changes require RFC-level discussion |
-| **B** | Behavioural | Behavioural contracts and API semantics — changing requires coordinated updates across call sites | Stable; changes documented via Amended status |
-| **C** | Tooling | Tooling, DX, and build decisions — changing is localized to configuration or test infrastructure | Flexible; changes append monotonically |
-| **D** | Detail | Implementation detail — changing affects one crate's internals | Mutable; may be superseded freely |
+Tier values, descriptions, and stability expectations are documented
+in `cargo run -p adr-fmt -- --guidelines`. The assignment guidelines
+below help determine the correct tier:
 
-### Assignment Guidelines
+- **S** — "If this changed, would we need to rewrite the framework?"
+- **A** — "If this changed, would trait signatures or type bounds change?"
+- **B** — "If this changed, would call sites or runtime behaviour change?"
+- **C** — "If this changed, would only CI, lints, or test setup change?"
+- **D** — "If this changed, would only one crate's internal
+  implementation change?"
 
-- S-tier: "If this changed, would we need to rewrite the framework?"
-  → Yes = S-tier
-- A-tier: "If this changed, would trait signatures or type bounds change?"
-  → Yes = A-tier
-- B-tier: "If this changed, would call sites or runtime behaviour change?"
-  → Yes = B-tier
-- C-tier: "If this changed, would only CI, lints, or test setup change?"
-  → Yes = C-tier
-- D-tier: "If this changed, would only one crate's internal implementation
-  change?" → Yes = D-tier
+Answer "Yes" to assign that tier. Start from S and work down.
 
 ---
 
-## 5. Relationship Vocabulary
+## 3. Lifecycle
 
-ADRs link **toward the root** of the dependency graph using three
-permitted verbs. Reverse links (parent listing children) are not
-stored; use `adr-fmt --report` to compute a children index on demand.
+ADR lifecycle states and their meanings are documented in
+`cargo run -p adr-fmt -- --guidelines`.
 
-| Verb | Meaning | Direction |
-|------|---------|-----------|
-| **Root** | Self-reference marking this ADR as a tree root (`- Root: CHE-0001` in CHE-0001's file) | Self |
-| **References** | This ADR cites the target in context or consequences | Citing → Cited |
-| **Supersedes** | Replaces target entirely; target becomes Deprecated/Superseded | Newer → Older |
-
-### Usage Rules
-
-1. Every ADR must have at least one relationship — no orphans, no
-   placeholder dashes. Tree roots use `- Root: {OWN-ID}`.
-2. `Root` and `References` may not coexist — a root ADR does not
-   reference another ADR (it *is* the starting point). `Root` and
-   `Supersedes` may coexist (a root can supersede an older root).
-3. `Supersedes` requires setting the target's status to
-   `Superseded by {PREFIX}-{NNNN}`.
-4. Multiple roots per domain are permitted (multiple independent trees).
-5. Cross-domain references are encouraged — they make the
-   architecture's cross-cutting concerns explicit.
-
-### Legacy Verbs (L006)
-
-The following verbs were part of the original 12-verb vocabulary and
-are now deprecated. `adr-fmt` emits L006 warnings for these:
-
-| Legacy Verb | Migration |
-|-------------|-----------|
-| `Depends on` | → `References` |
-| `Extends` | → `References` |
-| `Illustrates` | → `References` |
-| `Contrasts with` | → `References` |
-| `Scoped by` | → `References` |
-| `Informs` | Remove (reverse verb) |
-| `Extended by` | Remove (reverse verb) |
-| `Illustrated by` | Remove (reverse verb) |
-| `Referenced by` | Remove (reverse verb) |
-| `Superseded by` | Remove (reverse verb) |
-| `Scopes` | Remove (reverse verb) |
+Terminal states (Rejected, Deprecated, Superseded) require moving the
+ADR to the stale directory and adding a `## Retirement` section
+explaining why the ADR left active service.
 
 ---
 
-## 6. Lifecycle
-
-```
-Draft → Proposed → Accepted → Amended (with date log)
-            ↓                      ↓
-         Rejected           Deprecated → (optional) Superseded by X
-```
-
-| State | Meaning |
-|-------|---------|
-| **Draft** | Under development, not yet proposed for review. May be incomplete. |
-| **Proposed** | Ready for review. All required fields present. |
-| **Accepted** | Decision is binding. Implementation may be pending. |
-| **Amended** | Accepted with recorded modifications. The amendment date and summary are appended to the Status section. Previous text is preserved, not deleted. |
-| **Rejected** | Decision was proposed but deliberately not adopted. Remains in record for context. Requires a `## Rejection Rationale` section. |
-| **Deprecated** | No longer applicable but preserved for historical context. Reason documented. |
-| **Superseded** | Replaced by another ADR. Status reads: `Superseded by {PREFIX}-{NNNN}`. |
-
-### Terminal States
-
-`Rejected`, `Deprecated`, and `Superseded` are terminal states. ADRs in
-these states are moved to `docs/adr/stale/` and require a
-`## Retirement` section (≥10 words) explaining why the ADR left active
-service. Active ADRs must not have a Retirement section.
-
-### Amendment Format
-
-When amending an accepted ADR, append to the Status section:
-
-```markdown
-## Status
-
-Accepted
-
-Amended 2026-04-25 — added fencing requirement (previously documented only)
-```
-
-Do not delete original text. Add new content inline with clear markers
-or append a new section.
-
-### Date Semantics
-
-- `Date:` is the formal authorship date — the date the ADR was first
-  written or accepted.
-- `Last-reviewed:` is the most recent review or audit date.
-- Amendment dates (in the Status section) must be ≥ `Date:`. An
-  amendment cannot predate the ADR's creation. `adr-fmt` enforces this
-  via rule T012.
-
-### Title and Intent Immutability
-
-Once an ADR reaches `Accepted` status:
-
-1. **Title**: The title line (`# {PREFIX}-{NNNN}. Title`) is immutable.
-   Renaming requires a new Superseding ADR.
-2. **Decision intent**: The core decision (the "what we chose" in the
-   Decision section) cannot be reversed or materially altered via
-   amendment. Amendments may add detail, clarify scope, or document
-   implementation refinements — but not change the fundamental choice.
-3. **Reversing a decision**: Requires a new ADR with `Supersedes:
-   {PREFIX}-{NNNN}` in its Related section and the original ADR's
-   status set to `Superseded by {PREFIX}-{NNNN}`.
-
----
-
-## 7. ADR Template
-
-```markdown
-# {PREFIX}-{NNNN}. Title
-
-Date: YYYY-MM-DD
-Last-reviewed: YYYY-MM-DD
-Tier: S | A | B | C | D
-
-## Status
-
-Draft | Proposed | Accepted | Amended | Rejected | Deprecated | Superseded by {PREFIX}-{NNNN}
-
-## Related
-
-- Root: {OWN-PREFIX}-{OWN-NNNN}
-- References: {PREFIX}-{NNNN}
-- Supersedes: {PREFIX}-{NNNN}
-
-## Context
-
-What is the issue? Why does a decision need to be made?
-Include alternatives considered and why they were rejected.
-
-## Decision
-
-What is the change being proposed or decided?
-Be specific — name types, traits, crates, configuration.
-
-## Consequences
-
-What becomes easier or harder? Trade-offs and risks.
-Include both positive and negative consequences.
-```
-
-### Stale ADR Template Addition
-
-ADRs in `stale/` must append a Retirement section:
-
-```markdown
-## Retirement
-
-Why this ADR left active service. Must be ≥10 words.
-```
-
-### Required Fields
-
-All ADRs must have: Title, Date, Last-reviewed, Tier, Status,
-Related (with ≥1 relationship — no empty placeholder), Context,
-Decision, Consequences. Stale ADRs additionally require Retirement.
-
-### Section Ordering
-
-Sections must appear in canonical order: Status → Related → Context →
-Decision → Consequences (→ Retirement for stale). `adr-fmt` rule T014
-warns when sections are misordered.
-
-### Minimum Word Count
-
-Prose sections (Context, Decision, Consequences, Retirement) must each
-contain ≥10 words. The threshold is configurable via `adr-fmt.toml`
-rule T015 params.
-
-### Optional Fields
-
-- `Alternatives Considered` — may be a subsection of Context or a separate
-  section
-- `References` — links to design docs, issues, or external resources
-
-### Code Block Guidance
-
-Decision sections should use type signatures, trait bounds, or pseudocode.
-Reference source files for full implementations. Code blocks exceeding 20
-lines indicate implementation detail leaking into the ADR — `adr-fmt`
-emits a T011 warning for these.
-
-Acceptable: trait definitions, struct signatures, error enums.
-Avoid: full method implementations, accessor methods, test code.
-
----
-
-## 8. Cross-Domain Referencing
-
-### Within ADR Text
-
-Use the prefixed identifier inline:
-
-```markdown
-Cherry-pit's single-writer assumption (CHE-0006) is enforced at the
-transport level by pardosa's NATS sequence fencing (PAR-0004).
-```
-
-### In Related Sections
-
-Use the full prefix:
-
-```markdown
-## Related
-
-- References: CHE-0004
-- References: CHE-0006
-```
-
-### Markdown Links
-
-Use relative paths from the ADR file:
-
-```markdown
-<!-- From docs/adr/pardosa/PAR-0004-... to a Cherry domain ADR -->
-See [CHE-0006](../cherry/CHE-0006-single-writer-assumption.md)
-
-<!-- From docs/adr/cherry/CHE-0022-... to a genome ADR -->
-See [GEN-0002](../genome/GEN-0002-no-schema-evolution-fixed-layout.md)
-
-<!-- Within the same domain -->
-See [CHE-0002](CHE-0002-illegal-states-unrepresentable.md)
-```
-
-### Reference Docs
-
-Design documents in `docs/` are referenced from ADRs using relative paths:
-
-```markdown
-See [pardosa design](../plans/pardosa-design.md)
-See [genome design](../plans/genome.md)
-```
-
----
-
-## 9. When to Write an ADR
+## 4. When to Write an ADR
 
 Write an ADR when a decision:
 
@@ -395,24 +115,29 @@ Do **not** write an ADR for:
 
 ---
 
-## 10. Review Process
+## 5. Review Process
 
 1. **Author** creates a Draft ADR in the appropriate domain directory
-2. **Author** validates the MECE checklist (§2)
+2. **Author** validates MECE compliance:
+   - The ADR belongs to exactly one domain
+   - No existing ADR in the same domain covers the same decision space
+   - If the decision affects another domain, cross-references are added
+   - All relationship targets exist and are Accepted or Amended
+   - No circular dependencies are introduced
+   - A tier is assigned
 3. **Author** opens a PR moving the ADR from Draft to Proposed
 4. **Reviewer** verifies:
    - Correct domain assignment
    - Tier assignment with justification
-   - Relationship vocabulary uses only permitted verbs (§5)
-   - Every ADR has ≥1 relationship (Root, References, or Supersedes)
-   - Template conformance (section order, word counts)
+   - Template and vocabulary conformance (`cargo run -p adr-fmt`)
    - MECE compliance
 5. On approval, status changes to Accepted and the PR is merged
-6. Domain README index is updated in the same PR
+6. Run `cargo run -p adr-fmt` to regenerate README indexes; commit
+   the ADR and any regenerated files together
 
 ---
 
-## 11. Overlap Resolution
+## 6. Overlap Resolution
 
 When pardosa or genome ADRs cover the same concern as a Cherry domain ADR at
 a different abstraction level, the resolution is cross-referencing — not
@@ -431,17 +156,3 @@ concrete transport-level implementation.
 Merging is reserved for cases where two ADRs in the **same domain**
 genuinely cover the same decision space — then the newer ADR supersedes
 the older one.
-
----
-
-## 12. Index Structure
-
-Each domain directory contains a `README.md` with:
-
-1. **Domain description** — one-paragraph scope statement
-2. **Index table** — columns: `#`, `Title`, `Tier`, `Status`, `References`
-3. **Dependency graph** — textual tree and/or Graphviz DOT
-4. **Cross-domain references** — links to related ADRs in other domains
-
-The top-level `docs/adr/README.md` is the hub linking to all domain
-READMEs and GOVERNANCE.md.
