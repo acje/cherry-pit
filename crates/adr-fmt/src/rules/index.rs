@@ -15,7 +15,12 @@ use regex::Regex;
 use crate::model::{parse_adr_id_from_str, AdrId, AdrRecord, DomainDir};
 use crate::report::Diagnostic;
 
-pub fn check(dir: &DomainDir, records: &[&AdrRecord], diags: &mut Vec<Diagnostic>) {
+pub fn check(
+    dir: &DomainDir,
+    records: &[&AdrRecord],
+    domain_prefixes: &[&str],
+    diags: &mut Vec<Diagnostic>,
+) {
     let readme_path = dir.path.join("README.md");
 
     let Ok(content) = fs::read_to_string(&readme_path) else {
@@ -57,7 +62,7 @@ pub fn check(dir: &DomainDir, records: &[&AdrRecord], diags: &mut Vec<Diagnostic
     }
 
     // I003: Hyperlink targets in README resolve to files
-    let link_targets = extract_link_targets_from_readme(&content);
+    let link_targets = extract_link_targets_from_readme(&content, domain_prefixes);
     for (target, line) in &link_targets {
         // Skip cross-domain relative paths (e.g., ../genome/GEN-0002-...)
         if target.starts_with("../") {
@@ -113,8 +118,20 @@ impl ContainsId for Vec<(AdrId, usize)> {
 ///
 /// Matches patterns like `[CHE-0001](CHE-0001-design-priority-ordering.md)`
 /// and returns the target filename with its 1-indexed line number.
-fn extract_link_targets_from_readme(content: &str) -> Vec<(String, usize)> {
-    let link_re = Regex::new(r"\[(?:CHE|PAR|GEN|COM)-\d{4}\]\(([^)]+\.md)\)")
+///
+/// Prefixes are built dynamically from the configured domain list so
+/// that new domains are picked up automatically.
+fn extract_link_targets_from_readme(content: &str, prefixes: &[&str]) -> Vec<(String, usize)> {
+    if prefixes.is_empty() {
+        return Vec::new();
+    }
+
+    let prefix_alt: String = prefixes
+        .iter()
+        .map(|p| regex::escape(p))
+        .collect::<Vec<_>>()
+        .join("|");
+    let link_re = Regex::new(&format!(r"\[(?:{prefix_alt})-\d{{4}}\]\(([^)]+\.md)\)"))
         .expect("valid regex");
 
     let mut targets = Vec::new();
@@ -135,6 +152,8 @@ fn extract_link_targets_from_readme(content: &str) -> Vec<(String, usize)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    const TEST_PREFIXES: &[&str] = &["CHE", "PAR", "GEN", "COM"];
 
     #[test]
     fn extract_ids_finds_che_refs() {
@@ -167,7 +186,7 @@ And CHE-0001 appears again.
 | [CHE-0002](CHE-0002-illegal-states.md) | Illegal States | S | Accepted |
 Some text with [CHE-0003](CHE-0003-foo.md) not in table.
 ";
-        let targets = extract_link_targets_from_readme(content);
+        let targets = extract_link_targets_from_readme(content, TEST_PREFIXES);
         assert_eq!(targets.len(), 2, "only table rows should match");
         assert_eq!(targets[0].0, "CHE-0001-design-priority-ordering.md");
         assert_eq!(targets[0].1, 1);
@@ -180,7 +199,18 @@ Some text with [CHE-0003](CHE-0003-foo.md) not in table.
         let content = "\
 | CHE-0001 | Design Priority | S | Accepted |
 ";
-        let targets = extract_link_targets_from_readme(content);
+        let targets = extract_link_targets_from_readme(content, TEST_PREFIXES);
         assert!(targets.is_empty(), "no hyperlinks should produce no targets");
+    }
+
+    #[test]
+    fn extract_link_targets_ignores_unknown_prefix() {
+        let content = "\
+| [ZZZ-0001](ZZZ-0001-unknown.md) | Unknown | B | Accepted |
+| [CHE-0001](CHE-0001-known.md) | Known | S | Accepted |
+";
+        let targets = extract_link_targets_from_readme(content, TEST_PREFIXES);
+        assert_eq!(targets.len(), 1, "ZZZ prefix should not match");
+        assert_eq!(targets[0].0, "CHE-0001-known.md");
     }
 }

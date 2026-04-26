@@ -53,7 +53,17 @@ pub fn parse_stale(stale_dir: &Path, config: &Config) -> Vec<AdrRecord> {
         return records;
     };
 
-    let prefixes: Vec<&str> = config.domains.iter().map(|d| d.prefix.as_str()).collect();
+    let prefixes: Vec<(&str, Regex)> = config
+        .domains
+        .iter()
+        .map(|d| {
+            let pattern = format!(
+                r"^{}-\d{{4}}-[a-z0-9]+(?:-[a-z0-9]+)*\.md$",
+                regex::escape(&d.prefix),
+            );
+            (d.prefix.as_str(), Regex::new(&pattern).expect("valid regex"))
+        })
+        .collect();
 
     for entry in entries.flatten() {
         let file_name = entry.file_name();
@@ -64,9 +74,7 @@ pub fn parse_stale(stale_dir: &Path, config: &Config) -> Vec<AdrRecord> {
         }
 
         // Try each prefix to find which domain this stale ADR belongs to
-        for prefix in &prefixes {
-            let pattern = format!(r"^{}-\d{{4}}-[a-z0-9]+(?:-[a-z0-9]+)*\.md$", regex::escape(prefix));
-            let re = Regex::new(&pattern).expect("valid regex");
+        for (prefix, re) in &prefixes {
             if re.is_match(&name) {
                 if let Some(record) = parse_adr_file(&entry.path(), prefix, true) {
                     records.push(record);

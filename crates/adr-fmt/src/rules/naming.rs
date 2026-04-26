@@ -5,10 +5,22 @@
 //! N003: Slug must be lowercase kebab-case (a-z0-9, hyphens)
 //! N004: Prefix must match a configured domain
 
+use std::sync::LazyLock;
+
 use regex::Regex;
 
 use crate::model::{parse_adr_id_from_str, AdrRecord};
 use crate::report::Diagnostic;
+
+/// N001: filename must match `PREFIX-NNNN-kebab-slug.md`.
+static N001_PATTERN: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"^[A-Z]{2,4}-\d{4}-[a-z0-9]+(?:-[a-z0-9]+)*\.md$").expect("valid regex")
+});
+
+/// N003: slug must be lowercase kebab-case.
+static KEBAB_PATTERN: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"^[a-z0-9]+(?:-[a-z0-9]+)*$").expect("valid regex")
+});
 
 pub fn check(record: &AdrRecord, domain_prefixes: &[&str], diags: &mut Vec<Diagnostic>) {
     let Some(file_name) = record.file_path.file_name().and_then(|f| f.to_str()) else {
@@ -16,10 +28,7 @@ pub fn check(record: &AdrRecord, domain_prefixes: &[&str], diags: &mut Vec<Diagn
     };
 
     // N001: Overall pattern
-    let pattern = Regex::new(r"^[A-Z]{2,4}-\d{4}-[a-z0-9]+(?:-[a-z0-9]+)*\.md$")
-        .expect("valid regex");
-
-    if !pattern.is_match(file_name) {
+    if !N001_PATTERN.is_match(file_name) {
         diags.push(Diagnostic::warning(
             "N001",
             &record.file_path,
@@ -55,8 +64,7 @@ pub fn check(record: &AdrRecord, domain_prefixes: &[&str], diags: &mut Vec<Diagn
     let slug_with_ext = &file_name[prefix_len..];
     let slug = slug_with_ext.strip_suffix(".md").unwrap_or(slug_with_ext);
 
-    let kebab = Regex::new(r"^[a-z0-9]+(?:-[a-z0-9]+)*$").expect("valid regex");
-    if !kebab.is_match(slug) {
+    if !KEBAB_PATTERN.is_match(slug) {
         diags.push(Diagnostic::warning(
             "N003",
             &record.file_path,

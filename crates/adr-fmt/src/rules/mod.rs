@@ -28,7 +28,7 @@ pub fn run_all(records: &[AdrRecord], domain_dirs: &[DomainDir], config: &Config
     for dir in domain_dirs {
         let domain_records: Vec<&AdrRecord> =
             records.iter().filter(|r| r.id.prefix == dir.prefix).collect();
-        index::check(dir, &domain_records, &mut diagnostics);
+        index::check(dir, &domain_records, &domain_prefixes, &mut diagnostics);
     }
 
     // Sort by file, then line

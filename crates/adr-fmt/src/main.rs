@@ -13,7 +13,7 @@
 //! # Usage
 //!
 //! ```text
-//! cargo run -p adr-fmt [-- [--report | --guidelines] [path/to/adr]]
+//! adr-fmt [--report | --guidelines] [<ADR_DIR>]
 //! ```
 //!
 //! Exit codes:
@@ -40,19 +40,43 @@ mod rules;
 use std::path::{Path, PathBuf};
 use std::process;
 
+use clap::Parser;
+
 use config::Config;
 use model::DomainDir;
 use report::Severity;
 
-/// CLI mode of operation.
-enum Mode {
-    Lint,
-    Report,
-    Guidelines,
+/// ADR template and link-integrity validator for cherry-pit.
+#[derive(Parser)]
+#[command(name = "adr-fmt", version)]
+struct Cli {
+    /// Print computed children report (reverse-link index)
+    #[arg(long, conflicts_with = "guidelines")]
+    report: bool,
+
+    /// Print complete ADR guidelines (plain text to stdout)
+    #[arg(long, conflicts_with = "report")]
+    guidelines: bool,
+
+    /// Path to ADR root directory (default: auto-discover docs/adr/)
+    #[arg(value_name = "ADR_DIR")]
+    adr_directory: Option<PathBuf>,
 }
 
 fn main() {
-    let (adr_root, mode) = resolve_args();
+    let cli = Cli::parse();
+
+    let adr_root = match cli.adr_directory {
+        Some(ref p) => {
+            if p.is_dir() {
+                p.clone()
+            } else {
+                eprintln!("error: {} is not a directory", p.display());
+                process::exit(1);
+            }
+        }
+        None => resolve_adr_root_auto(),
+    };
 
     let config = match config::load(&adr_root) {
         Ok(c) => c,
@@ -63,7 +87,7 @@ fn main() {
     };
 
     // --guidelines: print guidelines to stdout and exit
-    if matches!(mode, Mode::Guidelines) {
+    if cli.guidelines {
         guidelines::print(&config);
         return;
     }
@@ -89,7 +113,7 @@ fn main() {
     }
 
     // Report mode: compute and print children index
-    if matches!(mode, Mode::Report) {
+    if cli.report {
         let children = nav::compute_children(&all_records);
         nav::print_report(&all_records, &children);
     }
@@ -131,62 +155,6 @@ fn main() {
     // Only infrastructure errors (missing config, no domains) exit 1.
 }
 
-/// Parse CLI arguments. Returns (adr_root, mode).
-///
-/// Extracts `--report` / `--guidelines` flags and optional positional path.
-/// `--report` and `--guidelines` are mutually exclusive.
-/// No dependency on clap — manual flag extraction.
-fn resolve_args() -> (PathBuf, Mode) {
-    let args: Vec<String> = std::env::args().collect();
-
-    let mut mode = Mode::Lint;
-    let mut positional: Option<String> = None;
-
-    for arg in &args[1..] {
-        match arg.as_str() {
-            "--help" | "-h" => {
-                print_help();
-                process::exit(0);
-            }
-            "--report" => {
-                if matches!(mode, Mode::Guidelines) {
-                    eprintln!("error: --report and --guidelines are mutually exclusive");
-                    process::exit(1);
-                }
-                mode = Mode::Report;
-            }
-            "--guidelines" => {
-                if matches!(mode, Mode::Report) {
-                    eprintln!("error: --report and --guidelines are mutually exclusive");
-                    process::exit(1);
-                }
-                mode = Mode::Guidelines;
-            }
-            _ => {
-                if positional.is_some() {
-                    eprintln!("error: unexpected argument: {arg}");
-                    process::exit(1);
-                }
-                positional = Some(arg.clone());
-            }
-        }
-    }
-
-    let adr_root = if let Some(path_str) = positional {
-        let p = PathBuf::from(&path_str);
-        if p.is_dir() {
-            p
-        } else {
-            eprintln!("error: {} is not a directory", p.display());
-            process::exit(1);
-        }
-    } else {
-        resolve_adr_root_auto()
-    };
-
-    (adr_root, mode)
-}
-
 /// Walk up from CWD looking for `docs/adr/GOVERNANCE.md`.
 fn resolve_adr_root_auto() -> PathBuf {
     if let Ok(cwd) = std::env::current_dir() {
@@ -223,33 +191,4 @@ fn discover_domains(root: &Path, config: &Config) -> Vec<DomainDir> {
         }
     }
     dirs
-}
-
-fn print_help() {
-    eprintln!("adr-fmt — ADR template and link-integrity validator for cherry-pit");
-    eprintln!();
-    eprintln!("USAGE:");
-    eprintln!("    cargo run -p adr-fmt [-- [OPTIONS] [<adr-directory>]]");
-    eprintln!();
-    eprintln!("OPTIONS:");
-    eprintln!("    --report            Print computed children report (reverse-link index)");
-    eprintln!("    --guidelines        Print complete ADR guidelines (plain text to stdout)");
-    eprintln!("    -h, --help          Print this help message");
-    eprintln!();
-    eprintln!("    --report and --guidelines are mutually exclusive.");
-    eprintln!();
-    eprintln!("ARGS:");
-    eprintln!("    <adr-directory>    Path to ADR root (default: auto-discover docs/adr/)");
-    eprintln!();
-    eprintln!("EXIT CODES:");
-    eprintln!("    0    Lint complete (warnings may be present)");
-    eprintln!("    1    Infrastructure error (missing config, no domains)");
-    eprintln!();
-    eprintln!("RULES:");
-    eprintln!("    T001-T015   Template compliance");
-    eprintln!("    L001,L003   Link and relationship integrity");
-    eprintln!("    L006-L009   Verb vocabulary and Root validation");
-    eprintln!("    N001-N004   File naming conventions");
-    eprintln!("    S004-S006   Structure and stale archive rules");
-    eprintln!("    I001-I003   README index consistency (internal)");
 }
