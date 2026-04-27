@@ -106,10 +106,7 @@ fn check_single_link(
                 "L007",
                 &source.file_path,
                 rel.line,
-                format!(
-                    "{} → {target_id}: reference to stale ADR",
-                    source.id,
-                ),
+                format!("{} → {target_id}: reference to stale ADR", source.id,),
             ));
         }
     }
@@ -153,11 +150,7 @@ fn check_supersedes_consistency(
 }
 
 /// L008: Root self-reference mismatch.
-fn check_root_self_reference(
-    source: &AdrRecord,
-    rel: &Relationship,
-    diags: &mut Vec<Diagnostic>,
-) {
+fn check_root_self_reference(source: &AdrRecord, rel: &Relationship, diags: &mut Vec<Diagnostic>) {
     debug_assert_eq!(rel.verb, RelVerb::Root);
     if rel.target != source.id {
         diags.push(Diagnostic::warning(
@@ -217,11 +210,7 @@ mod tests {
         }
     }
 
-    fn make_record_with_rels(
-        prefix: &str,
-        num: u16,
-        rels: Vec<(RelVerb, AdrId)>,
-    ) -> AdrRecord {
+    fn make_record_with_rels(prefix: &str, num: u16, rels: Vec<(RelVerb, AdrId)>) -> AdrRecord {
         let id = make_id(prefix, num);
         let relationships: Vec<Relationship> = rels
             .into_iter()
@@ -239,9 +228,7 @@ mod tests {
 
         AdrRecord {
             id,
-            file_path: PathBuf::from(format!(
-                "docs/adr/cherry/{prefix}-{num:04}-test.md"
-            )),
+            file_path: PathBuf::from(format!("docs/adr/cherry/{prefix}-{num:04}-test.md")),
             title: Some("Test".into()),
             title_line: 1,
             date: Some("2026-04-25".into()),
@@ -270,7 +257,10 @@ mod tests {
         check(&records, TEST_PREFIXES, &mut diags);
         // Filter out L006 — we're testing link integrity, not verb vocabulary
         let non_l006: Vec<_> = diags.iter().filter(|d| d.rule != "L006").collect();
-        assert!(non_l006.is_empty(), "expected no diags (excl L006), got: {non_l006:?}");
+        assert!(
+            non_l006.is_empty(),
+            "expected no diags (excl L006), got: {non_l006:?}"
+        );
     }
 
     #[test]
@@ -477,14 +467,12 @@ mod tests {
 
     #[test]
     fn cross_domain_forward_link_no_errors() {
-        let mut che = make_record_with_rels(
-            "CHE",
-            5,
-            vec![(RelVerb::References, make_id("COM", 2))],
-        );
+        let mut che =
+            make_record_with_rels("CHE", 5, vec![(RelVerb::References, make_id("COM", 2))]);
         che.file_path = "docs/adr/cherry/CHE-0005-test.md".into();
 
-        let mut com_target = make_record_with_rels("COM", 2, vec![(RelVerb::Root, make_id("COM", 2))]);
+        let mut com_target =
+            make_record_with_rels("COM", 2, vec![(RelVerb::Root, make_id("COM", 2))]);
         com_target.file_path = "docs/adr/common/COM-0002-test.md".into();
 
         let records = vec![che, com_target];
@@ -492,17 +480,16 @@ mod tests {
         check(&records, TEST_PREFIXES, &mut diags);
         // Filter L006 — testing link integrity only
         let non_l006: Vec<_> = diags.iter().filter(|d| d.rule != "L006").collect();
-        assert!(non_l006.is_empty(), "expected no diags (excl L006), got: {non_l006:?}");
+        assert!(
+            non_l006.is_empty(),
+            "expected no diags (excl L006), got: {non_l006:?}"
+        );
     }
 
     #[test]
     fn contrasts_with_produces_l006() {
         let records = vec![
-            make_record_with_rels(
-                "CHE",
-                1,
-                vec![(RelVerb::ContrastsWith, make_id("CHE", 2))],
-            ),
+            make_record_with_rels("CHE", 1, vec![(RelVerb::ContrastsWith, make_id("CHE", 2))]),
             make_record_with_rels("CHE", 2, vec![(RelVerb::Root, make_id("CHE", 2))]),
         ];
         let mut diags = Vec::new();

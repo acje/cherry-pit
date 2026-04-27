@@ -37,7 +37,7 @@ use std::process;
 use clap::Parser;
 
 use config::Config;
-use model::{parse_adr_id_from_str, DomainDir};
+use model::{DomainDir, parse_adr_id_from_str};
 
 /// ADR template and link-integrity validator for cherry-pit.
 #[derive(Parser)]
@@ -100,7 +100,10 @@ fn main() {
     let domain_dirs = discover_domains(&adr_root, &config);
 
     if domain_dirs.is_empty() {
-        eprintln!("error: no domain directories found in {}", adr_root.display());
+        eprintln!(
+            "error: no domain directories found in {}",
+            adr_root.display()
+        );
         process::exit(1);
     }
 
@@ -147,10 +150,7 @@ fn main() {
     } else if cli.report {
         // --report mode
         let children = nav::compute_children(&all_records);
-        print!(
-            "{}",
-            output::render_report(&all_records, &children)
-        );
+        print!("{}", output::render_report(&all_records, &children));
     } else {
         // Default lint mode
         let diagnostics = rules::run_all(&all_records, &config);

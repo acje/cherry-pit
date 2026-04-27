@@ -17,11 +17,7 @@ use crate::output::CrateRule;
 ///
 /// Returns `CrateRule` entries ordered: foundation first (by prefix),
 /// then non-foundation by tier (S→D), then by ADR ID.
-pub fn context(
-    crate_name: &str,
-    records: &[AdrRecord],
-    config: &Config,
-) -> Vec<CrateRule> {
+pub fn context(crate_name: &str, records: &[AdrRecord], config: &Config) -> Vec<CrateRule> {
     // Find candidate domains
     let candidate_domains: Vec<&str> = config
         .domains
@@ -139,7 +135,7 @@ pub fn context(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::{AdrId, AdrRecord, TaggedRule, Status, Tier};
+    use crate::model::{AdrId, AdrRecord, Status, TaggedRule, Tier};
     use std::path::PathBuf;
 
     fn make_config() -> Config {
@@ -236,12 +232,7 @@ description = "test"
     #[test]
     fn context_filters_by_per_adr_crates() {
         let records = vec![
-            make_record_with_rules(
-                "CHE",
-                1,
-                vec!["cherry-pit-core"],
-                vec![("R1", "Core rule")],
-            ),
+            make_record_with_rules("CHE", 1, vec!["cherry-pit-core"], vec![("R1", "Core rule")]),
             make_record_with_rules(
                 "CHE",
                 2,

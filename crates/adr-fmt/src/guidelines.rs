@@ -65,7 +65,11 @@ fn print_domains(config: &Config) {
     println!("-------");
     println!();
     for domain in &config.domains {
-        let foundation_marker = if domain.foundation { " [foundation]" } else { "" };
+        let foundation_marker = if domain.foundation {
+            " [foundation]"
+        } else {
+            ""
+        };
         println!(
             "{name} ({prefix}){foundation_marker}",
             name = domain.name,
@@ -73,7 +77,11 @@ fn print_domains(config: &Config) {
         );
         println!("  Directory: {}", domain.directory);
         // Normalize whitespace in description
-        let desc: String = domain.description.split_whitespace().collect::<Vec<_>>().join(" ");
+        let desc: String = domain
+            .description
+            .split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" ");
         println!("  {desc}");
         if domain.crates.is_empty() {
             if domain.foundation {
@@ -93,10 +101,7 @@ fn print_tiers() {
     println!("-----");
     println!();
     for tier in Tier::all() {
-        println!(
-            "{tier:?} — {name}",
-            name = tier.name(),
-        );
+        println!("{tier:?} — {name}", name = tier.name(),);
         println!("  {}", tier.description());
         println!("  Stability: {}", tier.stability());
         println!("  Assignment: {} → Yes = {tier:?}", tier.assignment_guide());
@@ -317,7 +322,11 @@ fn print_rule(rule: &crate::config::RuleConfig) {
             .collect();
         format!(" ({})", pairs.join(", "))
     };
-    println!("  {id} — {desc}{params_str}", id = rule.id, desc = rule.description);
+    println!(
+        "  {id} — {desc}{params_str}",
+        id = rule.id,
+        desc = rule.description
+    );
 }
 
 #[cfg(test)]

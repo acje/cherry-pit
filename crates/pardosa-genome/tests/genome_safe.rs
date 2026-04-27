@@ -1,7 +1,7 @@
 //! Tests for `GenomeSafe` trait, derive macro, and schema source generation.
 
-use pardosa_genome::GenomeSafe;
 use pardosa_genome::GenomeOrd;
+use pardosa_genome::GenomeSafe;
 use pardosa_genome::genome_safe::{schema_hash_bytes, schema_hash_combine};
 use serde::{Deserialize, Serialize};
 
@@ -551,7 +551,24 @@ fn nested_option_distinct() {
 
 #[test]
 fn tuple_16_compiles() {
-    let h = <(u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8) as GenomeSafe>::SCHEMA_HASH;
+    let h = <(
+        u8,
+        u8,
+        u8,
+        u8,
+        u8,
+        u8,
+        u8,
+        u8,
+        u8,
+        u8,
+        u8,
+        u8,
+        u8,
+        u8,
+        u8,
+        u8,
+    ) as GenomeSafe>::SCHEMA_HASH;
     assert_ne!(h, 0);
 }
 
@@ -606,7 +623,24 @@ fn genome_ord_composite_impls() {
     assert_genome_ord::<(u32,)>();
     assert_genome_ord::<(u32, String)>();
     assert_genome_ord::<(u8, u16, u32, u64)>();
-    assert_genome_ord::<(u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8)>();
+    assert_genome_ord::<(
+        u8,
+        u8,
+        u8,
+        u8,
+        u8,
+        u8,
+        u8,
+        u8,
+        u8,
+        u8,
+        u8,
+        u8,
+        u8,
+        u8,
+        u8,
+        u8,
+    )>();
 }
 
 #[test]

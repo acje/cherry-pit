@@ -16,11 +16,7 @@ use crate::output::{self, OutputBlock};
 ///
 /// Returns output blocks: focal first, connected sorted by tier then
 /// ID, excluded stale count last.
-pub fn critique(
-    focal_id: &AdrId,
-    records: &[AdrRecord],
-    config: &Config,
-) -> Vec<OutputBlock> {
+pub fn critique(focal_id: &AdrId, records: &[AdrRecord], config: &Config) -> Vec<OutputBlock> {
     // Find focal record
     let focal = match records.iter().find(|r| r.id == *focal_id) {
         Some(r) => r,
@@ -169,7 +165,7 @@ fn build_relationship_path(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::{AdrRecord, AdrId, Relationship, RelVerb, Status, Tier};
+    use crate::model::{AdrId, AdrRecord, RelVerb, Relationship, Status, Tier};
     use std::path::PathBuf;
 
     fn make_id(prefix: &str, num: u16) -> AdrId {

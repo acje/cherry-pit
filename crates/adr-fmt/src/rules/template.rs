@@ -30,13 +30,7 @@ const MAX_CODE_BLOCK_LINES: usize = 20;
 const DEFAULT_MIN_WORDS: u64 = 10;
 
 /// Canonical H2 section order for active ADRs.
-const ACTIVE_SECTION_ORDER: &[&str] = &[
-    "Status",
-    "Related",
-    "Context",
-    "Decision",
-    "Consequences",
-];
+const ACTIVE_SECTION_ORDER: &[&str] = &["Status", "Related", "Context", "Decision", "Consequences"];
 
 /// Canonical H2 section order for stale ADRs (Retirement at end).
 const STALE_SECTION_ORDER: &[&str] = &[
@@ -237,7 +231,9 @@ pub fn check(record: &AdrRecord, config: &Config, diags: &mut Vec<Diagnostic>) {
     check_section_order(record, diags);
 
     // T015: Section minimum word count
-    let min_words = config.rule_param_u64("T015", "min_words").unwrap_or(DEFAULT_MIN_WORDS);
+    let min_words = config
+        .rule_param_u64("T015", "min_words")
+        .unwrap_or(DEFAULT_MIN_WORDS);
     check_section_word_counts(record, min_words, diags);
 
     // T016: Tagged rules in Decision section
@@ -513,9 +509,11 @@ params = { min_words = 10 }
             line: 10,
         }];
         record.is_self_referencing = true;
-        record.decision_rules = vec![
-            TaggedRule { id: "R1".into(), text: "Test rule".into(), line: 10 },
-        ];
+        record.decision_rules = vec![TaggedRule {
+            id: "R1".into(),
+            text: "Test rule".into(),
+            line: 10,
+        }];
 
         let config = make_config();
         let mut diags = Vec::new();
@@ -641,7 +639,7 @@ params = { min_words = 10 }
         let mut record = make_record();
         record.section_order = vec![
             "Status".into(),
-            "Context".into(),  // out of order — Related should come first
+            "Context".into(), // out of order — Related should come first
             "Related".into(),
             "Decision".into(),
             "Consequences".into(),
@@ -786,7 +784,10 @@ params = { min_words = 10 }
         let mut diags = Vec::new();
         check(&record, &config, &mut diags);
         let s006 = diags.iter().find(|d| d.rule == "S006");
-        assert!(s006.is_some(), "Superseded in active dir should trigger S006");
+        assert!(
+            s006.is_some(),
+            "Superseded in active dir should trigger S006"
+        );
         assert!(
             s006.unwrap().message.contains("Superseded by CHE-0099"),
             "S006 message should name the superseding ADR"
@@ -833,10 +834,22 @@ params = { min_words = 10 }
         let mut diags = Vec::new();
         check(&record, &config, &mut diags);
         let s006 = diags.iter().find(|d| d.rule == "S006").unwrap();
-        assert!(s006.message.contains("move this file to"), "must say what to do");
-        assert!(s006.message.contains("stale/"), "must name target directory");
-        assert!(s006.message.contains("## Retirement"), "must name required section");
-        assert!(s006.message.contains("≥10 words"), "must specify word count");
+        assert!(
+            s006.message.contains("move this file to"),
+            "must say what to do"
+        );
+        assert!(
+            s006.message.contains("stale/"),
+            "must name target directory"
+        );
+        assert!(
+            s006.message.contains("## Retirement"),
+            "must name required section"
+        );
+        assert!(
+            s006.message.contains("≥10 words"),
+            "must specify word count"
+        );
     }
 
     #[test]
@@ -844,8 +857,16 @@ params = { min_words = 10 }
         use crate::model::TaggedRule;
         let mut record = make_record();
         record.decision_rules = vec![
-            TaggedRule { id: "R1".into(), text: "Rule one".into(), line: 10 },
-            TaggedRule { id: "R2".into(), text: "Rule two".into(), line: 11 },
+            TaggedRule {
+                id: "R1".into(),
+                text: "Rule one".into(),
+                line: 10,
+            },
+            TaggedRule {
+                id: "R2".into(),
+                text: "Rule two".into(),
+                line: 11,
+            },
         ];
         let config = make_config();
         let mut diags = Vec::new();
@@ -922,8 +943,16 @@ params = { min_words = 10 }
         use crate::model::TaggedRule;
         let mut record = make_record();
         record.decision_rules = vec![
-            TaggedRule { id: "R1".into(), text: "Rule one".into(), line: 10 },
-            TaggedRule { id: "R3".into(), text: "Rule three".into(), line: 12 },
+            TaggedRule {
+                id: "R1".into(),
+                text: "Rule one".into(),
+                line: 10,
+            },
+            TaggedRule {
+                id: "R3".into(),
+                text: "Rule three".into(),
+                line: 12,
+            },
         ];
         let config = make_config();
         let mut diags = Vec::new();

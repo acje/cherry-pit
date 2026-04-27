@@ -4,7 +4,9 @@ use std::num::NonZeroU64;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use cherry_pit_core::{AggregateId, CorrelationContext, DomainEvent, EventEnvelope, EventStore, StoreError};
+use cherry_pit_core::{
+    AggregateId, CorrelationContext, DomainEvent, EventEnvelope, EventStore, StoreError,
+};
 
 /// File-based event store using `MessagePack` serialization.
 ///
@@ -122,19 +124,15 @@ impl<E: DomainEvent> MsgpackFileStore<E> {
             .get_or_try_init(|| async {
                 let dir = self.dir.clone();
                 tokio::task::spawn_blocking(move || {
-                    std::fs::create_dir_all(&dir).map_err(|e| {
-                        StoreError::Infrastructure(Box::new(e))
-                    })?;
+                    std::fs::create_dir_all(&dir)
+                        .map_err(|e| StoreError::Infrastructure(Box::new(e)))?;
 
                     let lock_path = dir.join(".lock");
-                    let file = std::fs::File::create(&lock_path).map_err(|e| {
-                        StoreError::Infrastructure(Box::new(e))
-                    })?;
+                    let file = std::fs::File::create(&lock_path)
+                        .map_err(|e| StoreError::Infrastructure(Box::new(e)))?;
 
                     file.try_lock().map_err(|e| match e {
-                        std::fs::TryLockError::WouldBlock => {
-                            StoreError::StoreLocked { path: dir }
-                        }
+                        std::fs::TryLockError::WouldBlock => StoreError::StoreLocked { path: dir },
                         std::fs::TryLockError::Error(io_err) => {
                             StoreError::Infrastructure(Box::new(io_err))
                         }
@@ -260,10 +258,7 @@ impl<E: DomainEvent> Default for MsgpackFileStore<E> {
 impl<E: DomainEvent> EventStore for MsgpackFileStore<E> {
     type Event = E;
 
-    async fn load(
-        &self,
-        id: AggregateId,
-    ) -> Result<Vec<EventEnvelope<E>>, StoreError> {
+    async fn load(&self, id: AggregateId) -> Result<Vec<EventEnvelope<E>>, StoreError> {
         let path = self.aggregate_path(id);
         match tokio::fs::read(&path).await {
             Ok(bytes) => {
@@ -303,15 +298,11 @@ impl<E: DomainEvent> EventStore for MsgpackFileStore<E> {
             } else {
                 let max = self.scan_max_id().await?;
                 max.checked_add(1).ok_or_else(|| {
-                    StoreError::Infrastructure(Box::new(io::Error::other(
-                        "aggregate ID overflow",
-                    )))
+                    StoreError::Infrastructure(Box::new(io::Error::other("aggregate ID overflow")))
                 })?
             };
             let after = n.checked_add(1).ok_or_else(|| {
-                StoreError::Infrastructure(Box::new(io::Error::other(
-                    "aggregate ID overflow",
-                )))
+                StoreError::Infrastructure(Box::new(io::Error::other("aggregate ID overflow")))
             })?;
             *next = Some(after);
             let nz = NonZeroU64::new(n).ok_or_else(|| {
@@ -556,8 +547,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let store = MsgpackFileStore::new(dir.path());
 
-        let events: Vec<EventEnvelope<TestEvent>> =
-            store.load(agg_id(999)).await.unwrap();
+        let events: Vec<EventEnvelope<TestEvent>> = store.load(agg_id(999)).await.unwrap();
         assert!(events.is_empty());
     }
 
@@ -572,8 +562,7 @@ mod tests {
             .unwrap();
 
         let store = MsgpackFileStore::new(dir.path());
-        let result: Result<Vec<EventEnvelope<TestEvent>>, _> =
-            store.load(agg_id(1)).await;
+        let result: Result<Vec<EventEnvelope<TestEvent>>, _> = store.load(agg_id(1)).await;
         assert!(result.is_err());
         assert!(
             matches!(result.unwrap_err(), StoreError::Infrastructure(_)),
@@ -589,7 +578,12 @@ mod tests {
         let store = MsgpackFileStore::new(dir.path());
 
         let (id, created) = store
-            .create(vec![TestEvent::Created { name: "alice".into() }], no_ctx())
+            .create(
+                vec![TestEvent::Created {
+                    name: "alice".into(),
+                }],
+                no_ctx(),
+            )
             .await
             .unwrap();
 
@@ -608,12 +602,22 @@ mod tests {
         let store = MsgpackFileStore::new(dir.path());
 
         let (id, _) = store
-            .create(vec![TestEvent::Created { name: "alice".into() }], no_ctx())
+            .create(
+                vec![TestEvent::Created {
+                    name: "alice".into(),
+                }],
+                no_ctx(),
+            )
             .await
             .unwrap();
 
         let appended = store
-            .append(id, nz(1), vec![TestEvent::Updated { name: "bob".into() }], no_ctx())
+            .append(
+                id,
+                nz(1),
+                vec![TestEvent::Updated { name: "bob".into() }],
+                no_ctx(),
+            )
             .await
             .unwrap();
         assert_eq!(appended.len(), 1);
@@ -632,16 +636,33 @@ mod tests {
         let store = MsgpackFileStore::new(dir.path());
 
         let (id, _) = store
-            .create(vec![TestEvent::Created { name: "alice".into() }], no_ctx())
+            .create(
+                vec![TestEvent::Created {
+                    name: "alice".into(),
+                }],
+                no_ctx(),
+            )
             .await
             .unwrap();
 
         store
-            .append(id, nz(1), vec![TestEvent::Updated { name: "bob".into() }], no_ctx())
+            .append(
+                id,
+                nz(1),
+                vec![TestEvent::Updated { name: "bob".into() }],
+                no_ctx(),
+            )
             .await
             .unwrap();
         store
-            .append(id, nz(2), vec![TestEvent::Updated { name: "carol".into() }], no_ctx())
+            .append(
+                id,
+                nz(2),
+                vec![TestEvent::Updated {
+                    name: "carol".into(),
+                }],
+                no_ctx(),
+            )
             .await
             .unwrap();
 
@@ -658,7 +679,12 @@ mod tests {
         let store = MsgpackFileStore::new(dir.path());
 
         let (id, _) = store
-            .create(vec![TestEvent::Created { name: "alice".into() }], no_ctx())
+            .create(
+                vec![TestEvent::Created {
+                    name: "alice".into(),
+                }],
+                no_ctx(),
+            )
             .await
             .unwrap();
 
@@ -716,19 +742,36 @@ mod tests {
         let store = MsgpackFileStore::new(dir.path());
 
         let (id, _) = store
-            .create(vec![TestEvent::Created { name: "alice".into() }], no_ctx())
+            .create(
+                vec![TestEvent::Created {
+                    name: "alice".into(),
+                }],
+                no_ctx(),
+            )
             .await
             .unwrap();
 
         // First append succeeds.
         store
-            .append(id, nz(1), vec![TestEvent::Updated { name: "bob".into() }], no_ctx())
+            .append(
+                id,
+                nz(1),
+                vec![TestEvent::Updated { name: "bob".into() }],
+                no_ctx(),
+            )
             .await
             .unwrap();
 
         // Second append with stale expected_sequence fails.
         let result = store
-            .append(id, nz(1), vec![TestEvent::Updated { name: "carol".into() }], no_ctx())
+            .append(
+                id,
+                nz(1),
+                vec![TestEvent::Updated {
+                    name: "carol".into(),
+                }],
+                no_ctx(),
+            )
             .await;
         assert!(result.is_err());
         assert!(
@@ -743,7 +786,12 @@ mod tests {
         let store = Arc::new(MsgpackFileStore::new(dir.path()));
 
         let (id, _) = store
-            .create(vec![TestEvent::Created { name: "seed".into() }], no_ctx())
+            .create(
+                vec![TestEvent::Created {
+                    name: "seed".into(),
+                }],
+                no_ctx(),
+            )
             .await
             .unwrap();
 
@@ -791,7 +839,12 @@ mod tests {
         let store = MsgpackFileStore::new(dir.path());
 
         let (id1, _) = store
-            .create(vec![TestEvent::Created { name: "alice".into() }], no_ctx())
+            .create(
+                vec![TestEvent::Created {
+                    name: "alice".into(),
+                }],
+                no_ctx(),
+            )
             .await
             .unwrap();
         let (id2, _) = store
@@ -806,7 +859,9 @@ mod tests {
         assert_eq!(loaded2.len(), 1);
         assert_eq!(
             *loaded1[0].payload(),
-            TestEvent::Created { name: "alice".into() }
+            TestEvent::Created {
+                name: "alice".into()
+            }
         );
         assert_eq!(
             *loaded2[0].payload(),
@@ -830,7 +885,12 @@ mod tests {
 
         // Create.
         let (id, created) = store
-            .create(vec![TestEvent::Created { name: "order".into() }], no_ctx())
+            .create(
+                vec![TestEvent::Created {
+                    name: "order".into(),
+                }],
+                no_ctx(),
+            )
             .await
             .unwrap();
         assert_eq!(created.len(), 1);
@@ -838,7 +898,14 @@ mod tests {
 
         // Append.
         let appended = store
-            .append(id, nz(1), vec![TestEvent::Updated { name: "shipped".into() }], no_ctx())
+            .append(
+                id,
+                nz(1),
+                vec![TestEvent::Updated {
+                    name: "shipped".into(),
+                }],
+                no_ctx(),
+            )
             .await
             .unwrap();
         assert_eq!(appended.len(), 1);
@@ -858,8 +925,7 @@ mod tests {
 
         // Loading a never-created aggregate returns empty — the bus
         // layer maps this to AggregateNotFound.
-        let events: Vec<EventEnvelope<TestEvent>> =
-            store.load(agg_id(42)).await.unwrap();
+        let events: Vec<EventEnvelope<TestEvent>> = store.load(agg_id(42)).await.unwrap();
         assert!(events.is_empty());
     }
 
@@ -872,9 +938,12 @@ mod tests {
         for i in 0..10 {
             let s = Arc::clone(&store);
             handles.push(tokio::spawn(async move {
-                s.create(vec![TestEvent::Created {
-                    name: format!("agg-{i}"),
-                }], no_ctx())
+                s.create(
+                    vec![TestEvent::Created {
+                        name: format!("agg-{i}"),
+                    }],
+                    no_ctx(),
+                )
                 .await
             }));
         }
@@ -905,7 +974,12 @@ mod tests {
         // Attempt to append with start_sequence near u64::MAX.
         // This should fail with an overflow error, not panic.
         let result = store
-            .append(id, nz(u64::MAX), vec![TestEvent::Updated { name: "b".into() }], no_ctx())
+            .append(
+                id,
+                nz(u64::MAX),
+                vec![TestEvent::Updated { name: "b".into() }],
+                no_ctx(),
+            )
             .await;
 
         // The concurrency check will fire first (actual_sequence=1 != u64::MAX),
@@ -951,7 +1025,10 @@ mod tests {
         let loaded = store.load(agg_id(1)).await.unwrap();
 
         assert_eq!(loaded.len(), 1);
-        assert_eq!(*loaded[0].payload(), TestEvent::Created { name: "old".into() });
+        assert_eq!(
+            *loaded[0].payload(),
+            TestEvent::Created { name: "old".into() }
+        );
         assert!(loaded[0].correlation_id().is_none());
         assert!(loaded[0].causation_id().is_none());
     }
@@ -962,7 +1039,12 @@ mod tests {
         let store = MsgpackFileStore::new(dir.path());
 
         let (id, created) = store
-            .create(vec![TestEvent::Created { name: "traced".into() }], no_ctx())
+            .create(
+                vec![TestEvent::Created {
+                    name: "traced".into(),
+                }],
+                no_ctx(),
+            )
             .await
             .unwrap();
 
@@ -985,15 +1067,20 @@ mod tests {
 
         let corr = uuid::Uuid::now_v7();
         let cause = uuid::Uuid::now_v7();
-        let envelopes = vec![EventEnvelope::new(
-            uuid::Uuid::now_v7(),
-            agg_id(1),
-            NonZeroU64::new(1).unwrap(),
-            jiff::Timestamp::now(),
-            Some(corr),
-            Some(cause),
-            TestEvent::Created { name: "with-ids".into() },
-        ).unwrap()];
+        let envelopes = vec![
+            EventEnvelope::new(
+                uuid::Uuid::now_v7(),
+                agg_id(1),
+                NonZeroU64::new(1).unwrap(),
+                jiff::Timestamp::now(),
+                Some(corr),
+                Some(cause),
+                TestEvent::Created {
+                    name: "with-ids".into(),
+                },
+            )
+            .unwrap(),
+        ];
 
         let bytes = rmp_serde::encode::to_vec_named(&envelopes).unwrap();
         tokio::fs::write(dir.path().join("1.msgpack"), &bytes)
@@ -1037,7 +1124,12 @@ mod tests {
         let store = MsgpackFileStore::new(dir.path());
 
         let (id, _) = store
-            .create(vec![TestEvent::Created { name: "seed".into() }], no_ctx())
+            .create(
+                vec![TestEvent::Created {
+                    name: "seed".into(),
+                }],
+                no_ctx(),
+            )
             .await
             .unwrap();
 
@@ -1046,7 +1138,12 @@ mod tests {
         let ctx = CorrelationContext::new(corr, cause);
 
         let appended = store
-            .append(id, nz(1), vec![TestEvent::Updated { name: "ctx".into() }], ctx)
+            .append(
+                id,
+                nz(1),
+                vec![TestEvent::Updated { name: "ctx".into() }],
+                ctx,
+            )
             .await
             .unwrap();
 
@@ -1068,7 +1165,12 @@ mod tests {
         let ctx = CorrelationContext::correlated(corr);
 
         let (id, created) = store
-            .create(vec![TestEvent::Created { name: "corr-only".into() }], ctx)
+            .create(
+                vec![TestEvent::Created {
+                    name: "corr-only".into(),
+                }],
+                ctx,
+            )
             .await
             .unwrap();
 
@@ -1102,7 +1204,9 @@ mod tests {
             aggregate_id: agg_id(1),
             sequence: 0,
             timestamp: jiff::Timestamp::now(),
-            payload: TestEvent::Created { name: "zero-seq".into() },
+            payload: TestEvent::Created {
+                name: "zero-seq".into(),
+            },
         }];
 
         let bytes = rmp_serde::encode::to_vec_named(&bad).unwrap();
@@ -1175,18 +1279,19 @@ mod tests {
 
         // create() should scan and discover 1.msgpack, then assign ID 2.
         let (id, _) = store
-            .create(vec![TestEvent::Created {
-                name: "safe".into(),
-            }], no_ctx())
+            .create(
+                vec![TestEvent::Created {
+                    name: "safe".into(),
+                }],
+                no_ctx(),
+            )
             .await
             .unwrap();
 
         assert_eq!(id.get(), 2, "should skip the occupied ID");
 
         // Verify the sentinel file is untouched.
-        let data = tokio::fs::read(dir.path().join("1.msgpack"))
-            .await
-            .unwrap();
+        let data = tokio::fs::read(dir.path().join("1.msgpack")).await.unwrap();
         assert_eq!(data, sentinel, "existing file must not be overwritten");
     }
 
@@ -1201,33 +1306,36 @@ mod tests {
         tokio::fs::create_dir_all(dir.path()).await.unwrap();
         for id_val in [1u64, 5] {
             let id = agg_id(id_val);
-            let envelopes = vec![EventEnvelope::new(
-                uuid::Uuid::now_v7(),
-                id,
-                NonZeroU64::new(1).unwrap(),
-                jiff::Timestamp::now(),
-                None,
-                None,
-                TestEvent::Created {
-                    name: format!("agg-{id_val}"),
-                },
-            ).unwrap()];
+            let envelopes = vec![
+                EventEnvelope::new(
+                    uuid::Uuid::now_v7(),
+                    id,
+                    NonZeroU64::new(1).unwrap(),
+                    jiff::Timestamp::now(),
+                    None,
+                    None,
+                    TestEvent::Created {
+                        name: format!("agg-{id_val}"),
+                    },
+                )
+                .unwrap(),
+            ];
             let bytes = rmp_serde::encode::to_vec_named(&envelopes).unwrap();
-            tokio::fs::write(
-                dir.path().join(format!("{id_val}.msgpack")),
-                &bytes,
-            )
-            .await
-            .unwrap();
+            tokio::fs::write(dir.path().join(format!("{id_val}.msgpack")), &bytes)
+                .await
+                .unwrap();
         }
 
         // Simulate restart — new store instance.
         let store2 = MsgpackFileStore::<TestEvent>::new(dir.path());
 
         let (id, _) = store2
-            .create(vec![TestEvent::Created {
-                name: "after-gap".into(),
-            }], no_ctx())
+            .create(
+                vec![TestEvent::Created {
+                    name: "after-gap".into(),
+                }],
+                no_ctx(),
+            )
             .await
             .unwrap();
 
@@ -1244,9 +1352,12 @@ mod tests {
 
         // Seed an aggregate so append has a target.
         let (seed_id, _) = store
-            .create(vec![TestEvent::Created {
-                name: "seed".into(),
-            }], no_ctx())
+            .create(
+                vec![TestEvent::Created {
+                    name: "seed".into(),
+                }],
+                no_ctx(),
+            )
             .await
             .unwrap();
 
@@ -1256,9 +1367,12 @@ mod tests {
         for i in 0..5 {
             let s = Arc::clone(&store);
             handles.push(tokio::spawn(async move {
-                s.create(vec![TestEvent::Created {
-                    name: format!("new-{i}"),
-                }], no_ctx())
+                s.create(
+                    vec![TestEvent::Created {
+                        name: format!("new-{i}"),
+                    }],
+                    no_ctx(),
+                )
                 .await
                 .map(|r| ("create", r.0))
             }));
@@ -1289,7 +1403,10 @@ mod tests {
             .collect();
 
         // All 5 creates must succeed.
-        let creates: Vec<_> = results.iter().filter(|r| r.as_ref().ok().is_some_and(|v| v.0 == "create")).collect();
+        let creates: Vec<_> = results
+            .iter()
+            .filter(|r| r.as_ref().ok().is_some_and(|v| v.0 == "create"))
+            .collect();
         assert_eq!(creates.len(), 5, "all creates should succeed");
 
         // Exactly 1 append succeeds, 4 get ConcurrencyConflict.
@@ -1297,18 +1414,9 @@ mod tests {
             .iter()
             .filter(|r| r.as_ref().ok().is_some_and(|v| v.0 == "append"))
             .count();
-        let append_err = results
-            .iter()
-            .filter(|r| r.is_err())
-            .count();
-        assert_eq!(
-            append_ok, 1,
-            "exactly one append should win"
-        );
-        assert_eq!(
-            append_err, 4,
-            "four appends should get ConcurrencyConflict"
-        );
+        let append_err = results.iter().filter(|r| r.is_err()).count();
+        assert_eq!(append_ok, 1, "exactly one append should win");
+        assert_eq!(append_err, 4, "four appends should get ConcurrencyConflict");
 
         // All created aggregates should have unique IDs.
         let mut created_ids: Vec<u64> = creates
@@ -1327,9 +1435,12 @@ mod tests {
         let store = MsgpackFileStore::new(dir.path());
 
         let (id, _) = store
-            .create(vec![TestEvent::Created {
-                name: "clean".into(),
-            }], no_ctx())
+            .create(
+                vec![TestEvent::Created {
+                    name: "clean".into(),
+                }],
+                no_ctx(),
+            )
             .await
             .unwrap();
 
@@ -1358,7 +1469,12 @@ mod tests {
 
         // First create triggers ensure_fenced — should succeed.
         let result = store
-            .create(vec![TestEvent::Created { name: "fenced".into() }], no_ctx())
+            .create(
+                vec![TestEvent::Created {
+                    name: "fenced".into(),
+                }],
+                no_ctx(),
+            )
             .await;
         assert!(result.is_ok(), "first store should acquire lock");
 
@@ -1376,14 +1492,24 @@ mod tests {
         // First store acquires the lock.
         let store1 = MsgpackFileStore::new(dir.path());
         store1
-            .create(vec![TestEvent::Created { name: "first".into() }], no_ctx())
+            .create(
+                vec![TestEvent::Created {
+                    name: "first".into(),
+                }],
+                no_ctx(),
+            )
             .await
             .unwrap();
 
         // Second store on the same directory should fail.
         let store2 = MsgpackFileStore::<TestEvent>::new(dir.path());
         let result = store2
-            .create(vec![TestEvent::Created { name: "second".into() }], no_ctx())
+            .create(
+                vec![TestEvent::Created {
+                    name: "second".into(),
+                }],
+                no_ctx(),
+            )
             .await;
 
         assert!(
@@ -1400,7 +1526,12 @@ mod tests {
         {
             let store = MsgpackFileStore::new(dir.path());
             store
-                .create(vec![TestEvent::Created { name: "first".into() }], no_ctx())
+                .create(
+                    vec![TestEvent::Created {
+                        name: "first".into(),
+                    }],
+                    no_ctx(),
+                )
                 .await
                 .unwrap();
         }
@@ -1412,7 +1543,9 @@ mod tests {
             .append(
                 agg_id(1),
                 nz(1),
-                vec![TestEvent::Updated { name: "after-drop".into() }],
+                vec![TestEvent::Updated {
+                    name: "after-drop".into(),
+                }],
                 no_ctx(),
             )
             .await;
@@ -1431,9 +1564,12 @@ mod tests {
         for i in 0..5 {
             let s = Arc::clone(&store);
             handles.push(tokio::spawn(async move {
-                s.create(vec![TestEvent::Created {
-                    name: format!("concurrent-{i}"),
-                }], no_ctx())
+                s.create(
+                    vec![TestEvent::Created {
+                        name: format!("concurrent-{i}"),
+                    }],
+                    no_ctx(),
+                )
                 .await
             }));
         }

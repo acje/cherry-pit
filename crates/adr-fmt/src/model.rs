@@ -176,14 +176,22 @@ impl Tier {
     /// Tier meaning and scope description.
     pub fn description(self) -> &'static str {
         match self {
-            Self::S => "Design philosophy or architecture pattern — changing \
-                        reverberates through every crate and every downstream consumer.",
-            Self::A => "Core trait design or invariant — changing requires major \
-                        refactoring across multiple crates.",
-            Self::B => "Behavioural contracts and API semantics — changing requires \
-                        coordinated updates across call sites.",
-            Self::C => "Tooling, DX, and build decisions — changing is localized to \
-                        configuration or test infrastructure.",
+            Self::S => {
+                "Design philosophy or architecture pattern — changing \
+                        reverberates through every crate and every downstream consumer."
+            }
+            Self::A => {
+                "Core trait design or invariant — changing requires major \
+                        refactoring across multiple crates."
+            }
+            Self::B => {
+                "Behavioural contracts and API semantics — changing requires \
+                        coordinated updates across call sites."
+            }
+            Self::C => {
+                "Tooling, DX, and build decisions — changing is localized to \
+                        configuration or test infrastructure."
+            }
             Self::D => "Implementation detail — changing affects one crate's internals.",
         }
     }
@@ -313,11 +321,17 @@ impl Status {
             Self::Draft => "Under development, not yet proposed for review. May be incomplete.",
             Self::Proposed => "Ready for review. All required fields present.",
             Self::Accepted => "Decision is binding. Implementation may be pending.",
-            Self::Amended { .. } => "Accepted with recorded modifications. Previous text preserved.",
-            Self::Rejected => "Decision was proposed but deliberately not adopted. \
-                              Remains in record for context.",
+            Self::Amended { .. } => {
+                "Accepted with recorded modifications. Previous text preserved."
+            }
+            Self::Rejected => {
+                "Decision was proposed but deliberately not adopted. \
+                              Remains in record for context."
+            }
             Self::Deprecated => "No longer applicable but preserved for historical context.",
-            Self::SupersededBy(_) => "Replaced by another ADR. The superseding ADR is authoritative.",
+            Self::SupersededBy(_) => {
+                "Replaced by another ADR. The superseding ADR is authoritative."
+            }
             Self::Invalid(_) => "Unrecognized status value.",
         }
     }

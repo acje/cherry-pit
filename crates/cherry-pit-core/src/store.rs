@@ -17,14 +17,14 @@ use crate::event::{DomainEvent, EventEnvelope};
 /// every load/append operates on the correct event type — the caller
 /// cannot accidentally deserialize one aggregate's events as another's.
 ///
-    /// # Envelope construction
-    ///
-    /// The store creates [`EventEnvelope`]s — callers pass raw domain
-    /// events and a [`CorrelationContext`]. The store assigns `event_id`
-    /// (UUID v7), `aggregate_id`, `sequence`, and `timestamp`, and
-    /// stamps `correlation_id`/`causation_id` from the context. This
-    /// eliminates redundancy and makes malformed envelopes impossible
-    /// by construction.
+/// # Envelope construction
+///
+/// The store creates [`EventEnvelope`]s — callers pass raw domain
+/// events and a [`CorrelationContext`]. The store assigns `event_id`
+/// (UUID v7), `aggregate_id`, `sequence`, and `timestamp`, and
+/// stamps `correlation_id`/`causation_id` from the context. This
+/// eliminates redundancy and makes malformed envelopes impossible
+/// by construction.
 ///
 /// # ID assignment
 ///
@@ -72,8 +72,7 @@ pub trait EventStore: Send + Sync + 'static {
         &self,
         events: Vec<Self::Event>,
         context: CorrelationContext,
-    ) -> impl Future<Output = Result<(AggregateId, Vec<EventEnvelope<Self::Event>>), StoreError>>
-           + Send;
+    ) -> impl Future<Output = Result<(AggregateId, Vec<EventEnvelope<Self::Event>>), StoreError>> + Send;
 
     /// Append new events to an existing aggregate's stream.
     ///

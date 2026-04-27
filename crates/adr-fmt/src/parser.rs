@@ -8,8 +8,8 @@ use regex::Regex;
 
 use crate::config::Config;
 use crate::model::{
-    parse_adr_id_from_str, AdrId, AdrRecord, DomainDir, RelVerb, Relationship, Status, TaggedRule,
-    Tier,
+    AdrId, AdrRecord, DomainDir, RelVerb, Relationship, Status, TaggedRule, Tier,
+    parse_adr_id_from_str,
 };
 
 /// Parse all ADR files in a domain directory.
@@ -62,7 +62,10 @@ pub fn parse_stale(stale_dir: &Path, config: &Config) -> Vec<AdrRecord> {
                 r"^{}-\d{{4}}-[a-z0-9]+(?:-[a-z0-9]+)*\.md$",
                 regex::escape(&d.prefix),
             );
-            (d.prefix.as_str(), Regex::new(&pattern).expect("valid regex"))
+            (
+                d.prefix.as_str(),
+                Regex::new(&pattern).expect("valid regex"),
+            )
         })
         .collect();
 
@@ -136,8 +139,7 @@ pub fn parse_adr_file(path: &Path, expected_prefix: &str, is_stale: bool) -> Opt
     let decision_rules = extract_tagged_rules(&lines, &decision_content);
 
     // --- Code block metrics ---
-    let (max_code_block_lines, code_block_count, max_code_block_line) =
-        measure_code_blocks(&lines);
+    let (max_code_block_lines, code_block_count, max_code_block_line) = measure_code_blocks(&lines);
 
     Some(AdrRecord {
         id,
@@ -413,11 +415,7 @@ fn extract_decision_content(lines: &[&str]) -> Option<String> {
 
     // Trim leading/trailing blank lines
     let text = content.join("\n").trim().to_owned();
-    if text.is_empty() {
-        None
-    } else {
-        Some(text)
-    }
+    if text.is_empty() { None } else { Some(text) }
 }
 
 /// Extract tagged rules from the Decision section.
@@ -555,7 +553,12 @@ mod tests {
 
     #[test]
     fn find_field_extracts_date() {
-        let lines = vec!["# Title", "", "Date: 2026-04-25", "Last-reviewed: 2026-04-25"];
+        let lines = vec![
+            "# Title",
+            "",
+            "Date: 2026-04-25",
+            "Last-reviewed: 2026-04-25",
+        ];
         let (date, line) = find_field(&lines, "Date:");
         assert_eq!(date.as_deref(), Some("2026-04-25"));
         assert_eq!(line, 3);
@@ -600,13 +603,7 @@ mod tests {
 
     #[test]
     fn find_relationships_parses_root_verb() {
-        let lines = vec![
-            "## Related",
-            "",
-            "- Root: CHE-0001",
-            "",
-            "## Context",
-        ];
+        let lines = vec!["## Related", "", "- Root: CHE-0001", "", "## Context"];
         let (rels, found, _) = find_relationships(&lines);
         assert!(found);
         assert_eq!(rels.len(), 1);
@@ -627,7 +624,15 @@ mod tests {
 
     #[test]
     fn has_heading_finds_section() {
-        let lines = vec!["## Status", "", "Accepted", "", "## Context", "", "Some text."];
+        let lines = vec![
+            "## Status",
+            "",
+            "Accepted",
+            "",
+            "## Context",
+            "",
+            "Some text.",
+        ];
         assert!(has_heading(&lines, "Context"));
         assert!(!has_heading(&lines, "Decision"));
     }
@@ -658,17 +663,7 @@ mod tests {
     #[test]
     fn measure_code_blocks_multiple_blocks() {
         let lines = vec![
-            "```",
-            "line1",
-            "```",
-            "text",
-            "```rust",
-            "a",
-            "b",
-            "c",
-            "d",
-            "e",
-            "```",
+            "```", "line1", "```", "text", "```rust", "a", "b", "c", "d", "e", "```",
         ];
         let (max, count, start) = measure_code_blocks(&lines);
         assert_eq!(max, 5, "second block has 5 lines");
@@ -761,17 +756,14 @@ mod tests {
 
     #[test]
     fn find_relationships_no_placeholder_with_rels() {
-        let lines = vec![
-            "## Related",
-            "",
-            "- Depends on: CHE-0001",
-            "",
-            "## Context",
-        ];
+        let lines = vec!["## Related", "", "- Depends on: CHE-0001", "", "## Context"];
         let (rels, found, placeholder) = find_relationships(&lines);
         assert!(found);
         assert_eq!(rels.len(), 1);
-        assert!(!placeholder, "should not detect placeholder when rels exist");
+        assert!(
+            !placeholder,
+            "should not detect placeholder when rels exist"
+        );
     }
 
     #[test]
@@ -800,7 +792,10 @@ mod tests {
             "This makes testing easier and code more maintainable overall.",
         ];
         let (order, counts) = analyze_sections(&lines);
-        assert_eq!(order, vec!["Status", "Related", "Context", "Decision", "Consequences"]);
+        assert_eq!(
+            order,
+            vec!["Status", "Related", "Context", "Decision", "Consequences"]
+        );
         assert_eq!(counts["Context"], 11);
         assert_eq!(counts["Decision"], 12);
         assert_eq!(counts["Consequences"], 9);
@@ -844,37 +839,29 @@ mod tests {
 
     #[test]
     fn self_referencing_detected() {
-        let lines = vec![
-            "## Related",
-            "",
-            "- Root: CHE-0001",
-            "",
-            "## Context",
-        ];
+        let lines = vec!["## Related", "", "- Root: CHE-0001", "", "## Context"];
         let (rels, _, _) = find_relationships(&lines);
         let id = AdrId {
             prefix: "CHE".into(),
             number: 1,
         };
-        let is_self_ref = rels.iter().any(|rel| rel.verb == RelVerb::Root && rel.target == id);
+        let is_self_ref = rels
+            .iter()
+            .any(|rel| rel.verb == RelVerb::Root && rel.target == id);
         assert!(is_self_ref);
     }
 
     #[test]
     fn self_referencing_wrong_id_not_detected() {
-        let lines = vec![
-            "## Related",
-            "",
-            "- Root: CHE-0002",
-            "",
-            "## Context",
-        ];
+        let lines = vec!["## Related", "", "- Root: CHE-0002", "", "## Context"];
         let (rels, _, _) = find_relationships(&lines);
         let id = AdrId {
             prefix: "CHE".into(),
             number: 1,
         };
-        let is_self_ref = rels.iter().any(|rel| rel.verb == RelVerb::Root && rel.target == id);
+        let is_self_ref = rels
+            .iter()
+            .any(|rel| rel.verb == RelVerb::Root && rel.target == id);
         assert!(!is_self_ref);
     }
 
@@ -895,26 +882,14 @@ mod tests {
 
     #[test]
     fn find_crates_field_empty() {
-        let lines = vec![
-            "# CHE-0042. Title",
-            "",
-            "Crates:",
-            "",
-            "## Status",
-        ];
+        let lines = vec!["# CHE-0042. Title", "", "Crates:", "", "## Status"];
         let crates = find_crates_field(&lines);
         assert!(crates.is_empty());
     }
 
     #[test]
     fn find_crates_field_absent() {
-        let lines = vec![
-            "# CHE-0042. Title",
-            "",
-            "Date: 2026-04-25",
-            "",
-            "## Status",
-        ];
+        let lines = vec!["# CHE-0042. Title", "", "Date: 2026-04-25", "", "## Status"];
         let crates = find_crates_field(&lines);
         assert!(crates.is_empty());
     }

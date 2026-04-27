@@ -400,10 +400,7 @@ fn adr_root(dir: &TempDir) -> String {
 
 #[test]
 fn valid_corpus_clean_output() {
-    let dir = setup_corpus(
-        MINIMAL_CONFIG,
-        &[("TST-0001-valid-test-adr.md", VALID_ADR)],
-    );
+    let dir = setup_corpus(MINIMAL_CONFIG, &[("TST-0001-valid-test-adr.md", VALID_ADR)]);
 
     adr_fmt()
         .arg(adr_root(&dir))
@@ -442,10 +439,7 @@ fn empty_domain_directory_graceful() {
 
 #[test]
 fn lint_output_on_stdout() {
-    let dir = setup_corpus(
-        MINIMAL_CONFIG,
-        &[("TST-0001-valid-test-adr.md", VALID_ADR)],
-    );
+    let dir = setup_corpus(MINIMAL_CONFIG, &[("TST-0001-valid-test-adr.md", VALID_ADR)]);
 
     // Verify diagnostics go to stdout, not stderr
     adr_fmt()
@@ -474,10 +468,7 @@ fn t016_missing_tagged_rules() {
 
 #[test]
 fn t016_draft_exempt() {
-    let dir = setup_corpus(
-        MINIMAL_CONFIG,
-        &[("TST-0005-draft-adr.md", DRAFT_ADR)],
-    );
+    let dir = setup_corpus(MINIMAL_CONFIG, &[("TST-0005-draft-adr.md", DRAFT_ADR)]);
 
     // Draft ADRs are exempt from T016 — should not appear in output
     adr_fmt()
@@ -503,10 +494,7 @@ fn t016_gap_in_rule_ids() {
 
 #[test]
 fn t016_tagged_rules_present_no_warning() {
-    let dir = setup_corpus(
-        MINIMAL_CONFIG,
-        &[("TST-0001-valid-test-adr.md", VALID_ADR)],
-    );
+    let dir = setup_corpus(MINIMAL_CONFIG, &[("TST-0001-valid-test-adr.md", VALID_ADR)]);
 
     // VALID_ADR has tagged rules — no T016
     adr_fmt()
@@ -542,10 +530,7 @@ fn critique_focal_with_connected() {
 
 #[test]
 fn critique_isolated_adr() {
-    let dir = setup_corpus(
-        MINIMAL_CONFIG,
-        &[("TST-0001-valid-test-adr.md", VALID_ADR)],
-    );
+    let dir = setup_corpus(MINIMAL_CONFIG, &[("TST-0001-valid-test-adr.md", VALID_ADR)]);
 
     // Isolated ADR: focal only, no connected blocks
     adr_fmt()
@@ -553,17 +538,13 @@ fn critique_isolated_adr() {
         .assert()
         .success()
         .stdout(
-            predicate::str::contains("◆ FOCAL")
-                .and(predicate::str::contains("◇ CONNECTED").not()),
+            predicate::str::contains("◆ FOCAL").and(predicate::str::contains("◇ CONNECTED").not()),
         );
 }
 
 #[test]
 fn critique_invalid_id_exits_nonzero() {
-    let dir = setup_corpus(
-        MINIMAL_CONFIG,
-        &[("TST-0001-valid-test-adr.md", VALID_ADR)],
-    );
+    let dir = setup_corpus(MINIMAL_CONFIG, &[("TST-0001-valid-test-adr.md", VALID_ADR)]);
 
     adr_fmt()
         .args(["--critique", "INVALID", &adr_root(&dir)])
@@ -574,10 +555,7 @@ fn critique_invalid_id_exits_nonzero() {
 
 #[test]
 fn critique_unknown_adr_exits_nonzero() {
-    let dir = setup_corpus(
-        MINIMAL_CONFIG,
-        &[("TST-0001-valid-test-adr.md", VALID_ADR)],
-    );
+    let dir = setup_corpus(MINIMAL_CONFIG, &[("TST-0001-valid-test-adr.md", VALID_ADR)]);
 
     adr_fmt()
         .args(["--critique", "TST-9999", &adr_root(&dir)])
@@ -590,9 +568,7 @@ fn critique_unknown_adr_exits_nonzero() {
 fn critique_with_stale_excluded() {
     let dir = setup_multi_corpus(
         MINIMAL_CONFIG,
-        &[("test", &[
-            ("TST-0001-valid-test-adr.md", VALID_ADR),
-        ])],
+        &[("test", &[("TST-0001-valid-test-adr.md", VALID_ADR)])],
         &[("TST-0010-stale-adr.md", STALE_ADR)],
     );
 
@@ -609,27 +585,18 @@ fn critique_with_stale_excluded() {
 
 #[test]
 fn context_shows_crate_rules() {
-    let dir = setup_corpus(
-        MINIMAL_CONFIG,
-        &[("TST-0001-valid-test-adr.md", VALID_ADR)],
-    );
+    let dir = setup_corpus(MINIMAL_CONFIG, &[("TST-0001-valid-test-adr.md", VALID_ADR)]);
 
     adr_fmt()
         .args(["--context", "test-core", &adr_root(&dir)])
         .assert()
         .success()
-        .stdout(
-            predicate::str::contains("test-core")
-                .and(predicate::str::contains("TST-0001")),
-        );
+        .stdout(predicate::str::contains("test-core").and(predicate::str::contains("TST-0001")));
 }
 
 #[test]
 fn context_unknown_crate_exits_nonzero() {
-    let dir = setup_corpus(
-        MINIMAL_CONFIG,
-        &[("TST-0001-valid-test-adr.md", VALID_ADR)],
-    );
+    let dir = setup_corpus(MINIMAL_CONFIG, &[("TST-0001-valid-test-adr.md", VALID_ADR)]);
 
     adr_fmt()
         .args(["--context", "unknown-crate", &adr_root(&dir)])
@@ -643,7 +610,10 @@ fn context_includes_foundation() {
     let dir = setup_multi_corpus(
         MULTI_DOMAIN_CONFIG,
         &[
-            ("common", &[("COM-0001-foundation-principle.md", FOUNDATION_ADR)]),
+            (
+                "common",
+                &[("COM-0001-foundation-principle.md", FOUNDATION_ADR)],
+            ),
             ("test", &[("TST-0001-valid-test-adr.md", VALID_ADR)]),
         ],
         &[],
@@ -654,10 +624,7 @@ fn context_includes_foundation() {
         .args(["--context", "test-core", &adr_root(&dir)])
         .assert()
         .success()
-        .stdout(
-            predicate::str::contains("COM-0001")
-                .and(predicate::str::contains("TST-0001")),
-        );
+        .stdout(predicate::str::contains("COM-0001").and(predicate::str::contains("TST-0001")));
 }
 
 #[test]
@@ -684,10 +651,7 @@ fn context_per_adr_crates_filtering() {
 
 #[test]
 fn index_produces_tree() {
-    let dir = setup_corpus(
-        MINIMAL_CONFIG,
-        &[("TST-0001-valid-test-adr.md", VALID_ADR)],
-    );
+    let dir = setup_corpus(MINIMAL_CONFIG, &[("TST-0001-valid-test-adr.md", VALID_ADR)]);
 
     // Use -- to separate --index (no domain filter) from positional ADR_DIR
     adr_fmt()
@@ -702,7 +666,10 @@ fn index_filtered_by_domain() {
     let dir = setup_multi_corpus(
         MULTI_DOMAIN_CONFIG,
         &[
-            ("common", &[("COM-0001-foundation-principle.md", FOUNDATION_ADR)]),
+            (
+                "common",
+                &[("COM-0001-foundation-principle.md", FOUNDATION_ADR)],
+            ),
             ("test", &[("TST-0001-valid-test-adr.md", VALID_ADR)]),
         ],
         &[],
@@ -714,17 +681,13 @@ fn index_filtered_by_domain() {
         .assert()
         .success()
         .stdout(
-            predicate::str::contains("TST-0001")
-                .and(predicate::str::contains("COM-0001").not()),
+            predicate::str::contains("TST-0001").and(predicate::str::contains("COM-0001").not()),
         );
 }
 
 #[test]
 fn index_unknown_domain_graceful() {
-    let dir = setup_corpus(
-        MINIMAL_CONFIG,
-        &[("TST-0001-valid-test-adr.md", VALID_ADR)],
-    );
+    let dir = setup_corpus(MINIMAL_CONFIG, &[("TST-0001-valid-test-adr.md", VALID_ADR)]);
 
     adr_fmt()
         .args(["--index", "NONEXISTENT", &adr_root(&dir)])
@@ -737,10 +700,7 @@ fn index_unknown_domain_graceful() {
 
 #[test]
 fn report_flag_produces_output() {
-    let dir = setup_corpus(
-        MINIMAL_CONFIG,
-        &[("TST-0001-valid-test-adr.md", VALID_ADR)],
-    );
+    let dir = setup_corpus(MINIMAL_CONFIG, &[("TST-0001-valid-test-adr.md", VALID_ADR)]);
 
     adr_fmt()
         .args(["--report", &adr_root(&dir)])
@@ -753,10 +713,7 @@ fn report_flag_produces_output() {
 
 #[test]
 fn guidelines_flag_produces_output() {
-    let dir = setup_corpus(
-        MINIMAL_CONFIG,
-        &[("TST-0001-valid-test-adr.md", VALID_ADR)],
-    );
+    let dir = setup_corpus(MINIMAL_CONFIG, &[("TST-0001-valid-test-adr.md", VALID_ADR)]);
 
     adr_fmt()
         .args(["--guidelines", &adr_root(&dir)])
@@ -844,19 +801,13 @@ fn invalid_path_exits_nonzero() {
 
 #[test]
 fn no_files_modified_after_lint() {
-    let dir = setup_corpus(
-        MINIMAL_CONFIG,
-        &[("TST-0001-valid-test-adr.md", VALID_ADR)],
-    );
+    let dir = setup_corpus(MINIMAL_CONFIG, &[("TST-0001-valid-test-adr.md", VALID_ADR)]);
 
     // Snapshot directory contents before
     let adr_dir = dir.path().join("docs/adr");
     let before: Vec<_> = walkdir(&adr_dir);
 
-    adr_fmt()
-        .arg(adr_root(&dir))
-        .assert()
-        .success();
+    adr_fmt().arg(adr_root(&dir)).assert().success();
 
     // Verify no new files or modifications
     let after: Vec<_> = walkdir(&adr_dir);
@@ -865,10 +816,7 @@ fn no_files_modified_after_lint() {
 
 #[test]
 fn no_files_modified_after_critique() {
-    let dir = setup_corpus(
-        MINIMAL_CONFIG,
-        &[("TST-0001-valid-test-adr.md", VALID_ADR)],
-    );
+    let dir = setup_corpus(MINIMAL_CONFIG, &[("TST-0001-valid-test-adr.md", VALID_ADR)]);
 
     let adr_dir = dir.path().join("docs/adr");
     let before: Vec<_> = walkdir(&adr_dir);
@@ -879,7 +827,10 @@ fn no_files_modified_after_critique() {
         .success();
 
     let after: Vec<_> = walkdir(&adr_dir);
-    assert_eq!(before, after, "critique mode should not create or modify files");
+    assert_eq!(
+        before, after,
+        "critique mode should not create or modify files"
+    );
 }
 
 /// Recursively list all files under a directory (sorted, relative paths).

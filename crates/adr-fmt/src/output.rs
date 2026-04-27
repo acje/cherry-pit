@@ -28,10 +28,7 @@ pub struct HeaderMeta {
 /// An output block in the Alternative 4 format.
 pub enum OutputBlock {
     /// Focal ADR block — the target of a `--critique` query.
-    Focal {
-        meta: HeaderMeta,
-        content: String,
-    },
+    Focal { meta: HeaderMeta, content: String },
     /// Connected ADR block — transitively reachable from focal.
     Connected {
         meta: HeaderMeta,
@@ -39,10 +36,7 @@ pub enum OutputBlock {
         path: String,
     },
     /// Excluded stale ADR count note.
-    Excluded {
-        count: usize,
-        reason: String,
-    },
+    Excluded { count: usize, reason: String },
 }
 
 /// A rule extracted for `--context` mode.
@@ -223,19 +217,13 @@ pub fn render_index(
     let mut by_prefix: HashMap<&str, Vec<&AdrRecord>> = HashMap::new();
     for record in records {
         if !record.is_stale {
-            by_prefix
-                .entry(&record.id.prefix)
-                .or_default()
-                .push(record);
+            by_prefix.entry(&record.id.prefix).or_default().push(record);
         }
     }
 
     // Filter by domain if requested
     let dirs: Vec<&DomainDir> = if let Some(filter) = domain_filter {
-        domain_dirs
-            .iter()
-            .filter(|d| d.prefix == filter)
-            .collect()
+        domain_dirs.iter().filter(|d| d.prefix == filter).collect()
     } else {
         domain_dirs.iter().collect()
     };
@@ -300,20 +288,14 @@ pub fn render_index(
 // ── Report rendering (--report mode) ───────────────────────────────
 
 /// Render the children report as Alternative 4 markdown.
-pub fn render_report(
-    records: &[AdrRecord],
-    children: &HashMap<AdrId, Vec<ChildEntry>>,
-) -> String {
+pub fn render_report(records: &[AdrRecord], children: &HashMap<AdrId, Vec<ChildEntry>>) -> String {
     let mut out = String::new();
     writeln!(out, "## ADR Children Report\n").unwrap();
 
     // Group records by domain prefix, sorted by number
     let mut by_prefix: HashMap<&str, Vec<&AdrRecord>> = HashMap::new();
     for record in records {
-        by_prefix
-            .entry(&record.id.prefix)
-            .or_default()
-            .push(record);
+        by_prefix.entry(&record.id.prefix).or_default().push(record);
     }
 
     let mut prefixes: Vec<&&str> = by_prefix.keys().collect();

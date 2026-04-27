@@ -306,10 +306,18 @@ impl_genome_safe_tuple!("tuple9", T0, T1, T2, T3, T4, T5, T6, T7, T8);
 impl_genome_safe_tuple!("tuple10", T0, T1, T2, T3, T4, T5, T6, T7, T8, T9);
 impl_genome_safe_tuple!("tuple11", T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10);
 impl_genome_safe_tuple!("tuple12", T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11);
-impl_genome_safe_tuple!("tuple13", T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12);
-impl_genome_safe_tuple!("tuple14", T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13);
-impl_genome_safe_tuple!("tuple15", T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14);
-impl_genome_safe_tuple!("tuple16", T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15);
+impl_genome_safe_tuple!(
+    "tuple13", T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12
+);
+impl_genome_safe_tuple!(
+    "tuple14", T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13
+);
+impl_genome_safe_tuple!(
+    "tuple15", T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14
+);
+impl_genome_safe_tuple!(
+    "tuple16", T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15
+);
 
 // ---------------------------------------------------------------------------
 // GenomeOrd impls — primitives
@@ -325,9 +333,7 @@ macro_rules! impl_genome_ord_primitive {
     };
 }
 
-impl_genome_ord_primitive!(
-    bool, u8, u16, u32, u64, u128, i8, i16, i32, i64, i128, char,
-);
+impl_genome_ord_primitive!(bool, u8, u16, u32, u64, u128, i8, i16, i32, i64, i128, char,);
 
 impl GenomeOrd for () {}
 impl GenomeOrd for String {}
@@ -368,5 +374,9 @@ impl_genome_ord_tuple!(T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10);
 impl_genome_ord_tuple!(T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11);
 impl_genome_ord_tuple!(T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12);
 impl_genome_ord_tuple!(T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13);
-impl_genome_ord_tuple!(T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14);
-impl_genome_ord_tuple!(T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15);
+impl_genome_ord_tuple!(
+    T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14
+);
+impl_genome_ord_tuple!(
+    T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15
+);

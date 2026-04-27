@@ -1,5 +1,5 @@
-use serde::de::DeserializeOwned;
 use serde::Serialize;
+use serde::de::DeserializeOwned;
 use std::num::NonZeroU64;
 
 use crate::aggregate_id::AggregateId;
@@ -50,10 +50,7 @@ pub trait DomainEvent: Serialize + DeserializeOwned + Clone + Send + Sync + 'sta
 /// reacting to a prior event, `causation_id` points to that prior
 /// event's `event_id`.
 #[derive(Debug, Clone, Serialize, serde::Deserialize)]
-#[serde(bound(
-    serialize = "E: Serialize",
-    deserialize = "E: DeserializeOwned"
-))]
+#[serde(bound(serialize = "E: Serialize", deserialize = "E: DeserializeOwned"))]
 pub struct EventEnvelope<E: DomainEvent> {
     /// Unique identifier for this event instance (UUID v7, time-ordered).
     event_id: uuid::Uuid,
@@ -266,7 +263,9 @@ mod tests {
             timestamp: jiff::Timestamp::now(),
             correlation_id: None,
             causation_id: None,
-            payload: TestEvent::Happened { value: "bad".into() },
+            payload: TestEvent::Happened {
+                value: "bad".into(),
+            },
         };
 
         assert!(matches!(
@@ -298,16 +297,16 @@ mod tests {
     /// serialized bytes are reproducible across runs and platforms.
     fn golden_envelope() -> EventEnvelope<TestEvent> {
         let event_id = uuid::Uuid::from_bytes([
-            0x01, 0x93, 0xa3, 0xe8, 0x80, 0x00, 0x7c, 0xde,
-            0x8f, 0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd,
+            0x01, 0x93, 0xa3, 0xe8, 0x80, 0x00, 0x7c, 0xde, 0x8f, 0x01, 0x23, 0x45, 0x67, 0x89,
+            0xab, 0xcd,
         ]);
         let correlation_id = uuid::Uuid::from_bytes([
-            0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff, 0x71, 0x22,
-            0x83, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0x00,
+            0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff, 0x71, 0x22, 0x83, 0x44, 0x55, 0x66, 0x77, 0x88,
+            0x99, 0x00,
         ]);
         let causation_id = uuid::Uuid::from_bytes([
-            0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88,
-            0x89, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff, 0x00,
+            0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x89, 0xaa, 0xbb, 0xcc, 0xdd, 0xee,
+            0xff, 0x00,
         ]);
         let aggregate_id = AggregateId::new(NonZeroU64::new(42).unwrap());
         let sequence = NonZeroU64::new(7).unwrap();
@@ -350,7 +349,8 @@ mod tests {
 
         let expected = std::fs::read(&path).unwrap();
         assert_eq!(
-            serialized, expected,
+            serialized,
+            expected,
             "Serialized envelope does not match golden file at {}. \
              If the change is intentional (schema evolution), update the \
              fixture and document in an ADR.",
@@ -358,8 +358,7 @@ mod tests {
         );
 
         // Deserialize the golden file and verify field values.
-        let deserialized: EventEnvelope<TestEvent> =
-            rmp_serde::from_slice(&expected).unwrap();
+        let deserialized: EventEnvelope<TestEvent> = rmp_serde::from_slice(&expected).unwrap();
         deserialized.validate().unwrap();
 
         assert_eq!(deserialized.event_id(), envelope.event_id());

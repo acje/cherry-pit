@@ -65,7 +65,9 @@ pub enum PardosaError {
     #[error("registry unavailable")]
     RegistryUnavailable,
 
-    #[error("registry CAS conflict on key {key}: expected revision {expected_revision}, actual {actual_revision}")]
+    #[error(
+        "registry CAS conflict on key {key}: expected revision {expected_revision}, actual {actual_revision}"
+    )]
     RegistryConflict {
         key: String,
         expected_revision: u64,
