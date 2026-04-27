@@ -170,6 +170,11 @@ description = "Prose section below minimum word count"
 [rules.params]
 min_words = 10
 
+[[rules]]
+id = "T016"
+category = "template"
+description = "Decision section lacks tagged rules (- **RN**: pattern) or has non-sequential rule IDs"
+
 # Link rules (L001–L009)
 
 [[rules]]
@@ -245,23 +250,3 @@ description = "Active ADR has Retirement section (forbidden outside stale/)"
 id = "S006"
 category = "structure"
 description = "Terminal-status ADR (Rejected/Deprecated/Superseded) not in stale directory"
-
-# Index rules (I001–I003) — internal assertions, not user-facing
-
-[[rules]]
-id = "I001"
-category = "index"
-description = "ADR file exists on disk but is missing from domain README index"
-internal = true
-
-[[rules]]
-id = "I002"
-category = "index"
-description = "Domain README references an ADR that does not exist on disk"
-internal = true
-
-[[rules]]
-id = "I003"
-category = "index"
-description = "Domain README hyperlink target does not resolve to a file"
-internal = true

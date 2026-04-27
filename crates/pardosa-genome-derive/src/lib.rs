@@ -1,3 +1,4 @@
+#![forbid(unsafe_code)]
 //! Derive macro for the `GenomeSafe` trait.
 //!
 //! Generates `SCHEMA_HASH` (xxHash64 fingerprint) and `SCHEMA_SOURCE`

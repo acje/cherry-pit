@@ -12,12 +12,24 @@ the pit handles persistence, transport, and fan-out.
 
 Every decision is evaluated against these priorities, in strict rank order:
 
-1. **Correctness** — make illegal states unrepresentable. Lean on the type
-   system to reject wrong code at compile time. Total functions. No unsafe.
-2. **Secure** — no data leakage across bounded contexts. Validate at boundaries.
-3. **Energy efficient** — do less work, not faster work. Avoid unnecessary
+1. **Correctness** — Make illegal states unrepresentable. Validated
+   constructors enforce invariants in all build profiles, derive macros
+   reject non-deterministic types at compile time, and every decode path
+   must run the full verification suite — no opt-out. Total functions.
+   `#![forbid(unsafe_code)]` in every crate.
+2. **Secure** — Treat every input as hostile. Validate structurally at
+   boundaries, bound resource consumption before allocation, and reject
+   malformed data as a hard error — no lenient modes. Module boundaries
+   hide design decisions; the crate DAG prevents domain code from depending
+   on infrastructure.
+3. **Energy efficient** — Do less work, not faster work. Prefer zero-copy
+   reads over deserialization, exact-size buffers over reallocation, and
+   compact wire representations over convenient ones. Avoid unnecessary
    allocations, cloning, and serialization.
-4. **Response time** — fast, but never at the cost of correctness.
+4. **Response time** — Fast, but never at the cost of correctness. Bound
+   latency with timeouts and circuit breakers that preserve read
+   availability during write-path failures. Trade simplicity for throughput
+   only when measured, not estimated.
 
 ## Architecture
 

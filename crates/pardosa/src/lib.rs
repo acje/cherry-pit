@@ -1,3 +1,5 @@
+#![forbid(unsafe_code)]
+
 // Pardosa relies on usize == u64 for index arithmetic. Reject 32-bit targets
 // at compile time to prevent silent truncation in `fiber.current().value() as usize`.
 #[cfg(not(target_pointer_width = "64"))]

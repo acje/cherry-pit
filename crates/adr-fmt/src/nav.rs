@@ -58,42 +58,6 @@ pub fn compute_children(records: &[AdrRecord]) -> HashMap<AdrId, Vec<ChildEntry>
     children
 }
 
-/// Print the children report to stdout.
-pub fn print_report(records: &[AdrRecord], children: &HashMap<AdrId, Vec<ChildEntry>>) {
-    // Group records by domain prefix, sorted by number
-    let mut by_prefix: HashMap<&str, Vec<&AdrRecord>> = HashMap::new();
-    for record in records {
-        by_prefix
-            .entry(&record.id.prefix)
-            .or_default()
-            .push(record);
-    }
-
-    let mut prefixes: Vec<&&str> = by_prefix.keys().collect();
-    prefixes.sort();
-
-    println!("=== ADR Children Report ===");
-    println!();
-
-    for prefix in prefixes {
-        let domain_records = by_prefix.get(*prefix).unwrap();
-        let mut sorted = domain_records.clone();
-        sorted.sort_by_key(|r| r.id.number);
-
-        println!("--- {prefix} ---");
-        for record in &sorted {
-            if let Some(entries) = children.get(&record.id) {
-                let title = record.title.as_deref().unwrap_or("(untitled)");
-                println!("  {} {title}", record.id);
-                for entry in entries {
-                    println!("    ← {} {}", entry.verb, entry.child);
-                }
-            }
-        }
-        println!();
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -129,30 +93,16 @@ mod tests {
             title: Some(format!("Test {prefix}-{num:04}")),
             title_line: 1,
             date: Some("2026-04-25".into()),
-            date_line: 3,
-            last_reviewed: None,
-            last_reviewed_line: 0,
             tier: Some(Tier::B),
-            tier_line: 5,
             status: Some(Status::Accepted),
-            status_line: 8,
             status_raw: Some("Accepted".into()),
             relationships,
             has_related: true,
             has_context: true,
             has_decision: true,
             has_consequences: true,
-            has_retirement: false,
-            has_rejection_rationale: false,
-            is_stale: false,
             is_self_referencing,
-            max_code_block_lines: 0,
-            max_code_block_line: 0,
-            code_block_count: 0,
-            amendment_dates: vec![],
-            related_has_placeholder: false,
-            section_order: vec![],
-            section_word_counts: std::collections::HashMap::new(),
+            ..AdrRecord::default()
         }
     }
 

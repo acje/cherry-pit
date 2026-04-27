@@ -58,7 +58,7 @@ efficiency.
 
 ## Steps
 
-### Step 1 · `src/output.rs` (new) — unified output formatter
+### Step 1 · `src/output.rs` (new) — unified output formatter ✅
 
 - `OutputBlock` enum: `Focal { meta, content }`, `Connected { meta, content,
   path }`, `Excluded { count, reason }`
@@ -73,7 +73,7 @@ efficiency.
 - `render_index()` → domain tree with box-drawing to stdout
 - All renderers return `String`; caller writes to stdout
 
-### Step 2 · `src/model.rs` — type extensions
+### Step 2 · `src/model.rs` — type extensions ✅
 
 - Add `crates: Vec<String>` to `AdrRecord`
 - Add `decision_rules: Vec<TaggedRule>` to `AdrRecord`
@@ -84,14 +84,14 @@ efficiency.
 - Add `decision_content: Option<String>` to `AdrRecord` (full Decision section
   text, needed for R0 fallback)
 
-### Step 3 · `docs/adr/adr-fmt.toml` — rule catalog update
+### Step 3 · `docs/adr/adr-fmt.toml` — rule catalog update ✅
 
 - Add `[[rules]] id = "T016"`, `category = "template"`,
   `description = "Decision section lacks tagged rules or has non-sequential
   rule IDs"`
 - Remove I001, I002, I003 entries
 
-### Step 4 · `src/parser.rs` — new extraction logic
+### Step 4 · `src/parser.rs` — new extraction logic ✅
 
 - `find_crates_field()` — parse `Crates: crate-a, crate-b` from metadata
   preamble; return `Vec<String>`
@@ -107,7 +107,7 @@ efficiency.
   normal/malformed/absent/mixed-with-prose; R0 fallback; sequential ID
   validation data
 
-### Step 5 · `src/critique.rs` (new) — critique mode
+### Step 5 · `src/critique.rs` (new) — critique mode ✅
 
 - `critique(focal_id: &AdrId, records: &[AdrRecord], config: &Config) ->
   Vec<OutputBlock>`
@@ -126,7 +126,7 @@ efficiency.
 - Ordering: focal first → connected sorted by tier (S→D) then by ID →
   excluded note last
 
-### Step 6 · `src/context.rs` (new) — context mode
+### Step 6 · `src/context.rs` (new) — context mode ✅
 
 - `context(crate_name: &str, records: &[AdrRecord], config: &Config) ->
   Vec<CrateRule>`
@@ -142,7 +142,7 @@ efficiency.
 - Ordering: foundation domains first (sorted by prefix) → non-foundation by
   tier (S→D) → by ADR ID
 
-### Step 7 · `src/main.rs` — control flow restructure
+### Step 7 · `src/main.rs` — control flow restructure ✅
 
 - Add clap args: `--critique <ADR_ID>`, `--context <CRATE>`,
   `--index [DOMAIN]`
@@ -164,7 +164,7 @@ efficiency.
 - stderr: infrastructure errors only
 - Exit codes: 0 = analysis complete, 1 = infrastructure error
 
-### Step 8 · `src/rules/template.rs` — add T016
+### Step 8 · `src/rules/template.rs` — add T016 ✅
 
 - `check_tagged_rules(record: &AdrRecord, config: &Config) -> Vec<Diagnostic>`
 - Two diagnostic variants under T016:
@@ -174,7 +174,7 @@ efficiency.
     parse R-IDs as integers, check for gaps
 - Exempt `Status::Draft` and `Status::Proposed`
 
-### Step 9 · Remove `src/generate.rs` and `src/rules/index.rs`
+### Step 9 · Remove `src/generate.rs` and `src/rules/index.rs` ✅
 
 - `generate.rs`: extract dependency tree rendering logic (primary parent
   selection, box-drawing, cycle detection) into a pure function; move to
@@ -183,7 +183,7 @@ efficiency.
 - `rules/index.rs`: delete entirely
 - `rules/mod.rs`: remove `mod index` declaration and `index::check` call site
 
-### Step 10 · `src/guidelines.rs` — sync with changes
+### Step 10 · `src/guidelines.rs` — sync with changes ✅
 
 - Add documentation for `--critique`, `--context`, `--index` modes
 - Add T016 rule description
@@ -192,18 +192,18 @@ efficiency.
 - Document tagged rule `- **RN**: text` convention
 - Update mode/flag reference section
 
-### Step 11 · `src/nav.rs` — update report output
+### Step 11 · `src/nav.rs` — update report output ✅
 
 - Keep `compute_children()` unchanged
 - Replace `print_report()` direct `println!` with `output.rs` formatter call
   (or remove `print_report()` entirely — `main.rs` builds output blocks from
   children data)
 
-### Step 12 · `src/config.rs` — cleanup
+### Step 12 · `src/config.rs` — cleanup ✅
 
 - Remove `#[allow(dead_code)]` from `DomainConfig.crates`
 
-### Step 13 · `tests/integration.rs` — comprehensive test update
+### Step 13 · `tests/integration.rs` — comprehensive test update ✅
 
 Remove:
 - All README-generation tests (file existence, safe_write)
@@ -229,7 +229,7 @@ Add:
   without → no warning; ADR with gap (R1, R3) → warning
 - Default lint mode: output on stdout in Alternative 4 format
 
-### Step 14 · `.opencode/skills/adr-fmt/SKILL.md` — update skill definition
+### Step 14 · `.opencode/skills/adr-fmt/SKILL.md` — update skill definition ✅
 
 - Update invocation examples for new flags
 - Remove README side-effect documentation

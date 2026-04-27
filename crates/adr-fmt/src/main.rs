@@ -1,38 +1,32 @@
 //! ADR template and link-integrity validator for cherry-pit.
 //!
-//! Single source of truth for all invariant ADR governance rules.
-//! Validates Architecture Decision Records against the rule catalog:
+//! Read-only, agent-first analysis tool. Single source of truth for
+//! all invariant ADR governance rules.
 //!
-//! - Template compliance (required fields, sections, tier, status format,
-//!   code block length, section ordering, minimum word count)
-//! - Relationship integrity (3-verb vocabulary: References, Supersedes,
-//!   Root; legacy verb detection; supersedes-status consistency)
-//! - File naming conventions (`{PREFIX}-{NNNN}-kebab-slug.md`)
-//! - Structure rules (stale location/status, Retirement section)
-//!
-//! # Usage
+//! # Modes
 //!
 //! ```text
-//! adr-fmt [--report | --guidelines] [<ADR_DIR>]
+//! adr-fmt [<ADR_DIR>]                     # default: lint all ADRs
+//! adr-fmt --critique <ADR_ID> [<ADR_DIR>] # focal ADR + transitive closure
+//! adr-fmt --context <CRATE> [<ADR_DIR>]   # decision rules for a crate
+//! adr-fmt --index [DOMAIN] [<ADR_DIR>]    # domain tree overview
+//! adr-fmt --report [<ADR_DIR>]            # computed children report
+//! adr-fmt --guidelines [<ADR_DIR>]        # print ADR guidelines
 //! ```
 //!
 //! Exit codes:
-//!   0 — Lint complete (warnings may be present)
-//!   1 — Infrastructure error (missing config, unreadable directory)
-//!
-//! Use `--report` to print a computed children index (reverse-link
-//! navigation without stored backlinks).
-//!
-//! Use `--guidelines` to print the complete ADR guidelines document
-//! generated from the rule catalog and configuration.
+//!   0 — Analysis complete
+//!   1 — Infrastructure error (missing config, unknown ADR, unknown crate)
 
 #![forbid(unsafe_code)]
 
 mod config;
-mod generate;
+mod context;
+mod critique;
 mod guidelines;
 mod model;
 mod nav;
+mod output;
 mod parser;
 mod report;
 mod rules;
@@ -43,19 +37,30 @@ use std::process;
 use clap::Parser;
 
 use config::Config;
-use model::DomainDir;
-use report::Severity;
+use model::{parse_adr_id_from_str, DomainDir};
 
 /// ADR template and link-integrity validator for cherry-pit.
 #[derive(Parser)]
 #[command(name = "adr-fmt", version)]
 struct Cli {
+    /// Critique a focal ADR: show transitive closure with full content
+    #[arg(long, value_name = "ADR_ID", group = "mode")]
+    critique: Option<String>,
+
+    /// Show decision rules applicable to a crate
+    #[arg(long, value_name = "CRATE", group = "mode")]
+    context: Option<String>,
+
+    /// Print domain index tree (optionally filtered by domain prefix)
+    #[arg(long, value_name = "DOMAIN", num_args = 0..=1, default_missing_value = "", group = "mode")]
+    index: Option<String>,
+
     /// Print computed children report (reverse-link index)
-    #[arg(long, conflicts_with = "guidelines")]
+    #[arg(long, group = "mode")]
     report: bool,
 
     /// Print complete ADR guidelines (plain text to stdout)
-    #[arg(long, conflicts_with = "report")]
+    #[arg(long, group = "mode")]
     guidelines: bool,
 
     /// Path to ADR root directory (default: auto-discover docs/adr/)
@@ -112,47 +117,48 @@ fn main() {
         all_records.extend(stale_records);
     }
 
-    // Report mode: compute and print children index
-    if cli.report {
+    // Mode dispatch
+    if let Some(ref adr_id_str) = cli.critique {
+        // --critique mode
+        let focal_id = match parse_adr_id_from_str(adr_id_str) {
+            Some(id) => id,
+            None => {
+                eprintln!("error: '{adr_id_str}' is not a valid ADR ID (expected PREFIX-NNNN)");
+                process::exit(1);
+            }
+        };
+        let blocks = critique::critique(&focal_id, &all_records, &config);
+        print!("{}", output::render_blocks(&blocks));
+    } else if let Some(ref crate_name) = cli.context {
+        // --context mode
+        let rules = context::context(crate_name, &all_records, &config);
+        print!("{}", output::render_rules(crate_name, &rules));
+    } else if let Some(ref domain_filter) = cli.index {
+        // --index mode
+        let filter = if domain_filter.is_empty() {
+            None
+        } else {
+            Some(domain_filter.as_str())
+        };
+        print!(
+            "{}",
+            output::render_index(&all_records, &domain_dirs, &config, filter)
+        );
+    } else if cli.report {
+        // --report mode
         let children = nav::compute_children(&all_records);
-        nav::print_report(&all_records, &children);
+        print!(
+            "{}",
+            output::render_report(&all_records, &children)
+        );
+    } else {
+        // Default lint mode
+        let diagnostics = rules::run_all(&all_records, &config);
+        print!(
+            "{}",
+            output::render_diagnostics(&diagnostics, all_records.len())
+        );
     }
-
-    // Generate README files
-    generate::generate_all(&all_records, &domain_dirs, &adr_root, &config);
-
-    let diagnostics = rules::run_all(&all_records, &domain_dirs, &config);
-
-    let mut errors = 0u32;
-    let mut warnings = 0u32;
-    let mut internal_count = 0u32;
-
-    for d in &diagnostics {
-        if d.internal {
-            internal_count += 1;
-            continue;
-        }
-        match d.severity {
-            Severity::Error => errors += 1,
-            Severity::Warning => warnings += 1,
-        }
-        report::print_diagnostic(d);
-    }
-
-    if errors > 0 || warnings > 0 {
-        eprintln!();
-    }
-    let mut summary = format!(
-        "adr-fmt: {errors} error(s), {warnings} warning(s) across {} ADR(s)",
-        all_records.len()
-    );
-    if internal_count > 0 {
-        summary.push_str(&format!(" [{internal_count} internal assertion(s)]"));
-    }
-    eprintln!("{summary}");
-
-    // Advisory tool: always exit 0 for lint findings.
-    // Only infrastructure errors (missing config, no domains) exit 1.
 }
 
 /// Walk up from CWD looking for `docs/adr/GOVERNANCE.md`.

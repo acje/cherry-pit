@@ -92,7 +92,6 @@ pub fn check(record: &AdrRecord, domain_prefixes: &[&str], diags: &mut Vec<Diagn
 mod tests {
     use super::*;
     use crate::model::{AdrId, Status, Tier};
-    use std::collections::HashMap;
     use std::path::PathBuf;
 
     const TEST_PREFIXES: &[&str] = &["COM", "CHE", "PAR", "GEN"];
@@ -107,30 +106,16 @@ mod tests {
             title: Some("Test".into()),
             title_line: 1,
             date: Some("2026-04-25".into()),
-            date_line: 3,
             last_reviewed: Some("2026-04-25".into()),
-            last_reviewed_line: 4,
             tier: Some(Tier::B),
-            tier_line: 5,
             status: Some(Status::Accepted),
             status_line: 8,
             status_raw: Some("Accepted".into()),
-            relationships: vec![],
             has_related: true,
             has_context: true,
             has_decision: true,
             has_consequences: true,
-            has_retirement: false,
-            has_rejection_rationale: false,
-            is_stale: false,
-            is_self_referencing: false,
-            max_code_block_lines: 0,
-            max_code_block_line: 0,
-            code_block_count: 0,
-            amendment_dates: vec![],
-            related_has_placeholder: false,
-            section_order: vec![],
-            section_word_counts: HashMap::new(),
+            ..AdrRecord::default()
         }
     }
 

@@ -38,7 +38,8 @@ handle low-level operations.
 
 Every cherry-pit crate uses `#![forbid(unsafe_code)]` at the crate
 root. No `unsafe` blocks, no `unsafe impl`, no `unsafe fn`. This
-applies to all current crates (`cherry-pit-core`, `cherry-pit-gateway`) and all
+applies to all current crates (`cherry-pit-core`, `cherry-pit-gateway`,
+`pardosa`, `pardosa-genome`, `pardosa-genome-derive`, `adr-fmt`) and all
 future crates in the workspace.
 
 Dependencies may use `unsafe` internally — that is their

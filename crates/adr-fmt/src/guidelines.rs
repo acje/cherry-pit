@@ -11,10 +11,13 @@ use crate::model::{RelVerb, Status, Tier};
 /// Print the complete guidelines document to stdout.
 pub fn print(config: &Config) {
     print_header();
+    print_modes();
     print_domains(config);
     print_tiers();
     print_lifecycle();
     print_template_requirements(config);
+    print_tagged_rules();
+    print_crates_metadata();
     print_relationship_vocabulary();
     print_naming_rules(config);
     print_link_rules(config);
@@ -30,8 +33,30 @@ fn print_header() {
     println!("This is the single source of truth for all invariant ADR governance rules.");
     println!("Configurable values are read from adr-fmt.toml.");
     println!();
+    println!("adr-fmt is a read-only analysis tool. It never modifies files.");
+    println!("All output goes to stdout; stderr is reserved for infrastructure errors.");
+    println!();
     println!("For rationale, domain taxonomy justification, tier philosophy,");
     println!("and process guidance, see GOVERNANCE.md.");
+    println!();
+}
+
+fn print_modes() {
+    println!("MODES");
+    println!("-----");
+    println!();
+    println!("adr-fmt operates in one of these mutually exclusive modes:");
+    println!();
+    println!("  (default)                Lint all ADRs, report diagnostics to stdout");
+    println!("  --critique <ADR_ID>      Transitive closure around a focal ADR");
+    println!("                           Fan-out + fan-in, stale filtered, tier-sorted");
+    println!("  --context <CRATE>        Decision rules applicable to a crate");
+    println!("                           Foundation domains always included");
+    println!("  --index [DOMAIN]         Domain dependency tree (optional domain filter)");
+    println!("  --report                 Children index computed from relationships");
+    println!("  --guidelines             This document");
+    println!();
+    println!("Exit codes: 0 = analysis complete, 1 = infrastructure error");
     println!();
 }
 
@@ -153,6 +178,46 @@ fn print_template_requirements(config: &Config) {
             print_rule(rule);
         }
     }
+    println!();
+}
+
+fn print_tagged_rules() {
+    println!("TAGGED RULES (Decision Section)");
+    println!("-------------------------------");
+    println!();
+    println!("Every Decision section must contain tagged rules in this format:");
+    println!();
+    println!("  - **R1**: First rule or decision statement");
+    println!("  - **R2**: Second rule or decision statement");
+    println!();
+    println!("Global identifier: PREFIX-NNNN:R1 (e.g., CHE-0042:R1)");
+    println!();
+    println!("Requirements (T016):");
+    println!("  - At least one tagged rule must be present");
+    println!("  - Rule IDs must be sequential (R1, R2, R3 — no gaps)");
+    println!("  - Exempt: Draft and Proposed status ADRs");
+    println!();
+    println!("Fallback: when no tagged rules are found, the entire Decision");
+    println!("section text is captured as R0 (non-conforming, triggers T016).");
+    println!();
+}
+
+fn print_crates_metadata() {
+    println!("CRATES METADATA");
+    println!("---------------");
+    println!();
+    println!("ADRs can specify which crates they apply to:");
+    println!();
+    println!("  Crates: crate-a, crate-b");
+    println!();
+    println!("Placed in the metadata preamble (after Date/Tier, before ## Status).");
+    println!();
+    println!("Resolution for --context mode:");
+    println!("  1. If any ADR in a domain has a Crates: field, only ADRs listing");
+    println!("     the queried crate are included");
+    println!("  2. If no ADR in a domain has a Crates: field, all domain ADRs");
+    println!("     are included (domain-level fallback)");
+    println!("  3. Foundation domains are always included regardless of Crates:");
     println!();
 }
 

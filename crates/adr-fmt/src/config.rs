@@ -30,7 +30,6 @@ pub struct DomainConfig {
     pub name: String,
     pub directory: String,
     pub description: String,
-    #[allow(dead_code)]
     pub crates: Vec<String>,
     /// Foundation domains are included with every domain query.
     /// COM is the canonical foundation domain.

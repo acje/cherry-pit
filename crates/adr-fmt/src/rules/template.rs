@@ -240,6 +240,9 @@ pub fn check(record: &AdrRecord, config: &Config, diags: &mut Vec<Diagnostic>) {
     let min_words = config.rule_param_u64("T015", "min_words").unwrap_or(DEFAULT_MIN_WORDS);
     check_section_word_counts(record, min_words, diags);
 
+    // T016: Tagged rules in Decision section
+    check_tagged_rules(record, diags);
+
     // S004: Stale ADR must have Retirement section
     if record.is_stale && !record.has_retirement {
         diags.push(Diagnostic::warning(
@@ -374,6 +377,65 @@ fn check_section_word_counts(record: &AdrRecord, min_words: u64, diags: &mut Vec
     }
 }
 
+/// T016: Decision section should have tagged rules (`- **RN**: text`).
+///
+/// Two diagnostic variants:
+/// - No tagged rules (decision_rules empty or sole entry is R0)
+/// - Non-sequential IDs (gap in R-number sequence)
+///
+/// Exempt: `Status::Draft` and `Status::Proposed`.
+fn check_tagged_rules(record: &AdrRecord, diags: &mut Vec<Diagnostic>) {
+    // Exempt Draft and Proposed
+    if let Some(ref status) = record.status {
+        if matches!(status, Status::Draft | Status::Proposed) {
+            return;
+        }
+    }
+
+    // Check for missing tagged rules
+    let has_real_rules = !record.decision_rules.is_empty()
+        && !(record.decision_rules.len() == 1 && record.decision_rules[0].id == "R0");
+
+    if !has_real_rules {
+        diags.push(Diagnostic::warning(
+            "T016",
+            &record.file_path,
+            0,
+            "Decision section lacks tagged rules (- **RN**: pattern)".into(),
+        ));
+        return;
+    }
+
+    // Check for non-sequential IDs
+    let mut nums: Vec<u32> = Vec::new();
+    for rule in &record.decision_rules {
+        if let Some(num_str) = rule.id.strip_prefix('R') {
+            if let Ok(num) = num_str.parse::<u32>() {
+                nums.push(num);
+            }
+        }
+    }
+
+    nums.sort();
+    for (i, &num) in nums.iter().enumerate() {
+        let expected = (i as u32) + 1;
+        if num != expected {
+            let prev = if i > 0 {
+                format!("R{}", nums[i - 1])
+            } else {
+                "start".into()
+            };
+            diags.push(Diagnostic::warning(
+                "T016",
+                &record.file_path,
+                0,
+                format!("Tagged rule IDs not sequential (gap after {prev})"),
+            ));
+            return;
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -419,28 +481,15 @@ params = { min_words = 10 }
             title: Some("Test".into()),
             title_line: 1,
             date: Some("2026-04-25".into()),
-            date_line: 3,
             last_reviewed: Some("2026-04-25".into()),
-            last_reviewed_line: 4,
             tier: Some(Tier::S),
-            tier_line: 5,
             status: Some(Status::Accepted),
             status_line: 8,
             status_raw: Some("Accepted".into()),
-            relationships: vec![],
             has_related: true,
             has_context: true,
             has_decision: true,
             has_consequences: true,
-            has_retirement: false,
-            has_rejection_rationale: false,
-            is_stale: false,
-            is_self_referencing: false,
-            max_code_block_lines: 0,
-            max_code_block_line: 0,
-            code_block_count: 0,
-            amendment_dates: vec![],
-            related_has_placeholder: false,
             section_order: vec![
                 "Status".into(),
                 "Related".into(),
@@ -449,13 +498,14 @@ params = { min_words = 10 }
                 "Consequences".into(),
             ],
             section_word_counts: word_counts,
+            ..AdrRecord::default()
         }
     }
 
     #[test]
     fn valid_record_produces_no_diagnostics() {
         // Add a relationship to avoid T007
-        use crate::model::{RelVerb, Relationship};
+        use crate::model::{RelVerb, Relationship, TaggedRule};
         let mut record = make_record();
         record.relationships = vec![Relationship {
             verb: RelVerb::Root,
@@ -463,6 +513,9 @@ params = { min_words = 10 }
             line: 10,
         }];
         record.is_self_referencing = true;
+        record.decision_rules = vec![
+            TaggedRule { id: "R1".into(), text: "Test rule".into(), line: 10 },
+        ];
 
         let config = make_config();
         let mut diags = Vec::new();
@@ -784,5 +837,102 @@ params = { min_words = 10 }
         assert!(s006.message.contains("stale/"), "must name target directory");
         assert!(s006.message.contains("## Retirement"), "must name required section");
         assert!(s006.message.contains("≥10 words"), "must specify word count");
+    }
+
+    #[test]
+    fn tagged_rules_present_no_t016() {
+        use crate::model::TaggedRule;
+        let mut record = make_record();
+        record.decision_rules = vec![
+            TaggedRule { id: "R1".into(), text: "Rule one".into(), line: 10 },
+            TaggedRule { id: "R2".into(), text: "Rule two".into(), line: 11 },
+        ];
+        let config = make_config();
+        let mut diags = Vec::new();
+        check(&record, &config, &mut diags);
+        assert!(
+            !diags.iter().any(|d| d.rule == "T016"),
+            "tagged rules should not trigger T016, got: {diags:?}"
+        );
+    }
+
+    #[test]
+    fn no_tagged_rules_produces_t016() {
+        let mut record = make_record();
+        record.decision_rules = vec![]; // no rules at all
+        let config = make_config();
+        let mut diags = Vec::new();
+        check(&record, &config, &mut diags);
+        assert!(
+            diags.iter().any(|d| d.rule == "T016"),
+            "missing tagged rules should trigger T016, got: {diags:?}"
+        );
+    }
+
+    #[test]
+    fn r0_fallback_produces_t016() {
+        use crate::model::TaggedRule;
+        let mut record = make_record();
+        record.decision_rules = vec![TaggedRule {
+            id: "R0".into(),
+            text: "Full decision text".into(),
+            line: 0,
+        }];
+        let config = make_config();
+        let mut diags = Vec::new();
+        check(&record, &config, &mut diags);
+        assert!(
+            diags.iter().any(|d| d.rule == "T016"),
+            "R0 fallback should trigger T016, got: {diags:?}"
+        );
+    }
+
+    #[test]
+    fn draft_exempt_from_t016() {
+        let mut record = make_record();
+        record.status = Some(Status::Draft);
+        record.status_raw = Some("Draft".into());
+        record.decision_rules = vec![];
+        let config = make_config();
+        let mut diags = Vec::new();
+        check(&record, &config, &mut diags);
+        assert!(
+            !diags.iter().any(|d| d.rule == "T016"),
+            "Draft should be exempt from T016, got: {diags:?}"
+        );
+    }
+
+    #[test]
+    fn proposed_exempt_from_t016() {
+        let mut record = make_record();
+        record.status = Some(Status::Proposed);
+        record.status_raw = Some("Proposed".into());
+        record.decision_rules = vec![];
+        let config = make_config();
+        let mut diags = Vec::new();
+        check(&record, &config, &mut diags);
+        assert!(
+            !diags.iter().any(|d| d.rule == "T016"),
+            "Proposed should be exempt from T016"
+        );
+    }
+
+    #[test]
+    fn non_sequential_ids_produces_t016() {
+        use crate::model::TaggedRule;
+        let mut record = make_record();
+        record.decision_rules = vec![
+            TaggedRule { id: "R1".into(), text: "Rule one".into(), line: 10 },
+            TaggedRule { id: "R3".into(), text: "Rule three".into(), line: 12 },
+        ];
+        let config = make_config();
+        let mut diags = Vec::new();
+        check(&record, &config, &mut diags);
+        let t016 = diags.iter().find(|d| d.rule == "T016");
+        assert!(t016.is_some(), "gap in IDs should trigger T016");
+        assert!(
+            t016.unwrap().message.contains("gap after R1"),
+            "should identify the gap location"
+        );
     }
 }

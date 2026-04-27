@@ -8,7 +8,20 @@ pub struct DomainDir {
     pub path: PathBuf,
     pub prefix: String,
     pub name: String,
+    #[allow(dead_code)] // Retained for guidelines output
     pub description: String,
+}
+
+/// A tagged rule extracted from the Decision section.
+///
+/// Format in ADR: `- **R1**: Rule text here`
+/// Global identifier: `CHE-0042:R1`
+#[derive(Debug, Clone)]
+pub struct TaggedRule {
+    pub id: String,
+    pub text: String,
+    #[allow(dead_code)] // Line number for diagnostic context
+    pub line: usize,
 }
 
 /// Composite ADR identifier: prefix + number (e.g., CHE-0042).
@@ -54,6 +67,7 @@ pub struct AdrRecord {
     /// True when the ADR file lives in the stale archive directory.
     pub is_stale: bool,
     /// True when the ADR has a `- Root: SELF` self-reference.
+    #[allow(dead_code)] // Used by generate tree logic (retained for future)
     pub is_self_referencing: bool,
     pub max_code_block_lines: usize,
     /// 1-indexed line number of the opening fence of the largest code
@@ -66,12 +80,64 @@ pub struct AdrRecord {
     pub amendment_dates: Vec<(String, usize)>,
     /// True when the Related section contains a `—` placeholder (no
     /// relationships).
+    #[allow(dead_code)] // Parsed for completeness
     pub related_has_placeholder: bool,
     /// Ordered list of H2 section names as they appear in the file.
     pub section_order: Vec<String>,
     /// Word count per H2 section (section name → count). Code blocks
     /// are excluded from the count.
     pub section_word_counts: HashMap<String, usize>,
+    /// Crates associated with this ADR via `Crates:` metadata field.
+    pub crates: Vec<String>,
+    /// Tagged rules extracted from the Decision section
+    /// (`- **RN**: text` pattern). Falls back to R0 with full
+    /// decision content when no tagged rules are found.
+    pub decision_rules: Vec<TaggedRule>,
+    /// Full text of the Decision section (for R0 fallback).
+    #[allow(dead_code)] // Available for context mode R0 extraction
+    pub decision_content: Option<String>,
+}
+
+impl Default for AdrRecord {
+    fn default() -> Self {
+        Self {
+            id: AdrId {
+                prefix: String::new(),
+                number: 0,
+            },
+            file_path: PathBuf::new(),
+            title: None,
+            title_line: 0,
+            date: None,
+            date_line: 0,
+            last_reviewed: None,
+            last_reviewed_line: 0,
+            tier: None,
+            tier_line: 0,
+            status: None,
+            status_line: 0,
+            status_raw: None,
+            relationships: Vec::new(),
+            has_related: false,
+            has_context: false,
+            has_decision: false,
+            has_consequences: false,
+            has_retirement: false,
+            has_rejection_rationale: false,
+            is_stale: false,
+            is_self_referencing: false,
+            max_code_block_lines: 0,
+            max_code_block_line: 0,
+            code_block_count: 0,
+            amendment_dates: Vec::new(),
+            related_has_placeholder: false,
+            section_order: Vec::new(),
+            section_word_counts: HashMap::new(),
+            crates: Vec::new(),
+            decision_rules: Vec::new(),
+            decision_content: None,
+        }
+    }
 }
 
 /// ADR tier classification.
@@ -147,6 +213,17 @@ impl Tier {
     /// All tier variants in order.
     pub fn all() -> &'static [Self] {
         &[Self::S, Self::A, Self::B, Self::C, Self::D]
+    }
+
+    /// Numeric rank for sorting (S=0, A=1, ... D=4).
+    pub fn rank(self) -> u8 {
+        match self {
+            Self::S => 0,
+            Self::A => 1,
+            Self::B => 2,
+            Self::C => 3,
+            Self::D => 4,
+        }
     }
 }
 
@@ -257,6 +334,20 @@ impl Status {
             "Deprecated",
             "Superseded by PREFIX-NNNN",
         ]
+    }
+
+    /// Short display string for output formatting.
+    pub fn short_display(&self) -> String {
+        match self {
+            Self::Draft => "Draft".into(),
+            Self::Proposed => "Proposed".into(),
+            Self::Accepted => "Accepted".into(),
+            Self::Amended { .. } => "Amended".into(),
+            Self::Rejected => "Rejected".into(),
+            Self::Deprecated => "Deprecated".into(),
+            Self::SupersededBy(id) => format!("Superseded by {id}"),
+            Self::Invalid(s) => s.clone(),
+        }
     }
 }
 
@@ -654,5 +745,36 @@ mod tests {
                 "{verb:?} should not have migration guidance"
             );
         }
+    }
+
+    #[test]
+    fn default_adr_record() {
+        let record = AdrRecord::default();
+        assert_eq!(record.id.prefix, "");
+        assert_eq!(record.id.number, 0);
+        assert!(record.crates.is_empty());
+        assert!(record.decision_rules.is_empty());
+        assert!(record.decision_content.is_none());
+    }
+
+    #[test]
+    fn tier_rank_ordering() {
+        assert!(Tier::S.rank() < Tier::A.rank());
+        assert!(Tier::A.rank() < Tier::B.rank());
+        assert!(Tier::D.rank() == 4);
+    }
+
+    #[test]
+    fn status_short_display() {
+        assert_eq!(Status::Draft.short_display(), "Draft");
+        assert_eq!(Status::Accepted.short_display(), "Accepted");
+        assert_eq!(
+            Status::SupersededBy(AdrId {
+                prefix: "CHE".into(),
+                number: 99,
+            })
+            .short_display(),
+            "Superseded by CHE-0099"
+        );
     }
 }

@@ -8,7 +8,8 @@ use regex::Regex;
 
 use crate::config::Config;
 use crate::model::{
-    parse_adr_id_from_str, AdrId, AdrRecord, DomainDir, RelVerb, Relationship, Status, Tier,
+    parse_adr_id_from_str, AdrId, AdrRecord, DomainDir, RelVerb, Relationship, Status, TaggedRule,
+    Tier,
 };
 
 /// Parse all ADR files in a domain directory.
@@ -127,6 +128,13 @@ pub fn parse_adr_file(path: &Path, expected_prefix: &str, is_stale: bool) -> Opt
     // --- Section ordering and word counts ---
     let (section_order, section_word_counts) = analyze_sections(&lines);
 
+    // --- Crates field ---
+    let crates = find_crates_field(&lines);
+
+    // --- Decision section content and tagged rules ---
+    let decision_content = extract_decision_content(&lines);
+    let decision_rules = extract_tagged_rules(&lines, &decision_content);
+
     // --- Code block metrics ---
     let (max_code_block_lines, code_block_count, max_code_block_line) =
         measure_code_blocks(&lines);
@@ -161,6 +169,9 @@ pub fn parse_adr_file(path: &Path, expected_prefix: &str, is_stale: bool) -> Opt
         related_has_placeholder,
         section_order,
         section_word_counts,
+        crates,
+        decision_rules,
+        decision_content,
     })
 }
 
@@ -356,6 +367,102 @@ fn analyze_sections(lines: &[&str]) -> (Vec<String>, HashMap<String, usize>) {
     }
 
     (order, word_counts)
+}
+
+/// Parse `Crates: crate-a, crate-b` from the metadata preamble.
+///
+/// Returns an empty vec if the field is absent or empty.
+fn find_crates_field(lines: &[&str]) -> Vec<String> {
+    for line in lines {
+        if let Some(value) = line.strip_prefix("Crates:") {
+            let value = value.trim();
+            if value.is_empty() {
+                return Vec::new();
+            }
+            return value.split(',').map(|s| s.trim().to_owned()).collect();
+        }
+        // Stop searching at first H2 — metadata preamble is above sections
+        if line.starts_with("## ") {
+            break;
+        }
+    }
+    Vec::new()
+}
+
+/// Extract the full text of the Decision section (for R0 fallback).
+fn extract_decision_content(lines: &[&str]) -> Option<String> {
+    let mut in_decision = false;
+    let mut content = Vec::new();
+
+    for line in lines {
+        if *line == "## Decision" {
+            in_decision = true;
+            continue;
+        }
+        if in_decision {
+            if line.starts_with("## ") {
+                break;
+            }
+            content.push(*line);
+        }
+    }
+
+    if content.is_empty() {
+        return None;
+    }
+
+    // Trim leading/trailing blank lines
+    let text = content.join("\n").trim().to_owned();
+    if text.is_empty() {
+        None
+    } else {
+        Some(text)
+    }
+}
+
+/// Extract tagged rules from the Decision section.
+///
+/// Matches `- **RN**: text` pattern within the Decision section.
+/// When no tagged rules are found, produces a single R0 fallback
+/// with the full decision content.
+fn extract_tagged_rules(lines: &[&str], decision_content: &Option<String>) -> Vec<TaggedRule> {
+    let rule_re = Regex::new(r"^\s*-\s*\*\*R(\d+)\*\*:\s*(.+)").expect("valid regex");
+    let mut rules = Vec::new();
+    let mut in_decision = false;
+
+    for (i, line) in lines.iter().enumerate() {
+        if *line == "## Decision" {
+            in_decision = true;
+            continue;
+        }
+        if in_decision {
+            if line.starts_with("## ") {
+                break;
+            }
+            if let Some(caps) = rule_re.captures(line) {
+                let num = caps.get(1).unwrap().as_str();
+                let text = caps.get(2).unwrap().as_str().trim().to_owned();
+                rules.push(TaggedRule {
+                    id: format!("R{num}"),
+                    text,
+                    line: i + 1,
+                });
+            }
+        }
+    }
+
+    // R0 fallback: when no tagged rules found, use full decision text
+    if rules.is_empty() {
+        if let Some(content) = decision_content {
+            rules.push(TaggedRule {
+                id: "R0".into(),
+                text: content.clone(),
+                line: 0,
+            });
+        }
+    }
+
+    rules
 }
 
 /// Strip trailing annotations like ` (indirect)` or ` (\`#[non_exhaustive]\`)`.
@@ -769,5 +876,141 @@ mod tests {
         };
         let is_self_ref = rels.iter().any(|rel| rel.verb == RelVerb::Root && rel.target == id);
         assert!(!is_self_ref);
+    }
+
+    #[test]
+    fn find_crates_field_present() {
+        let lines = vec![
+            "# CHE-0042. Title",
+            "",
+            "Date: 2026-04-25",
+            "Crates: cherry-pit-core, cherry-pit-gateway",
+            "Tier: A",
+            "",
+            "## Status",
+        ];
+        let crates = find_crates_field(&lines);
+        assert_eq!(crates, vec!["cherry-pit-core", "cherry-pit-gateway"]);
+    }
+
+    #[test]
+    fn find_crates_field_empty() {
+        let lines = vec![
+            "# CHE-0042. Title",
+            "",
+            "Crates:",
+            "",
+            "## Status",
+        ];
+        let crates = find_crates_field(&lines);
+        assert!(crates.is_empty());
+    }
+
+    #[test]
+    fn find_crates_field_absent() {
+        let lines = vec![
+            "# CHE-0042. Title",
+            "",
+            "Date: 2026-04-25",
+            "",
+            "## Status",
+        ];
+        let crates = find_crates_field(&lines);
+        assert!(crates.is_empty());
+    }
+
+    #[test]
+    fn extract_decision_content_basic() {
+        let lines = vec![
+            "## Decision",
+            "",
+            "We decided to use event sourcing.",
+            "This provides full auditability.",
+            "",
+            "## Consequences",
+        ];
+        let content = extract_decision_content(&lines);
+        assert_eq!(
+            content.as_deref(),
+            Some("We decided to use event sourcing.\nThis provides full auditability.")
+        );
+    }
+
+    #[test]
+    fn extract_decision_content_absent() {
+        let lines = vec!["## Context", "", "Some context.", "", "## Consequences"];
+        let content = extract_decision_content(&lines);
+        assert!(content.is_none());
+    }
+
+    #[test]
+    fn extract_tagged_rules_normal() {
+        let lines = vec![
+            "## Decision",
+            "",
+            "- **R1**: All events must be versioned",
+            "- **R2**: Snapshots at 100-event intervals",
+            "",
+            "## Consequences",
+        ];
+        let decision_content = extract_decision_content(&lines);
+        let rules = extract_tagged_rules(&lines, &decision_content);
+        assert_eq!(rules.len(), 2);
+        assert_eq!(rules[0].id, "R1");
+        assert_eq!(rules[0].text, "All events must be versioned");
+        assert_eq!(rules[1].id, "R2");
+        assert_eq!(rules[1].text, "Snapshots at 100-event intervals");
+    }
+
+    #[test]
+    fn extract_tagged_rules_r0_fallback() {
+        let lines = vec![
+            "## Decision",
+            "",
+            "We use event sourcing for persistence.",
+            "",
+            "## Consequences",
+        ];
+        let decision_content = extract_decision_content(&lines);
+        let rules = extract_tagged_rules(&lines, &decision_content);
+        assert_eq!(rules.len(), 1);
+        assert_eq!(rules[0].id, "R0");
+        assert_eq!(rules[0].text, "We use event sourcing for persistence.");
+    }
+
+    #[test]
+    fn extract_tagged_rules_mixed_with_prose() {
+        let lines = vec![
+            "## Decision",
+            "",
+            "We adopt the following rules:",
+            "",
+            "- **R1**: Events are append-only",
+            "Some prose between rules.",
+            "- **R2**: Snapshots are optional",
+            "",
+            "## Consequences",
+        ];
+        let decision_content = extract_decision_content(&lines);
+        let rules = extract_tagged_rules(&lines, &decision_content);
+        assert_eq!(rules.len(), 2);
+        assert_eq!(rules[0].id, "R1");
+        assert_eq!(rules[1].id, "R2");
+    }
+
+    #[test]
+    fn extract_tagged_rules_malformed_ignored() {
+        let lines = vec![
+            "## Decision",
+            "",
+            "- **Rfoo**: Not a valid rule tag",
+            "- **R1**: Valid rule",
+            "",
+            "## Consequences",
+        ];
+        let decision_content = extract_decision_content(&lines);
+        let rules = extract_tagged_rules(&lines, &decision_content);
+        assert_eq!(rules.len(), 1);
+        assert_eq!(rules[0].id, "R1");
     }
 }
