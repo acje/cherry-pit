@@ -105,52 +105,7 @@ explaining why the ADR left active service.
 
 ---
 
-## 4. When to Write an ADR
-
-Write an ADR when a decision:
-
-1. **Constrains future implementation** — the choice limits what can be
-   built or how it can be built
-2. **Has trade-offs** — reasonable alternatives exist and the choice is
-   not obvious
-3. **Crosses crate boundaries** — the decision affects more than one
-   crate's API or behaviour
-4. **Is hard to reverse** — undoing the decision would require
-   significant refactoring
-5. **Was debated** — multiple contributors or design sessions discussed
-   alternatives
-
-Do **not** write an ADR for:
-
-- Trivial implementation choices within a single function
-- Dependency version bumps (unless they change API surface)
-- Formatting or style decisions (covered by lints/rustfmt)
-
----
-
-## 5. Review Process
-
-1. **Author** creates a Draft ADR in the appropriate domain directory
-2. **Author** validates MECE compliance:
-   - The ADR belongs to exactly one domain
-   - No existing ADR in the same domain covers the same decision space
-   - If the decision affects another domain, cross-references are added
-   - All relationship targets exist and are Accepted or Amended
-   - No circular dependencies are introduced
-   - A tier is assigned
-3. **Author** opens a PR moving the ADR from Draft to Proposed
-4. **Reviewer** verifies:
-   - Correct domain assignment
-   - Tier assignment with justification
-   - Template and vocabulary conformance (`cargo run -p adr-fmt`)
-   - MECE compliance
-5. On approval, status changes to Accepted and the PR is merged
-6. Run `cargo run -p adr-fmt` to regenerate README indexes; commit
-   the ADR and any regenerated files together
-
----
-
-## 6. Overlap Resolution
+## 4. Overlap Resolution
 
 When a domain-specific ADR covers the same concern as a foundation
 domain ADR (COM or RST) at a different abstraction level, the
