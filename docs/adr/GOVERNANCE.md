@@ -65,6 +65,7 @@ The domain split reflects clean architectural boundaries:
 - **Cherry** — *what* the framework's architecture looks like (structure)
 - **Pardosa** — *how* events are stored and transported (infrastructure)
 - **Genome** — *how* data is serialized on the wire (format)
+- **AFM** — *how* ADR governance is enforced (tooling)
 
 Each domain has a distinct rate of change, audience, and abstraction
 level. A decision that spans two domains at equal weight triggers a

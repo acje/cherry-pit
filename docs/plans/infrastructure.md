@@ -1,7 +1,7 @@
 # Infrastructure crates
 
 Concrete implementations of cherry-pit-core port traits. Components are
-pulled in as narrow, purpose-built crates under the `pit-*` namespace.
+pulled in as narrow, purpose-built crates under the `cherry-pit-*` namespace.
 
 ## Components
 

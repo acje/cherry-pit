@@ -47,7 +47,7 @@ included in the workspace plan.
 ### 4. No async_trait
 
 All async port traits use RPITIT (`impl Future` in trait return
-position). Requires Rust 1.75+ (we target 1.85+). Zero-cost: no
+position). Requires Rust 1.75+ (we target 1.95+). Zero-cost: no
 `Box<dyn Future>` heap allocation per dispatch.
 
 ## Crate dependency DAG
@@ -115,6 +115,8 @@ on, so it ships first.
 - `Aggregate` trait (with `type Event` associated type)
 - `HandleCommand<C>` trait (with `type Error` per command)
 - `EventEnvelope<E>` struct (UUID v7, `jiff::Timestamp`, correlation/causation IDs)
+- `AggregateId` newtype (`NonZeroU64`, Copy, store-assigned)
+- `CorrelationContext` struct (explicit correlation/causation propagation)
 - `Policy` trait (with `type Event`, `type Output`)
 - `Projection` trait (with `type Event`)
 - `CommandGateway` trait (async, RPITIT, `type Aggregate`)
@@ -123,7 +125,9 @@ on, so it ships first.
 - `EventBus` trait (async, RPITIT, `type Event`)
 - `DispatchError<E>` enum
 - `DispatchResult<A, C>` type alias
+- `CreateResult<A, C>` type alias
 - `StoreError` enum
+- `EnvelopeError` enum
 - `BusError` struct
 
 ### Module layout
@@ -132,41 +136,40 @@ on, so it ships first.
 cherry-pit-core/
 ├── Cargo.toml
 └── src/
-    ├── lib.rs          # Re-exports
-    ├── event.rs        # DomainEvent, EventEnvelope
-    ├── command.rs      # Command
-    ├── aggregate.rs    # Aggregate, HandleCommand
-    ├── policy.rs       # Policy
-    ├── projection.rs   # Projection
-    ├── gateway.rs      # CommandGateway
-    ├── bus.rs          # CommandBus, EventBus
-    ├── store.rs        # EventStore
-    └── error.rs        # DispatchError, StoreError, BusError
+    ├── lib.rs            # Re-exports
+    ├── event.rs          # DomainEvent, EventEnvelope
+    ├── command.rs        # Command
+    ├── aggregate.rs      # Aggregate, HandleCommand
+    ├── aggregate_id.rs   # AggregateId newtype
+    ├── correlation.rs    # CorrelationContext
+    ├── policy.rs         # Policy
+    ├── projection.rs     # Projection
+    ├── gateway.rs        # CommandGateway
+    ├── bus.rs            # CommandBus, EventBus
+    ├── store.rs          # EventStore
+    └── error.rs          # DispatchError, StoreError, EnvelopeError, BusError
 ```
 
 ## Phase 2: pardosa-genome + pardosa-genome-derive
 
-Append-only file format, log versioning, migration engine. Can be built
-in parallel with cherry-pit-gateway since they share no dependencies beyond
-cherry-pit-core.
+Binary serialization format with zero-copy reads and serde integration.
+Can be built in parallel with cherry-pit-gateway since they share no
+dependencies beyond cherry-pit-core.
 
 ### pardosa-genome dependencies
 
-| Crate      | Version | Features | Why                            |
-|------------|---------|----------|--------------------------------|
-| serde      | 1       | derive   | Log entry serialization        |
-| serde_json | 1       | —        | Default wire format            |
-| sha2       | 0.11    | —        | Content integrity hashing      |
-| bytes      | 1       | —        | Zero-copy byte buffers         |
-| thiserror  | 2       | —        | Error types                    |
-| jiff       | 0.2     | serde    | Log timestamps                 |
+| Crate        | Version | Features    | Why                            |
+|--------------|---------|-------------|--------------------------------|
+| serde        | 1       | derive      | Serialization traits           |
+| xxhash-rust  | 0.8     | const_xxh64 | Schema fingerprinting          |
 
 ### pardosa-genome dev dependencies
 
-| Crate    | Version | Why                    |
-|----------|---------|------------------------|
-| proptest | 1       | Property-based tests   |
-| tempfile | 3       | Temp dirs for log tests|
+| Crate      | Version | Why                    |
+|------------|---------|------------------------|
+| serde_json | 1       | Serialization tests    |
+| proptest   | 1       | Property-based tests   |
+| trybuild   | 1       | Compile-fail tests     |
 
 ### pardosa-genome-derive dependencies
 
@@ -182,32 +185,26 @@ cherry-pit-core.
 pardosa-genome/
 ├── Cargo.toml
 └── src/
-    ├── lib.rs          # Re-exports
-    ├── log.rs          # Append-only log structure
-    ├── entry.rs        # Log entry format
-    ├── version.rs      # Log versioning
-    ├── migration.rs    # Migration engine
-    ├── integrity.rs    # SHA-256 content hashing
-    └── error.rs        # GenomeError types
+    ├── lib.rs          # Re-exports, GenomeSafe/GenomeOrd traits
+    ├── config.rs       # DecodeOptions, PageClass, size limits
+    ├── format.rs       # Binary format constants, header/index layout
+    ├── genome_safe.rs  # GenomeSafe trait implementation details
+    └── error.rs        # SerError, DeError types
 ```
 
-## Phase 3: pardosa (serialization + transport)
+## Phase 3: pardosa (EDA storage layer)
 
-Depends on pardosa-genome and cherry-pit-core.
+EDA storage layer implementing fiber semantics. Currently standalone;
+future phases add pardosa-genome and cherry-pit-core integration (see
+pardosa-next.md Phases 3–6).
 
 ### Dependencies
 
-| Crate      | Version | Features                      | Why                    |
-|------------|---------|-------------------------------|------------------------|
-| cherry-pit-core   | path    | —                             | DomainEvent trait      |
-| pardosa-genome | path | —                            | File format            |
-| serde      | 1       | derive                        | Serialization          |
-| serde_json | 1       | —                             | Wire format            |
-| tokio      | 1       | macros, rt-multi-thread, sync | Async runtime          |
-| async-nats | 0.47    | —                             | NATS/JetStream client  |
-| bytes      | 1       | —                             | Zero-copy buffers      |
-| tracing    | 0.1     | —                             | Observability          |
-| thiserror  | 2       | —                             | Error types            |
+| Crate      | Version | Features | Why                    |
+|------------|---------|----------|------------------------|
+| serde      | 1       | derive   | Serialization          |
+| serde_json | 1       | —        | JSON wire format       |
+| thiserror  | 2       | —        | Error types            |
 
 ## Phase 4: cherry-pit-gateway (port implementations)
 
@@ -221,7 +218,7 @@ IDs, store-created envelopes, and optimistic concurrency.
 |------------|---------|----------------------|-------------------------|
 | cherry-pit-core   | path    | —                    | Port traits             |
 | serde      | 1       | derive               | Event serialization     |
-| rmp-serde  | 0.15    | —                    | MessagePack format      |
+| rmp-serde  | 1       | —                    | MessagePack format      |
 | scc        | 3       | —                    | Concurrent collections  |
 | tokio      | 1       | fs                   | Async file I/O          |
 | uuid       | 1       | v7, serde            | Event ID generation     |
@@ -244,7 +241,7 @@ cherry-pit-gateway/
     ├── lib.rs              # Re-exports
     └── event_store/
         ├── mod.rs          # Re-exports
-        └── msgpack_file.rs # MsgpackFileStore<E> + 20 tests
+        └── msgpack_file.rs # MsgpackFileStore<E>
 ```
 
 ## Phase 5: cherry-pit-web (HTTP adapter)

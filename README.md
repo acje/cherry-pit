@@ -67,7 +67,7 @@ infrastructure crates (cherry-pit-web, cherry-pit-projection) are planned. Pardo
 |----------|----------|
 | [cherry-pit-core trait design](docs/plans/cherry-pit-core.md) | All trait signatures, single-aggregate design rationale, type-safety guarantees |
 | [Build plan](docs/plans/build-plan.md) | Crate dependency DAG, dependency mapping, design decisions |
-| [Pardosa](docs/plans/pardosa.md) | Event serialization, append-only log format, schema evolution |
+| [Pardosa](docs/plans/pardosa.md) | EDA storage layer implementing fiber semantics |
 | [Infrastructure](docs/plans/infrastructure.md) | Infrastructure crate catalogue |
 | [Key concepts](docs/plans/glossary.md) | Glossary of DDD and EDA terms |
 
