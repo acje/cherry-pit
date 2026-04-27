@@ -44,8 +44,7 @@ pub fn context(crate_name: &str, records: &[AdrRecord], config: &Config) -> Vec<
             .domains
             .iter()
             .find(|d| d.prefix == prefix)
-            .map(|d| d.name.clone())
-            .unwrap_or_else(|| prefix.to_owned())
+            .map_or_else(|| prefix.to_owned(), |d| d.name.clone())
     };
 
     let mut rules = Vec::new();
@@ -68,8 +67,7 @@ pub fn context(crate_name: &str, records: &[AdrRecord], config: &Config) -> Vec<
             status: record
                 .status
                 .as_ref()
-                .map(|s| s.short_display())
-                .unwrap_or_else(|| "?".into()),
+                .map_or_else(|| "?".into(), super::model::Status::short_display),
             domain: domain_name_for(&record.id.prefix),
             rules: record.decision_rules.clone(),
         });
@@ -87,10 +85,11 @@ pub fn context(crate_name: &str, records: &[AdrRecord], config: &Config) -> Vec<
 
         for record in &domain_records {
             // If per-ADR crate annotations exist, filter to matching ADRs
-            if any_has_crates && !record.crates.is_empty() {
-                if !record.crates.iter().any(|c| c == crate_name) {
-                    continue;
-                }
+            if any_has_crates
+                && !record.crates.is_empty()
+                && !record.crates.iter().any(|c| c == crate_name)
+            {
+                continue;
             }
 
             if record.decision_rules.is_empty() {
@@ -103,8 +102,7 @@ pub fn context(crate_name: &str, records: &[AdrRecord], config: &Config) -> Vec<
                 status: record
                     .status
                     .as_ref()
-                    .map(|s| s.short_display())
-                    .unwrap_or_else(|| "?".into()),
+                    .map_or_else(|| "?".into(), super::model::Status::short_display),
                 domain: domain_name_for(&record.id.prefix),
                 rules: record.decision_rules.clone(),
             });
@@ -189,7 +187,10 @@ description = "test"
             has_context: true,
             has_decision: true,
             has_consequences: true,
-            crates: crates.into_iter().map(|s| s.to_owned()).collect(),
+            crates: crates
+                .into_iter()
+                .map(std::borrow::ToOwned::to_owned)
+                .collect(),
             decision_rules: rules
                 .into_iter()
                 .map(|(id, text)| TaggedRule {

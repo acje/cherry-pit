@@ -136,7 +136,7 @@ pub fn parse_adr_file(path: &Path, expected_prefix: &str, is_stale: bool) -> Opt
 
     // --- Decision section content and tagged rules ---
     let decision_content = extract_decision_content(&lines);
-    let decision_rules = extract_tagged_rules(&lines, &decision_content);
+    let decision_rules = extract_tagged_rules(&lines, decision_content.as_ref());
 
     // --- Code block metrics ---
     let (max_code_block_lines, code_block_count, max_code_block_line) = measure_code_blocks(&lines);
@@ -182,14 +182,12 @@ fn parse_title(lines: &[&str], expected_prefix: &str) -> Option<(AdrId, String, 
     for (i, line) in lines.iter().enumerate() {
         if let Some(rest) = line.strip_prefix("# ") {
             // Expected format: "PREFIX-NNNN. Title text"
-            if let Some(dot_pos) = rest.find(". ") {
-                let id_part = &rest[..dot_pos];
-                if let Some(id) = parse_adr_id_from_str(id_part) {
-                    if id.prefix == expected_prefix {
-                        let title = rest[dot_pos + 2..].to_owned();
-                        return Some((id, title, i + 1));
-                    }
-                }
+            if let Some(dot_pos) = rest.find(". ")
+                && let Some(id) = parse_adr_id_from_str(&rest[..dot_pos])
+                && id.prefix == expected_prefix
+            {
+                let title = rest[dot_pos + 2..].to_owned();
+                return Some((id, title, i + 1));
             }
         }
     }
@@ -261,7 +259,7 @@ fn find_amendment_dates(lines: &[&str]) -> Vec<(String, usize)> {
             }
             if let Some(rest) = line.strip_prefix("Amended ") {
                 // Extract date: "YYYY-MM-DD — note" or just "YYYY-MM-DD"
-                let date_part = rest.splitn(2, " — ").next().unwrap_or("").trim();
+                let date_part = rest.split(" — ").next().unwrap_or("").trim();
                 if !date_part.is_empty() {
                     dates.push((date_part.to_owned(), i + 1));
                 }
@@ -299,22 +297,22 @@ fn find_relationships(lines: &[&str]) -> (Vec<Relationship>, bool, bool) {
                 continue;
             }
             // Parse "- Verb: TARGET1, TARGET2"
-            if let Some(rest) = line.strip_prefix("- ") {
-                if let Some(colon_pos) = rest.find(": ") {
-                    let verb_str = &rest[..colon_pos];
-                    let targets_str = &rest[colon_pos + 2..];
+            if let Some(rest) = line.strip_prefix("- ")
+                && let Some(colon_pos) = rest.find(": ")
+            {
+                let verb_str = &rest[..colon_pos];
+                let targets_str = &rest[colon_pos + 2..];
 
-                    if let Some(verb) = RelVerb::parse(verb_str) {
-                        for target_str in targets_str.split(", ") {
-                            // Strip annotations like "(indirect)" or "(`#[non_exhaustive]`)"
-                            let clean = strip_annotation(target_str);
-                            if let Some(target_id) = parse_adr_id_from_str(clean) {
-                                rels.push(Relationship {
-                                    verb,
-                                    target: target_id,
-                                    line: i + 1,
-                                });
-                            }
+                if let Some(verb) = RelVerb::parse(verb_str) {
+                    for target_str in targets_str.split(", ") {
+                        // Strip annotations like "(indirect)" or "(`#[non_exhaustive]`)"
+                        let clean = strip_annotation(target_str);
+                        if let Some(target_id) = parse_adr_id_from_str(clean) {
+                            rels.push(Relationship {
+                                verb,
+                                target: target_id,
+                                line: i + 1,
+                            });
                         }
                     }
                 }
@@ -423,7 +421,7 @@ fn extract_decision_content(lines: &[&str]) -> Option<String> {
 /// Matches `- **RN**: text` pattern within the Decision section.
 /// When no tagged rules are found, produces a single R0 fallback
 /// with the full decision content.
-fn extract_tagged_rules(lines: &[&str], decision_content: &Option<String>) -> Vec<TaggedRule> {
+fn extract_tagged_rules(lines: &[&str], decision_content: Option<&String>) -> Vec<TaggedRule> {
     let rule_re = Regex::new(r"^\s*-\s*\*\*R(\d+)\*\*:\s*(.+)").expect("valid regex");
     let mut rules = Vec::new();
     let mut in_decision = false;
@@ -450,20 +448,20 @@ fn extract_tagged_rules(lines: &[&str], decision_content: &Option<String>) -> Ve
     }
 
     // R0 fallback: when no tagged rules found, use full decision text
-    if rules.is_empty() {
-        if let Some(content) = decision_content {
-            rules.push(TaggedRule {
-                id: "R0".into(),
-                text: content.clone(),
-                line: 0,
-            });
-        }
+    if rules.is_empty()
+        && let Some(content) = decision_content
+    {
+        rules.push(TaggedRule {
+            id: "R0".into(),
+            text: content.clone(),
+            line: 0,
+        });
     }
 
     rules
 }
 
-/// Strip trailing annotations like ` (indirect)` or ` (\`#[non_exhaustive]\`)`.
+/// Strip trailing annotations like ` (indirect)` or `` (`#[non_exhaustive]`) ``.
 fn strip_annotation(s: &str) -> &str {
     let s = s.trim();
     if let Some(paren_start) = s.find(" (") {
@@ -929,7 +927,7 @@ mod tests {
             "## Consequences",
         ];
         let decision_content = extract_decision_content(&lines);
-        let rules = extract_tagged_rules(&lines, &decision_content);
+        let rules = extract_tagged_rules(&lines, decision_content.as_ref());
         assert_eq!(rules.len(), 2);
         assert_eq!(rules[0].id, "R1");
         assert_eq!(rules[0].text, "All events must be versioned");
@@ -947,7 +945,7 @@ mod tests {
             "## Consequences",
         ];
         let decision_content = extract_decision_content(&lines);
-        let rules = extract_tagged_rules(&lines, &decision_content);
+        let rules = extract_tagged_rules(&lines, decision_content.as_ref());
         assert_eq!(rules.len(), 1);
         assert_eq!(rules[0].id, "R0");
         assert_eq!(rules[0].text, "We use event sourcing for persistence.");
@@ -967,7 +965,7 @@ mod tests {
             "## Consequences",
         ];
         let decision_content = extract_decision_content(&lines);
-        let rules = extract_tagged_rules(&lines, &decision_content);
+        let rules = extract_tagged_rules(&lines, decision_content.as_ref());
         assert_eq!(rules.len(), 2);
         assert_eq!(rules[0].id, "R1");
         assert_eq!(rules[1].id, "R2");
@@ -984,7 +982,7 @@ mod tests {
             "## Consequences",
         ];
         let decision_content = extract_decision_content(&lines);
-        let rules = extract_tagged_rules(&lines, &decision_content);
+        let rules = extract_tagged_rules(&lines, decision_content.as_ref());
         assert_eq!(rules.len(), 1);
         assert_eq!(rules[0].id, "R1");
     }

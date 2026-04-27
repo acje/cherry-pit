@@ -86,10 +86,7 @@ pub fn render_blocks(blocks: &[OutputBlock]) -> String {
 }
 
 fn render_focal_header(out: &mut String, meta: &HeaderMeta) {
-    let tier = meta
-        .tier
-        .map(|t| format!("{t:?}"))
-        .unwrap_or_else(|| "?".into());
+    let tier = meta.tier.map_or_else(|| "?".into(), |t| format!("{t:?}"));
     writeln!(
         out,
         "## ◆ FOCAL: {} | Tier: {} | Status: {}",
@@ -113,10 +110,7 @@ fn render_focal_header(out: &mut String, meta: &HeaderMeta) {
 }
 
 fn render_connected_header(out: &mut String, meta: &HeaderMeta, path: &str) {
-    let tier = meta
-        .tier
-        .map(|t| format!("{t:?}"))
-        .unwrap_or_else(|| "?".into());
+    let tier = meta.tier.map_or_else(|| "?".into(), |t| format!("{t:?}"));
     writeln!(
         out,
         "## ◇ CONNECTED: {} | Tier: {} | Status: {}",
@@ -158,17 +152,17 @@ pub fn render_diagnostics(diagnostics: &[Diagnostic], record_count: usize) -> St
         .unwrap();
     }
 
-    if !out.is_empty() {
-        let header = format!(
-            "## Diagnostics: {errors} error(s), {warnings} warning(s) across {record_count} ADR(s)\n\n"
-        );
-        out.insert_str(0, &header);
-    } else {
+    if out.is_empty() {
         writeln!(
             out,
             "## Diagnostics: 0 error(s), 0 warning(s) across {record_count} ADR(s)"
         )
         .unwrap();
+    } else {
+        let header = format!(
+            "## Diagnostics: {errors} error(s), {warnings} warning(s) across {record_count} ADR(s)\n\n"
+        );
+        out.insert_str(0, &header);
     }
 
     out
@@ -182,10 +176,7 @@ pub fn render_rules(crate_name: &str, rules: &[CrateRule]) -> String {
     writeln!(out, "## Rules for crate: {crate_name}\n").unwrap();
 
     for cr in rules {
-        let tier = cr
-            .tier
-            .map(|t| format!("{t:?}"))
-            .unwrap_or_else(|| "?".into());
+        let tier = cr.tier.map_or_else(|| "?".into(), |t| format!("{t:?}"));
         writeln!(
             out,
             "### {} | {} | Tier: {} | Status: {}",
@@ -241,7 +232,7 @@ pub fn render_index(
             .domains
             .iter()
             .find(|d| d.prefix == dir.prefix)
-            .map_or(false, |d| d.foundation);
+            .is_some_and(|d| d.foundation);
         let foundation_marker = if foundation { " [foundation]" } else { "" };
 
         writeln!(
@@ -257,15 +248,11 @@ pub fn render_index(
 
             for record in &sorted {
                 let title = record.title.as_deref().unwrap_or("(untitled)");
-                let tier = record
-                    .tier
-                    .map(|t| format!("{t:?}"))
-                    .unwrap_or_else(|| "?".into());
+                let tier = record.tier.map_or_else(|| "?".into(), |t| format!("{t:?}"));
                 let status = record
                     .status
                     .as_ref()
-                    .map(|s| s.short_display())
-                    .unwrap_or_else(|| "?".into());
+                    .map_or_else(|| "?".into(), super::model::Status::short_display);
                 writeln!(out, "  {} {title} [{tier}] {status}", record.id).unwrap();
             }
         }
@@ -334,14 +321,13 @@ pub fn build_header_meta(
         .domains
         .iter()
         .find(|d| d.prefix == record.id.prefix)
-        .map(|d| d.name.clone())
-        .unwrap_or_else(|| record.id.prefix.clone());
+        .map_or_else(|| record.id.prefix.clone(), |d| d.name.clone());
 
     // Fan-out: forward relationships
     let fan_out: Vec<String> = record
         .relationships
         .iter()
-        .filter(|r| !r.verb.is_reverse() && !(r.verb == RelVerb::Root && r.target == record.id))
+        .filter(|r| !(r.verb.is_reverse() || r.verb == RelVerb::Root && r.target == record.id))
         .map(|r| format!("{} {}", r.verb, r.target))
         .collect();
 
@@ -359,8 +345,7 @@ pub fn build_header_meta(
     let status = record
         .status
         .as_ref()
-        .map(|s| s.short_display())
-        .unwrap_or_else(|| "?".into());
+        .map_or_else(|| "?".into(), super::model::Status::short_display);
 
     HeaderMeta {
         id: record.id.clone(),

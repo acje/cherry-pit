@@ -361,7 +361,9 @@ impl<E: DomainEvent> EventStore for MsgpackFileStore<E> {
         };
 
         // Optimistic concurrency check.
-        let actual_sequence = existing.last().map_or(0, |e| e.sequence());
+        let actual_sequence = existing
+            .last()
+            .map_or(0, cherry_pit_core::EventEnvelope::sequence);
         if actual_sequence != expected_sequence.get() {
             return Err(StoreError::ConcurrencyConflict {
                 aggregate_id: id,
@@ -1423,7 +1425,7 @@ mod tests {
             .iter()
             .map(|r| r.as_ref().unwrap().1.get())
             .collect();
-        created_ids.sort();
+        created_ids.sort_unstable();
         created_ids.dedup();
         assert_eq!(created_ids.len(), 5, "all created IDs must be unique");
     }
@@ -1582,7 +1584,7 @@ mod tests {
 
         // All should succeed — same process, same OnceCell.
         assert!(
-            results.iter().all(|r| r.is_ok()),
+            results.iter().all(std::result::Result::is_ok),
             "all concurrent creates should succeed within same store"
         );
     }

@@ -101,7 +101,7 @@ fn print_tiers() {
     println!("-----");
     println!();
     for tier in Tier::all() {
-        println!("{tier:?} — {name}", name = tier.name(),);
+        println!("{tier:?} — {name}", name = tier.name());
         println!("  {}", tier.description());
         println!("  Stability: {}", tier.stability());
         println!("  Assignment: {} → Yes = {tier:?}", tier.assignment_guide());

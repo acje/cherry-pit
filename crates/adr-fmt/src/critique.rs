@@ -8,7 +8,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::fs;
 
 use crate::config::Config;
-use crate::model::{AdrId, AdrRecord, RelVerb};
+use crate::model::{AdrId, AdrRecord, RelVerb, Tier};
 use crate::nav::{self, ChildEntry};
 use crate::output::{self, OutputBlock};
 
@@ -18,12 +18,9 @@ use crate::output::{self, OutputBlock};
 /// ID, excluded stale count last.
 pub fn critique(focal_id: &AdrId, records: &[AdrRecord], config: &Config) -> Vec<OutputBlock> {
     // Find focal record
-    let focal = match records.iter().find(|r| r.id == *focal_id) {
-        Some(r) => r,
-        None => {
-            eprintln!("error: ADR {focal_id} not found");
-            std::process::exit(1);
-        }
+    let Some(focal) = records.iter().find(|r| r.id == *focal_id) else {
+        eprintln!("error: ADR {focal_id} not found");
+        std::process::exit(1);
     };
 
     // Build indexes
@@ -84,8 +81,8 @@ pub fn critique(focal_id: &AdrId, records: &[AdrRecord], config: &Config) -> Vec
 
     // Sort connected: by tier (S→D), then by ID
     connected.sort_by(|a, b| {
-        let ta = a.tier.map(|t| t.rank()).unwrap_or(255);
-        let tb = b.tier.map(|t| t.rank()).unwrap_or(255);
+        let ta = a.tier.map_or(255, Tier::rank);
+        let tb = b.tier.map_or(255, Tier::rank);
         ta.cmp(&tb)
             .then(a.id.prefix.cmp(&b.id.prefix))
             .then(a.id.number.cmp(&b.id.number))

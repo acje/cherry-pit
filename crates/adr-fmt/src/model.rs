@@ -39,6 +39,7 @@ impl fmt::Display for AdrId {
 
 /// Parsed ADR record with all metadata and line numbers.
 #[derive(Debug)]
+#[allow(clippy::struct_excessive_bools)]
 pub struct AdrRecord {
     pub id: AdrId,
     pub file_path: PathBuf,
@@ -288,10 +289,10 @@ impl Status {
         }
 
         // "Superseded by PREFIX-NNNN"
-        if let Some(rest) = trimmed.strip_prefix("Superseded by ") {
-            if let Some(id) = parse_adr_id_from_str(rest.trim()) {
-                return Self::SupersededBy(id);
-            }
+        if let Some(rest) = trimmed.strip_prefix("Superseded by ")
+            && let Some(id) = parse_adr_id_from_str(rest.trim())
+        {
+            return Self::SupersededBy(id);
         }
 
         Self::Invalid(trimmed.to_owned())
@@ -437,17 +438,17 @@ impl RelVerb {
     /// Migration guidance for legacy verbs. Returns None for permitted verbs.
     pub fn migration(self) -> Option<&'static str> {
         match self {
-            Self::DependsOn => Some("use References"),
-            Self::Extends => Some("use References"),
-            Self::Illustrates => Some("use References"),
-            Self::ContrastsWith => Some("use References"),
-            Self::ScopedBy => Some("use References"),
-            Self::Informs => Some("remove (reverse verb)"),
-            Self::ExtendedBy => Some("remove (reverse verb)"),
-            Self::IllustratedBy => Some("remove (reverse verb)"),
-            Self::ReferencedBy => Some("remove (reverse verb)"),
-            Self::SupersededBy => Some("remove (reverse verb)"),
-            Self::Scopes => Some("remove (reverse verb)"),
+            Self::DependsOn
+            | Self::Extends
+            | Self::Illustrates
+            | Self::ContrastsWith
+            | Self::ScopedBy => Some("use References"),
+            Self::Informs
+            | Self::ExtendedBy
+            | Self::IllustratedBy
+            | Self::ReferencedBy
+            | Self::SupersededBy
+            | Self::Scopes => Some("remove (reverse verb)"),
             _ => None,
         }
     }
@@ -526,7 +527,7 @@ pub fn parse_adr_id_from_str(s: &str) -> Option<AdrId> {
     let num_str = &s[dash + 1..];
 
     // Take only leading digits (ignore trailing annotations)
-    let digits: String = num_str.chars().take_while(|c| c.is_ascii_digit()).collect();
+    let digits: String = num_str.chars().take_while(char::is_ascii_digit).collect();
     if digits.is_empty() {
         return None;
     }

@@ -60,8 +60,8 @@ impl Config {
             .iter()
             .find(|r| r.id == rule_id)
             .and_then(|r| r.params.get(key))
-            .and_then(|v| v.as_integer())
-            .map(|v| v as u64)
+            .and_then(toml::Value::as_integer)
+            .map(i64::cast_unsigned)
     }
 }
 

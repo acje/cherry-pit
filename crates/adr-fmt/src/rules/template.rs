@@ -50,11 +50,12 @@ fn is_valid_date_format(s: &str) -> bool {
     let bytes = s.as_bytes();
     bytes[4] == b'-'
         && bytes[7] == b'-'
-        && bytes[..4].iter().all(|b| b.is_ascii_digit())
-        && bytes[5..7].iter().all(|b| b.is_ascii_digit())
-        && bytes[8..10].iter().all(|b| b.is_ascii_digit())
+        && bytes[..4].iter().all(u8::is_ascii_digit)
+        && bytes[5..7].iter().all(u8::is_ascii_digit)
+        && bytes[8..10].iter().all(u8::is_ascii_digit)
 }
 
+#[allow(clippy::too_many_lines)]
 pub fn check(record: &AdrRecord, config: &Config, diags: &mut Vec<Diagnostic>) {
     // T001: H1 title
     if record.title.is_none() {
@@ -264,28 +265,29 @@ pub fn check(record: &AdrRecord, config: &Config, diags: &mut Vec<Diagnostic>) {
     }
 
     // S006: Terminal-status ADR not in stale directory
-    if let Some(ref status) = record.status {
-        if status.is_terminal() && !record.is_stale {
-            let status_display = match status {
-                Status::Rejected => "Rejected".to_string(),
-                Status::Deprecated => "Deprecated".to_string(),
-                Status::SupersededBy(id) => format!("Superseded by {id}"),
-                _ => format!("{status:?}"),
-            };
-            diags.push(Diagnostic::warning(
-                "S006",
-                &record.file_path,
-                record.status_line,
-                format!(
-                    "{} has terminal status '{status_display}' but is not in the \
-                     stale directory. Action: move this file to {stale_dir}/ and add a \
-                     `## Retirement` section (≥{min_words} words) explaining why this \
-                     ADR left active service.",
-                    record.id,
-                    stale_dir = config.stale.directory,
-                ),
-            ));
-        }
+    if let Some(ref status) = record.status
+        && status.is_terminal()
+        && !record.is_stale
+    {
+        let status_display = match status {
+            Status::Rejected => "Rejected".to_string(),
+            Status::Deprecated => "Deprecated".to_string(),
+            Status::SupersededBy(id) => format!("Superseded by {id}"),
+            _ => format!("{status:?}"),
+        };
+        diags.push(Diagnostic::warning(
+            "S006",
+            &record.file_path,
+            record.status_line,
+            format!(
+                "{} has terminal status '{status_display}' but is not in the \
+                 stale directory. Action: move this file to {stale_dir}/ and add a \
+                 `## Retirement` section (≥{min_words} words) explaining why this \
+                 ADR left active service.",
+                record.id,
+                stale_dir = config.stale.directory,
+            ),
+        ));
     }
 }
 
@@ -340,57 +342,56 @@ fn check_section_word_counts(record: &AdrRecord, min_words: u64, diags: &mut Vec
     let prose_sections = ["Context", "Decision", "Consequences"];
 
     for section in &prose_sections {
-        if let Some(&count) = record.section_word_counts.get(*section) {
-            if (count as u64) < min_words {
-                diags.push(Diagnostic::warning(
-                    "T015",
-                    &record.file_path,
-                    0,
-                    format!(
-                        "`## {section}` has {count} word(s) (minimum {min_words}) — \
-                         provide meaningful content"
-                    ),
-                ));
-            }
+        if let Some(&count) = record.section_word_counts.get(*section)
+            && (count as u64) < min_words
+        {
+            diags.push(Diagnostic::warning(
+                "T015",
+                &record.file_path,
+                0,
+                format!(
+                    "`## {section}` has {count} word(s) (minimum {min_words}) — \
+                     provide meaningful content"
+                ),
+            ));
         }
     }
 
     // Retirement section also requires min_words if present
-    if record.has_retirement {
-        if let Some(&count) = record.section_word_counts.get("Retirement") {
-            if (count as u64) < min_words {
-                diags.push(Diagnostic::warning(
-                    "S004",
-                    &record.file_path,
-                    0,
-                    format!(
-                        "`## Retirement` has {count} word(s) (minimum {min_words}) — \
-                         explain why this ADR was retired"
-                    ),
-                ));
-            }
-        }
+    if record.has_retirement
+        && let Some(&count) = record.section_word_counts.get("Retirement")
+        && (count as u64) < min_words
+    {
+        diags.push(Diagnostic::warning(
+            "S004",
+            &record.file_path,
+            0,
+            format!(
+                "`## Retirement` has {count} word(s) (minimum {min_words}) — \
+                 explain why this ADR was retired"
+            ),
+        ));
     }
 }
 
 /// T016: Decision section should have tagged rules (`- **RN**: text`).
 ///
 /// Two diagnostic variants:
-/// - No tagged rules (decision_rules empty or sole entry is R0)
+/// - No tagged rules (`decision_rules` empty or sole entry is R0)
 /// - Non-sequential IDs (gap in R-number sequence)
 ///
 /// Exempt: `Status::Draft` and `Status::Proposed`.
 fn check_tagged_rules(record: &AdrRecord, diags: &mut Vec<Diagnostic>) {
     // Exempt Draft and Proposed
-    if let Some(ref status) = record.status {
-        if matches!(status, Status::Draft | Status::Proposed) {
-            return;
-        }
+    if let Some(ref status) = record.status
+        && matches!(status, Status::Draft | Status::Proposed)
+    {
+        return;
     }
 
     // Check for missing tagged rules
-    let has_real_rules = !record.decision_rules.is_empty()
-        && !(record.decision_rules.len() == 1 && record.decision_rules[0].id == "R0");
+    let has_real_rules = !(record.decision_rules.is_empty()
+        || record.decision_rules.len() == 1 && record.decision_rules[0].id == "R0");
 
     if !has_real_rules {
         diags.push(Diagnostic::warning(
@@ -405,16 +406,16 @@ fn check_tagged_rules(record: &AdrRecord, diags: &mut Vec<Diagnostic>) {
     // Check for non-sequential IDs
     let mut nums: Vec<u32> = Vec::new();
     for rule in &record.decision_rules {
-        if let Some(num_str) = rule.id.strip_prefix('R') {
-            if let Ok(num) = num_str.parse::<u32>() {
-                nums.push(num);
-            }
+        if let Some(num_str) = rule.id.strip_prefix('R')
+            && let Ok(num) = num_str.parse::<u32>()
+        {
+            nums.push(num);
         }
     }
 
-    nums.sort();
+    nums.sort_unstable();
     for (i, &num) in nums.iter().enumerate() {
-        let expected = (i as u32) + 1;
+        let expected = u32::try_from(i).expect("rule count fits u32") + 1;
         if num != expected {
             let prev = if i > 0 {
                 format!("R{}", nums[i - 1])

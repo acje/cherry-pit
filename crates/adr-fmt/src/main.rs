@@ -123,12 +123,9 @@ fn main() {
     // Mode dispatch
     if let Some(ref adr_id_str) = cli.critique {
         // --critique mode
-        let focal_id = match parse_adr_id_from_str(adr_id_str) {
-            Some(id) => id,
-            None => {
-                eprintln!("error: '{adr_id_str}' is not a valid ADR ID (expected PREFIX-NNNN)");
-                process::exit(1);
-            }
+        let Some(focal_id) = parse_adr_id_from_str(adr_id_str) else {
+            eprintln!("error: '{adr_id_str}' is not a valid ADR ID (expected PREFIX-NNNN)");
+            process::exit(1);
         };
         let blocks = critique::critique(&focal_id, &all_records, &config);
         print!("{}", output::render_blocks(&blocks));

@@ -100,15 +100,16 @@ fn check_single_link(
     }
 
     // L007: Stale reference — target is in stale archive
-    if let Some(target_record) = by_id.get(target_id) {
-        if target_record.is_stale && !source.is_stale {
-            diags.push(Diagnostic::warning(
-                "L007",
-                &source.file_path,
-                rel.line,
-                format!("{} → {target_id}: reference to stale ADR", source.id,),
-            ));
-        }
+    if let Some(target_record) = by_id.get(target_id)
+        && target_record.is_stale
+        && !source.is_stale
+    {
+        diags.push(Diagnostic::warning(
+            "L007",
+            &source.file_path,
+            rel.line,
+            format!("{} → {target_id}: reference to stale ADR", source.id),
+        ));
     }
 }
 

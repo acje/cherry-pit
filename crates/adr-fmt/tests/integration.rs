@@ -346,7 +346,7 @@ The linter should report a T016 warning for non-sequential rule IDs.
 
 /// Create test corpus in a tempdir with optional multi-domain support.
 ///
-/// `domains` is a slice of (domain_directory, &[(filename, content)]) tuples.
+/// `domains` is a slice of (`domain_directory`, &[(filename, content)]) tuples.
 /// `stale_adrs` is an optional slice of (filename, content) for the stale directory.
 fn setup_multi_corpus(
     config: &str,

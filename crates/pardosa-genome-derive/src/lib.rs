@@ -335,7 +335,7 @@ fn build_field_hash_exprs(fields: &Fields) -> Vec<TokenStream2> {
 // Uses last-segment matching (e.g., `BTreeMap` not `std::collections::BTreeMap`).
 // Known limitation: type aliases wrapping BTreeMap/BTreeSet are not detected.
 
-/// Collect generic type parameter names that appear in BTreeMap key or BTreeSet
+/// Collect generic type parameter names that appear in `BTreeMap` key or `BTreeSet`
 /// element position.
 fn collect_btree_key_params(input: &DeriveInput) -> std::collections::HashSet<String> {
     let generic_names: std::collections::HashSet<String> = input
@@ -437,7 +437,7 @@ fn find_btree_key_params(
 }
 
 /// Recursively collect all generic type parameter identifiers from a type
-/// expression. Used to extract params from BTreeMap key / BTreeSet element
+/// expression. Used to extract params from `BTreeMap` key / `BTreeSet` element
 /// position.
 fn collect_generic_idents(
     ty: &syn::Type,
@@ -536,7 +536,7 @@ fn reject_serde_attrs(attrs: &[syn::Attribute], context: &str) -> syn::Result<()
             let ident_str = meta
                 .path
                 .get_ident()
-                .map(|i| i.to_string())
+                .map(std::string::ToString::to_string)
                 .unwrap_or_default();
 
             // Check path-only attrs: #[serde(flatten)], #[serde(untagged)]
