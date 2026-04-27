@@ -1,14 +1,16 @@
 # ADR Improvement Backlog
 
 Date: 2026-04-27
+Updated: 2026-04-27 — evaluation verdicts, composition model findings,
+  priority adjustments added
 Source: Distributed systems design evaluation of the ADR decision log
 Provenance: Conversational evaluation artifact (2026-04-27), not a formal ADR
 Verified: 2026-04-27 — code-level audit against source, ADRs, and POSIX
   specifications. Two false positives removed; see Appendix A.
 
 This document consolidates all improvements identified during an
-architectural review of the cherry-pit ADR corpus (~123 ADRs across 6
-domains). Items are grouped by category and ranked by priority.
+architectural review of the cherry-pit ADR corpus across 6 domains.
+Items are grouped by category and ranked by priority.
 
 Items marked **Blocked** depend on unbuilt NATS integration code in the
 pardosa crate; they are correctly identified gaps but cannot be actioned
@@ -16,9 +18,17 @@ until the prerequisite code exists.
 
 ---
 
-## High Priority — Correctness and Safety
+## High Priority — Architecture and Correctness
 
 ### 1. Clarify event_id identity mapping between cherry-pit-core and pardosa
+
+**Status:** Blocked — design research required before ADR can be written.
+
+**Classification:** This is a **lynchpin design decision**, not a
+documentation gap. The composition model between cherry-pit-core and
+pardosa must be resolved before the identity mapping can be documented.
+All other cross-crate items (#3, #5, #6, #7, #12) depend on this
+decision.
 
 **Finding:** CHE-0041:45–46 references `event_id (UUID v7, CHE-0033)`
 while PAR-0007:31 defines `event_id: u64` (monotonic counter). These
@@ -39,20 +49,55 @@ runtime backend, the composition model and identity mapping must be
 designed. If they are independent stacks, that independence should be
 explicitly documented.
 
-**Action:** Write a dedicated ADR mapping cherry-pit-core UUID v7
-event identity to pardosa's u64 monotonic event_id. This ADR should
-specify:
-- Whether the two crates compose (pardosa wraps cherry-pit-core
-  aggregates) or remain independent stacks
-- If they compose: which identity is authoritative for deduplication
-  at each layer, and how the mapping is performed
-- If independent: document the boundary explicitly so future
-  contributors do not assume composition
+**Composition model (evaluated 2026-04-27):** Independent but
+composable. pardosa is a standalone event infrastructure; cherry-pit-core
+can use it as one possible backend via a bridge adapter. The dual
+event_id strategy (which identity is authoritative at which layer)
+requires further design research.
 
-Amending CHE-0041 is insufficient — this is a cross-crate
-architectural boundary decision, not a correction to one ADR.
+**Structural evidence (code-level audit 2026-04-27):**
+
+Zero shared types, zero cross-dependencies. The only evidence of planned
+composition is a doc comment in `EventStore` trait (`store.rs:42`):
+"Concrete implementations (in-memory for testing, Pardosa-backed,
+PostgreSQL-backed) live in infrastructure crates."
+
+Impedance mismatches requiring resolution for a bridge adapter:
+
+| Dimension | cherry-pit-core | pardosa | Adapter complexity |
+|---|---|---|---|
+| Entity ID | `AggregateId` (NonZeroU64, 1-based) | `DomainId` (u64, 0-based) | Offset + zero handling |
+| Event ID | `uuid::Uuid` v7 (16B) | `u64` monotonic (8B) | Dual-identity strategy needed |
+| Timestamp | `jiff::Timestamp` | `i64` epoch millis | Straightforward conversion |
+| Correlation | `Option<Uuid>` × 2 fields | Absent | Extend pardosa or store in payload |
+| Batch | Multi-event create/append | Single-event per call | Adapter loop |
+| Concurrency | Optimistic (`expected_sequence`) | None | Adapter must track per-fiber sequence |
+| Lifecycle | Not modeled | 5-state machine | cherry-pit-core has no concept |
+
+**Action:** Before writing the boundary ADR, complete design research:
+
+1. Determine whether UUID v7 and u64 event_id coexist at different
+   layers (recommended: both IDs live in the bridge adapter's storage,
+   UUID v7 is domain identity, u64 is transport identity)
+2. Determine where correlation metadata lives when pardosa backs
+   cherry-pit-core (extend pardosa's `Event<T>` or wrap externally)
+3. Determine whether pardosa's single-event-per-call API needs batch
+   support or whether the bridge adapter loops
+
+Then write a dedicated cross-crate architectural boundary ADR
+specifying: independent-but-composable relationship, dual event_id
+strategy, adapter mapping table, and what pardosa does NOT provide
+(correlation, batch semantics, optimistic concurrency).
 
 ### 2. Implement verify_roundtrip and add GenomeOrd adversarial test
+
+**Priority:** Low (downgraded 2026-04-27 from High). Real gap
+confirmed — the function does not exist and the doc link is broken.
+However, genome serialization (Phase 2) is not yet built.
+`verify_roundtrip` can only be meaningful when `SizingSerializer` and
+`WritingSerializer` exist. Track for implementation during the genome
+serialization phase; the broken doc link at `genome_safe.rs:72` should
+be updated to say "planned" in the interim.
 
 **Finding:** GEN-0032 and GEN-0033 reference `verify_roundtrip` as
 defense-in-depth against non-deterministic `Ord` implementations on
@@ -73,7 +118,7 @@ with no enforcement beyond compile-time bounds. Any type can implement
 it with an arbitrary `Ord` — including non-deterministic ones — and the
 system has no runtime check to catch the violation.
 
-**Action (two steps, ordered):**
+**Action (three steps, ordered):**
 1. **Implement `verify_roundtrip`** as described in GEN-0032: a
    function that serializes a value, deserializes it, re-serializes,
    and asserts byte-level equality. This is the missing safety net.
@@ -87,6 +132,11 @@ system has no runtime check to catch the violation.
    implemented.
 
 ### 3. Cross-stream ordering semantics ADR
+
+**Priority:** High (deferred 2026-04-27 — depends on composition model
+decision in #1).
+
+**Status:** Deferred — depends on composition model decision (#1).
 
 **Finding:** PAR-0007 provides total ordering within a stream via
 monotonic `event_id`. Cross-stream ordering (multiple pardosa
@@ -290,18 +340,60 @@ deployments.
 
 | # | Category | Priority | Domain | Status | Action |
 |---|----------|----------|--------|--------|--------|
-| 1 | Correctness | High | CHE + PAR | Open | Clarify event_id identity mapping and crate boundary |
-| 2 | Safety | High | GEN | Open | Implement verify_roundtrip + adversarial test |
-| 3 | New ADR | High | PAR | Open | Cross-stream ordering semantics |
-| 4 | Safety | Medium | PAR | Blocked | Orphan stream cleanup protocol |
+| 1 | Correctness | **Lynchpin** | CHE + PAR | Blocked (design research) | Resolve composition model, then write boundary ADR |
+| 2 | Safety | Low | GEN | Deferred (genome Phase 2) | Implement verify_roundtrip when serializer exists |
+| 3 | New ADR | High | PAR | Deferred (depends on #1) | Cross-stream ordering semantics |
+| 4 | Safety | Medium | PAR | Blocked (no NATS) | Orphan stream cleanup protocol |
 | 5 | New ADR | Medium | CHE/PAR | Open | CAP positioning (consolidation) |
 | 6 | New ADR | Medium | PAR | Open | FMEA (consolidation) |
-| 7 | New ADR | Medium | PAR | Blocked | Startup/recovery protocol |
-| 8 | New ADR | Medium | CHE/PAR | Blocked | Observability and metrics |
-| 9 | Refinement | Low | PAR | Blocked | Circuit breaker threshold tuning |
-| 10 | Test | Low | PAR | Blocked | Migration cutover under partition |
-| 11 | Refinement | Low | CHE/PAR | Blocked | CommandGateway backpressure |
-| 12 | Refinement | Low | CHE | Blocked | Multi-node command routing |
+| 7 | New ADR | Medium | PAR | Blocked (no NATS) | Startup/recovery protocol |
+| 8 | New ADR | Medium | CHE/PAR | Blocked (no infra) | Observability and metrics |
+| 9 | Refinement | Low | PAR | Blocked (no NATS) | Circuit breaker threshold tuning |
+| 10 | Test | Low | PAR | Blocked (no NATS) | Migration cutover under partition |
+| 11 | Refinement | Low | CHE/PAR | Blocked (no impl) | CommandGateway backpressure |
+| 12 | Refinement | Low | CHE | Blocked (no NATS) | Multi-node command routing |
+
+---
+
+## Evaluation Verdicts (2026-04-27)
+
+Each item was evaluated against source code, existing ADRs, and the
+crate dependency graph. A grilling session resolved the composition
+model question (independent but composable) and reprioritized items
+accordingly.
+
+### Verdict summary
+
+- **Item #1 (event_id mapping):** Reclassified from "High priority
+  correctness gap" to **lynchpin design decision**. The event_id
+  conflict is a symptom of an unresolved architectural boundary, not
+  a documentation gap. Design research required before the ADR can be
+  written. Composition model findings (impedance mismatch table,
+  structural evidence) added to the item.
+
+- **Item #2 (verify_roundtrip):** Confirmed real — the function does
+  not exist and the doc link is broken. **Downgraded** from High to
+  Low per owner decision: genome serialization (Phase 2) is not yet
+  built, so the safety net cannot be meaningfully implemented yet.
+
+- **Item #3 (cross-stream ordering):** Confirmed real gap. **Deferred**
+  — cross-stream semantics depend on the composition model decision (#1).
+
+- **Items #4–#12:** All correctly categorized. 8 of 9 are blocked on
+  unbuilt NATS integration or unbuilt implementations. Consolidation
+  items (#5 CAP, #6 FMEA) are low urgency — no new decisions.
+
+### False positive audit
+
+Appendix A's two removed items (flock semantics, BTreeMap ordering)
+are correctly identified as false positives:
+
+- `flock(2)` per-open-file-description semantics DO deny the second
+  exclusive lock from separate `open()` calls. Confirmed by passing
+  test `second_store_same_dir_fails_with_store_locked`.
+- `BTreeMap` sorted-by-key iteration is a documented stable guarantee
+  in the Rust standard library. Editions cannot change it without a
+  semver break.
 
 ---
 
