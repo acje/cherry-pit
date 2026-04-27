@@ -21,7 +21,7 @@ pub fn run_all(records: &[AdrRecord], config: &Config) -> Vec<Diagnostic> {
     }
 
     // Cross-file rules
-    links::check(records, &domain_prefixes, &mut diagnostics);
+    links::check(records, &mut diagnostics);
 
     // Sort by file, then line
     diagnostics.sort_by(|a, b| a.file.cmp(&b.file).then(a.line.cmp(&b.line)));

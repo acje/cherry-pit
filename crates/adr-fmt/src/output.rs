@@ -1,7 +1,7 @@
 //! Unified output formatter — Alternative 4 markdown format.
 //!
 //! All modes emit concatenated markdown with structured header blocks
-//! using `◆`/`◇`/`◈` markers and `---` separators.
+//! using `◆`/`◇` markers and `---` separators.
 //! Optimized for LLM token efficiency.
 
 use std::collections::HashMap;
@@ -35,8 +35,6 @@ pub enum OutputBlock {
         content: String,
         path: String,
     },
-    /// Excluded stale ADR count note.
-    Excluded { count: usize, reason: String },
 }
 
 /// A rule extracted for `--context` mode.
@@ -75,9 +73,6 @@ pub fn render_blocks(blocks: &[OutputBlock]) -> String {
                 out.push('\n');
                 out.push_str(content);
                 out.push('\n');
-            }
-            OutputBlock::Excluded { count, reason } => {
-                writeln!(out, "## ◈ EXCLUDED: {count} {reason}").unwrap();
             }
         }
     }
@@ -193,10 +188,10 @@ pub fn render_rules(crate_name: &str, rules: &[CrateRule]) -> String {
     out
 }
 
-// ── Index rendering (--index mode) ─────────────────────────────────
+// ── Tree rendering (--tree mode) ───────────────────────────────────
 
-/// Render the domain index tree with box-drawing to stdout.
-pub fn render_index(
+/// Render the domain tree with box-drawing to stdout.
+pub fn render_tree(
     records: &[AdrRecord],
     domain_dirs: &[DomainDir],
     config: &Config,
@@ -266,43 +261,6 @@ pub fn render_index(
             writeln!(out, "  ({stale_count} stale)").unwrap();
         }
 
-        out.push('\n');
-    }
-
-    out
-}
-
-// ── Report rendering (--report mode) ───────────────────────────────
-
-/// Render the children report as Alternative 4 markdown.
-pub fn render_report(records: &[AdrRecord], children: &HashMap<AdrId, Vec<ChildEntry>>) -> String {
-    let mut out = String::new();
-    writeln!(out, "## ADR Children Report\n").unwrap();
-
-    // Group records by domain prefix, sorted by number
-    let mut by_prefix: HashMap<&str, Vec<&AdrRecord>> = HashMap::new();
-    for record in records {
-        by_prefix.entry(&record.id.prefix).or_default().push(record);
-    }
-
-    let mut prefixes: Vec<&&str> = by_prefix.keys().collect();
-    prefixes.sort();
-
-    for prefix in prefixes {
-        let domain_records = by_prefix.get(*prefix).unwrap();
-        let mut sorted = domain_records.clone();
-        sorted.sort_by_key(|r| r.id.number);
-
-        writeln!(out, "### {prefix}\n").unwrap();
-        for record in &sorted {
-            if let Some(entries) = children.get(&record.id) {
-                let title = record.title.as_deref().unwrap_or("(untitled)");
-                writeln!(out, "  {} {title}", record.id).unwrap();
-                for entry in entries {
-                    writeln!(out, "    ← {} {}", entry.verb, entry.child).unwrap();
-                }
-            }
-        }
         out.push('\n');
     }
 
@@ -394,7 +352,7 @@ mod tests {
     }
 
     #[test]
-    fn render_blocks_with_connected_and_excluded() {
+    fn render_blocks_with_connected() {
         let blocks = vec![
             OutputBlock::Focal {
                 meta: HeaderMeta {
@@ -421,10 +379,6 @@ mod tests {
                 content: "connected content".into(),
                 path: "CHE-0042 → References → CHE-0001".into(),
             },
-            OutputBlock::Excluded {
-                count: 2,
-                reason: "stale ADRs filtered from closure".into(),
-            },
         ];
 
         let output = render_blocks(&blocks);
@@ -432,7 +386,6 @@ mod tests {
         assert!(output.contains("---"), "output:\n{output}");
         assert!(output.contains("## ◇ CONNECTED:"), "output:\n{output}");
         assert!(output.contains("## Path:"), "output:\n{output}");
-        assert!(output.contains("## ◈ EXCLUDED: 2"), "output:\n{output}");
     }
 
     #[test]

@@ -1,8 +1,7 @@
 //! Configuration loading from `adr-fmt.toml`.
 //!
-//! The config file is the single machine-readable source for domain
-//! definitions, crate mappings, stale directory path, and validation
-//! rules with optional parameters.
+//! The config file defines domain mappings, stale directory, and optional
+//! rule parameter overrides. Rules themselves are hardcoded in the binary.
 
 use std::collections::HashMap;
 use std::path::Path;
@@ -14,6 +13,9 @@ use serde::Deserialize;
 pub struct Config {
     pub stale: StaleConfig,
     pub domains: Vec<DomainConfig>,
+    /// Optional rule overrides. If present with full declarations (legacy
+    /// format), a deprecation warning is emitted to stderr.
+    #[serde(default)]
     pub rules: Vec<RuleConfig>,
 }
 
@@ -32,22 +34,25 @@ pub struct DomainConfig {
     pub description: String,
     pub crates: Vec<String>,
     /// Foundation domains are included with every domain query.
-    /// COM is the canonical foundation domain.
     #[serde(default)]
     pub foundation: bool,
 }
 
-/// Rule definition with optional parameters.
+/// Rule override entry. Only `id` is required; other fields are optional
+/// and used only for parameter overrides or disabling rules.
 #[derive(Debug, Deserialize)]
 pub struct RuleConfig {
     pub id: String,
+    #[serde(default)]
     pub category: String,
+    #[serde(default)]
     pub description: String,
-    /// Optional rule parameters (e.g., `min_words = 10`).
+    /// Optional rule parameters (e.g., `min_words = 7`).
     #[serde(default)]
     pub params: HashMap<String, toml::Value>,
     /// Internal rules are self-checks, not user-facing governance.
     #[serde(default)]
+    #[allow(dead_code)] // Retained for legacy config compatibility
     pub internal: bool,
 }
 
@@ -68,8 +73,6 @@ impl Config {
 /// Load configuration from `adr-fmt.toml` in the ADR root directory.
 ///
 /// Returns an error string if the file is missing or malformed.
-/// Config errors are hard failures — the tool cannot lint without
-/// valid configuration.
 pub fn load(adr_root: &Path) -> Result<Config, String> {
     let config_path = adr_root.join("adr-fmt.toml");
 
@@ -80,7 +83,58 @@ pub fn load(adr_root: &Path) -> Result<Config, String> {
         )
     })?;
 
-    toml::from_str(&content).map_err(|e| format!("failed to parse {}: {e}", config_path.display()))
+    let config: Config = toml::from_str(&content)
+        .map_err(|e| format!("failed to parse {}: {e}", config_path.display()))?;
+
+    // Deprecation warning for legacy full rule declarations
+    emit_legacy_rule_warnings(&config);
+
+    Ok(config)
+}
+
+/// Try to load configuration, returning None if the file does not exist.
+/// Used by guidelines mode to distinguish "no config" from "bad config".
+pub fn try_load(adr_root: &Path) -> Result<Option<Config>, String> {
+    let config_path = adr_root.join("adr-fmt.toml");
+
+    if !config_path.is_file() {
+        return Ok(None);
+    }
+
+    load(adr_root).map(Some)
+}
+
+/// Emit deprecation warnings if config contains legacy full rule declarations.
+///
+/// Legacy format: rules with `category` and `description` fields populated.
+/// New format: only `id` and optional `params` for overrides.
+fn emit_legacy_rule_warnings(config: &Config) {
+    let legacy_count = config
+        .rules
+        .iter()
+        .filter(|r| !r.category.is_empty() && !r.description.is_empty())
+        .count();
+
+    if legacy_count > 0 {
+        eprintln!(
+            "warning: adr-fmt.toml contains {legacy_count} legacy rule declaration(s)"
+        );
+        eprintln!(
+            "         Rules are now hardcoded in the binary. Only parameter overrides"
+        );
+        eprintln!(
+            "         are needed in config. Remove `category` and `description` fields."
+        );
+        eprintln!(
+            "         Example override: [[rules]]"
+        );
+        eprintln!(
+            "         id = \"T015\""
+        );
+        eprintln!(
+            "         params = {{ min_words = 7, max_words = 50 }}"
+        );
+    }
 }
 
 #[cfg(test)]
@@ -88,7 +142,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn parse_minimal_config() {
+    fn parse_minimal_config_no_rules() {
         let toml_str = r#"
 [stale]
 directory = "stale"
@@ -99,20 +153,37 @@ name = "Cherry"
 directory = "cherry"
 description = "Test domain"
 crates = ["cherry-pit-core"]
-
-[[rules]]
-id = "T001"
-category = "template"
-description = "H1 title present"
 "#;
         let config: Config = toml::from_str(toml_str).unwrap();
         assert_eq!(config.stale.directory, "stale");
         assert_eq!(config.domains.len(), 1);
         assert_eq!(config.domains[0].prefix, "CHE");
         assert_eq!(config.domains[0].crates, vec!["cherry-pit-core"]);
+        assert!(config.rules.is_empty());
+    }
+
+    #[test]
+    fn parse_config_with_overrides() {
+        let toml_str = r#"
+[stale]
+directory = "stale"
+
+[[domains]]
+prefix = "CHE"
+name = "Cherry"
+directory = "cherry"
+description = "Test"
+crates = []
+
+[[rules]]
+id = "T015"
+params = { min_words = 7, max_words = 50 }
+"#;
+        let config: Config = toml::from_str(toml_str).unwrap();
         assert_eq!(config.rules.len(), 1);
-        assert_eq!(config.rules[0].id, "T001");
-        assert!(config.rules[0].params.is_empty());
+        assert_eq!(config.rules[0].id, "T015");
+        assert_eq!(config.rule_param_u64("T015", "min_words"), Some(7));
+        assert_eq!(config.rule_param_u64("T015", "max_words"), Some(50));
     }
 
     #[test]
@@ -134,11 +205,6 @@ name = "Cherry"
 directory = "cherry"
 description = "Architecture"
 crates = ["cherry-pit-core", "cherry-pit-gateway"]
-
-[[rules]]
-id = "T001"
-category = "template"
-description = "test"
 "#;
         let config: Config = toml::from_str(toml_str).unwrap();
         assert_eq!(config.domains.len(), 2);
@@ -162,8 +228,6 @@ crates = []
 
 [[rules]]
 id = "T015"
-category = "template"
-description = "Section minimum word count"
 params = { min_words = 10 }
 "#;
         let config: Config = toml::from_str(toml_str).unwrap();
@@ -184,11 +248,6 @@ name = "Cherry"
 directory = "cherry"
 description = "Test"
 crates = []
-
-[[rules]]
-id = "T001"
-category = "template"
-description = "H1 title present"
 "#;
         let config: Config = toml::from_str(toml_str).unwrap();
         assert_eq!(config.rule_param_u64("T001", "min_words"), None);
@@ -222,11 +281,6 @@ name = "Cherry"
 directory = "cherry"
 description = "Test"
 crates = []
-
-[[rules]]
-id = "T001"
-category = "template"
-description = "H1 title present"
 "#;
         let config: Config = toml::from_str(toml_str).unwrap();
         assert!(!config.domains[0].foundation);
@@ -245,64 +299,14 @@ directory = "common"
 description = "Cross-cutting"
 crates = []
 foundation = true
-
-[[rules]]
-id = "T001"
-category = "template"
-description = "H1 title present"
 "#;
         let config: Config = toml::from_str(toml_str).unwrap();
         assert!(config.domains[0].foundation);
     }
 
     #[test]
-    fn internal_flag_defaults_to_false() {
-        let toml_str = r#"
-[stale]
-directory = "stale"
-
-[[domains]]
-prefix = "CHE"
-name = "Cherry"
-directory = "cherry"
-description = "Test"
-crates = []
-
-[[rules]]
-id = "T001"
-category = "template"
-description = "H1 title present"
-"#;
-        let config: Config = toml::from_str(toml_str).unwrap();
-        assert!(!config.rules[0].internal);
-    }
-
-    #[test]
-    fn internal_flag_true_deserializes() {
-        let toml_str = r#"
-[stale]
-directory = "stale"
-
-[[domains]]
-prefix = "CHE"
-name = "Cherry"
-directory = "cherry"
-description = "Test"
-crates = []
-
-[[rules]]
-id = "I001"
-category = "index"
-description = "ADR file exists but not in README"
-internal = true
-"#;
-        let config: Config = toml::from_str(toml_str).unwrap();
-        assert!(config.rules[0].internal);
-    }
-
-    #[test]
-    fn backward_compat_no_params_field() {
-        // Old-style TOML without params field still parses
+    fn legacy_format_still_parses() {
+        // Old-style TOML with full rule declarations still works
         let toml_str = r#"
 [stale]
 directory = "stale"
@@ -326,7 +330,25 @@ description = "Date field present"
 "#;
         let config: Config = toml::from_str(toml_str).unwrap();
         assert_eq!(config.rules.len(), 2);
-        assert!(config.rules[0].params.is_empty());
-        assert!(config.rules[1].params.is_empty());
+    }
+
+    #[test]
+    fn internal_flag_defaults_to_false() {
+        let toml_str = r#"
+[stale]
+directory = "stale"
+
+[[domains]]
+prefix = "CHE"
+name = "Cherry"
+directory = "cherry"
+description = "Test"
+crates = []
+
+[[rules]]
+id = "T001"
+"#;
+        let config: Config = toml::from_str(toml_str).unwrap();
+        assert!(!config.rules[0].internal);
     }
 }

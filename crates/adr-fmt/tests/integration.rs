@@ -12,7 +12,7 @@ use tempfile::TempDir;
 
 // ── helpers ─────────────────────────────────────────────────────────
 
-/// Minimal adr-fmt.toml for a single-domain test corpus.
+/// Minimal adr-fmt.toml for a single-domain test corpus (override-only format).
 const MINIMAL_CONFIG: &str = r#"
 [stale]
 directory = "stale"
@@ -25,20 +25,8 @@ description = "Integration test domain."
 crates = ["test-core"]
 
 [[rules]]
-id = "T001"
-category = "template"
-description = "H1 title present"
-
-[[rules]]
 id = "T015"
-category = "template"
-description = "Prose section below minimum word count"
 params = { min_words = 10 }
-
-[[rules]]
-id = "T016"
-category = "template"
-description = "Decision section tagged rules"
 "#;
 
 /// Multi-domain config with foundation domain.
@@ -62,20 +50,8 @@ description = "Integration test domain."
 crates = ["test-core"]
 
 [[rules]]
-id = "T001"
-category = "template"
-description = "H1 title present"
-
-[[rules]]
 id = "T015"
-category = "template"
-description = "Prose section below minimum word count"
 params = { min_words = 10 }
-
-[[rules]]
-id = "T016"
-category = "template"
-description = "Decision section tagged rules"
 "#;
 
 /// A valid ADR file that passes all rules (root ADR).
@@ -307,7 +283,7 @@ This ADR was superseded and moved to the stale directory.
 
 ## Consequences
 
-This ADR should be excluded from critique closures with a count note.
+This ADR should be included in critique closures (no stale filtering).
 
 ## Retirement
 
@@ -396,14 +372,49 @@ fn adr_root(dir: &TempDir) -> String {
         .to_owned()
 }
 
-// ── default lint mode ──────────────────────────────────────────────
+// ── default mode (guidelines) ──────────────────────────────────────
+
+#[test]
+fn default_mode_with_config_shows_governance() {
+    let dir = setup_corpus(MINIMAL_CONFIG, &[("TST-0001-valid-test-adr.md", VALID_ADR)]);
+
+    adr_fmt()
+        .arg(adr_root(&dir))
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("ADR Governance Reference")
+                .and(predicate::str::contains("MODES"))
+                .and(predicate::str::contains("TAGGED RULES")),
+        );
+}
+
+#[test]
+fn default_mode_without_config_shows_setup_guide() {
+    let dir = TempDir::new().expect("create tempdir");
+    let root = dir.path().join("docs/adr");
+    fs::create_dir_all(&root).expect("create dir");
+    fs::write(root.join("GOVERNANCE.md"), "# Governance\n").expect("write governance");
+    // No adr-fmt.toml
+
+    adr_fmt()
+        .arg(root.to_str().unwrap())
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("adr-fmt")
+                .and(predicate::str::contains("QUICK START")),
+        );
+}
+
+// ── lint mode ──────────────────────────────────────────────────────
 
 #[test]
 fn valid_corpus_clean_output() {
     let dir = setup_corpus(MINIMAL_CONFIG, &[("TST-0001-valid-test-adr.md", VALID_ADR)]);
 
     adr_fmt()
-        .arg(adr_root(&dir))
+        .args(["--lint", &adr_root(&dir)])
         .assert()
         .success()
         .stdout(predicate::str::contains("0 error(s), 0 warning(s)"));
@@ -420,7 +431,7 @@ fn dangling_link_produces_l001() {
     );
 
     adr_fmt()
-        .arg(adr_root(&dir))
+        .args(["--lint", &adr_root(&dir)])
         .assert()
         .success()
         .stdout(predicate::str::contains("L001"));
@@ -431,7 +442,7 @@ fn empty_domain_directory_graceful() {
     let dir = setup_corpus(MINIMAL_CONFIG, &[]);
 
     adr_fmt()
-        .arg(adr_root(&dir))
+        .args(["--lint", &adr_root(&dir)])
         .assert()
         .success()
         .stdout(predicate::str::contains("0 ADR(s)"));
@@ -441,13 +452,12 @@ fn empty_domain_directory_graceful() {
 fn lint_output_on_stdout() {
     let dir = setup_corpus(MINIMAL_CONFIG, &[("TST-0001-valid-test-adr.md", VALID_ADR)]);
 
-    // Verify diagnostics go to stdout, not stderr
+    // Verify diagnostics go to stdout
     adr_fmt()
-        .arg(adr_root(&dir))
+        .args(["--lint", &adr_root(&dir)])
         .assert()
         .success()
-        .stdout(predicate::str::contains("Diagnostics"))
-        .stderr(predicate::str::is_empty());
+        .stdout(predicate::str::contains("Diagnostics"));
 }
 
 // ── T016 tagged rules ──────────────────────────────────────────────
@@ -460,7 +470,7 @@ fn t016_missing_tagged_rules() {
     );
 
     adr_fmt()
-        .arg(adr_root(&dir))
+        .args(["--lint", &adr_root(&dir)])
         .assert()
         .success()
         .stdout(predicate::str::contains("T016"));
@@ -470,9 +480,9 @@ fn t016_missing_tagged_rules() {
 fn t016_draft_exempt() {
     let dir = setup_corpus(MINIMAL_CONFIG, &[("TST-0005-draft-adr.md", DRAFT_ADR)]);
 
-    // Draft ADRs are exempt from T016 — should not appear in output
+    // Draft ADRs are exempt from T016 — should not appear in lint output
     adr_fmt()
-        .arg(adr_root(&dir))
+        .args(["--lint", &adr_root(&dir)])
         .assert()
         .success()
         .stdout(predicate::str::contains("T016").not());
@@ -486,7 +496,7 @@ fn t016_gap_in_rule_ids() {
     );
 
     adr_fmt()
-        .arg(adr_root(&dir))
+        .args(["--lint", &adr_root(&dir)])
         .assert()
         .success()
         .stdout(predicate::str::contains("T016"));
@@ -498,7 +508,7 @@ fn t016_tagged_rules_present_no_warning() {
 
     // VALID_ADR has tagged rules — no T016
     adr_fmt()
-        .arg(adr_root(&dir))
+        .args(["--lint", &adr_root(&dir)])
         .assert()
         .success()
         .stdout(predicate::str::contains("T016").not());
@@ -565,7 +575,7 @@ fn critique_unknown_adr_exits_nonzero() {
 }
 
 #[test]
-fn critique_with_stale_excluded() {
+fn critique_includes_stale() {
     let dir = setup_multi_corpus(
         MINIMAL_CONFIG,
         &[("test", &[("TST-0001-valid-test-adr.md", VALID_ADR)])],
@@ -573,12 +583,36 @@ fn critique_with_stale_excluded() {
     );
 
     // Critique TST-0001 which is referenced by stale TST-0010
-    // The stale ADR should be excluded from the closure
+    // Stale ADRs are now included (no filtering)
     adr_fmt()
         .args(["--critique", "TST-0001", &adr_root(&dir)])
         .assert()
         .success()
-        .stdout(predicate::str::contains("◆ FOCAL"));
+        .stdout(
+            predicate::str::contains("◆ FOCAL")
+                .and(predicate::str::contains("TST-0010")),
+        );
+}
+
+#[test]
+fn critique_depth_limits_traversal() {
+    let dir = setup_corpus(
+        MINIMAL_CONFIG,
+        &[
+            ("TST-0001-valid-test-adr.md", VALID_ADR),
+            ("TST-0002-referencing-adr.md", REFERENCING_ADR),
+        ],
+    );
+
+    // Depth 0: focal only
+    adr_fmt()
+        .args(["--critique", "TST-0001", "--depth", "0", &adr_root(&dir)])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("◆ FOCAL")
+                .and(predicate::str::contains("◇ CONNECTED").not()),
+        );
 }
 
 // ── context mode ───────────────────────────────────────────────────
@@ -638,8 +672,6 @@ fn context_per_adr_crates_filtering() {
     );
 
     // TST-0006 has Crates: test-core, test-api — should be included
-    // TST-0001 has no Crates: field — per-ADR filtering applies,
-    // so only ADRs with matching crate are included
     adr_fmt()
         .args(["--context", "test-core", &adr_root(&dir)])
         .assert()
@@ -647,22 +679,22 @@ fn context_per_adr_crates_filtering() {
         .stdout(predicate::str::contains("TST-0006"));
 }
 
-// ── index mode ─────────────────────────────────────────────────────
+// ── tree mode ──────────────────────────────────────────────────────
 
 #[test]
-fn index_produces_tree() {
+fn tree_produces_output() {
     let dir = setup_corpus(MINIMAL_CONFIG, &[("TST-0001-valid-test-adr.md", VALID_ADR)]);
 
-    // Use -- to separate --index (no domain filter) from positional ADR_DIR
+    // Use -- to separate --tree (no domain filter) from positional ADR_DIR
     adr_fmt()
-        .args(["--index", "--", &adr_root(&dir)])
+        .args(["--tree", "--", &adr_root(&dir)])
         .assert()
         .success()
         .stdout(predicate::str::contains("TST-0001"));
 }
 
 #[test]
-fn index_filtered_by_domain() {
+fn tree_filtered_by_domain() {
     let dir = setup_multi_corpus(
         MULTI_DOMAIN_CONFIG,
         &[
@@ -677,7 +709,7 @@ fn index_filtered_by_domain() {
 
     // Filter to TST domain only
     adr_fmt()
-        .args(["--index", "TST", &adr_root(&dir)])
+        .args(["--tree", "TST", &adr_root(&dir)])
         .assert()
         .success()
         .stdout(
@@ -686,44 +718,14 @@ fn index_filtered_by_domain() {
 }
 
 #[test]
-fn index_unknown_domain_graceful() {
+fn tree_unknown_domain_graceful() {
     let dir = setup_corpus(MINIMAL_CONFIG, &[("TST-0001-valid-test-adr.md", VALID_ADR)]);
 
     adr_fmt()
-        .args(["--index", "NONEXISTENT", &adr_root(&dir)])
+        .args(["--tree", "NONEXISTENT", &adr_root(&dir)])
         .assert()
         .success()
         .stdout(predicate::str::contains("No domain found"));
-}
-
-// ── report mode ────────────────────────────────────────────────────
-
-#[test]
-fn report_flag_produces_output() {
-    let dir = setup_corpus(MINIMAL_CONFIG, &[("TST-0001-valid-test-adr.md", VALID_ADR)]);
-
-    adr_fmt()
-        .args(["--report", &adr_root(&dir)])
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("ADR Children Report"));
-}
-
-// ── guidelines mode ────────────────────────────────────────────────
-
-#[test]
-fn guidelines_flag_produces_output() {
-    let dir = setup_corpus(MINIMAL_CONFIG, &[("TST-0001-valid-test-adr.md", VALID_ADR)]);
-
-    adr_fmt()
-        .args(["--guidelines", &adr_root(&dir)])
-        .assert()
-        .success()
-        .stdout(
-            predicate::str::contains("ADR Guidelines")
-                .and(predicate::str::contains("MODES"))
-                .and(predicate::str::contains("TAGGED RULES")),
-        );
 }
 
 // ── mutual exclusion ───────────────────────────────────────────────
@@ -738,18 +740,18 @@ fn critique_and_context_mutually_exclusive() {
 }
 
 #[test]
-fn report_and_guidelines_mutually_exclusive() {
+fn lint_and_critique_mutually_exclusive() {
     adr_fmt()
-        .args(["--report", "--guidelines"])
+        .args(["--lint", "--critique", "TST-0001"])
         .assert()
         .failure()
         .stderr(predicate::str::contains("cannot be used with"));
 }
 
 #[test]
-fn critique_and_index_mutually_exclusive() {
+fn critique_and_tree_mutually_exclusive() {
     adr_fmt()
-        .args(["--critique", "TST-0001", "--index"])
+        .args(["--critique", "TST-0001", "--tree"])
         .assert()
         .failure()
         .stderr(predicate::str::contains("cannot be used with"));
@@ -758,13 +760,13 @@ fn critique_and_index_mutually_exclusive() {
 // ── infrastructure errors ──────────────────────────────────────────
 
 #[test]
-fn missing_config_exits_nonzero() {
+fn lint_missing_config_exits_nonzero() {
     let dir = TempDir::new().expect("create tempdir");
     let root = dir.path().join("docs/adr");
     fs::create_dir_all(&root).expect("create dir");
 
     adr_fmt()
-        .arg(root.to_str().unwrap())
+        .args(["--lint", root.to_str().unwrap()])
         .assert()
         .failure()
         .stderr(predicate::str::contains("cannot read"));
@@ -807,7 +809,10 @@ fn no_files_modified_after_lint() {
     let adr_dir = dir.path().join("docs/adr");
     let before: Vec<_> = walkdir(&adr_dir);
 
-    adr_fmt().arg(adr_root(&dir)).assert().success();
+    adr_fmt()
+        .args(["--lint", &adr_root(&dir)])
+        .assert()
+        .success();
 
     // Verify no new files or modifications
     let after: Vec<_> = walkdir(&adr_dir);

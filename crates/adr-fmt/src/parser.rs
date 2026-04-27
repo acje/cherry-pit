@@ -111,7 +111,6 @@ pub fn parse_adr_file(path: &Path, expected_prefix: &str, is_stale: bool) -> Opt
 
     // --- Status ---
     let (status, status_line, status_raw) = find_status(&lines);
-    let amendment_dates = find_amendment_dates(&lines);
 
     // --- Related ---
     let (relationships, has_related, related_has_placeholder) = find_relationships(&lines);
@@ -167,7 +166,6 @@ pub fn parse_adr_file(path: &Path, expected_prefix: &str, is_stale: bool) -> Opt
         max_code_block_lines,
         max_code_block_line,
         code_block_count,
-        amendment_dates,
         related_has_placeholder,
         section_order,
         section_word_counts,
@@ -241,33 +239,6 @@ fn find_status(lines: &[&str]) -> (Option<Status>, usize, Option<String>) {
         }
     }
     (None, 0, None)
-}
-
-/// Find all `Amended YYYY-MM-DD` dates in the Status section.
-fn find_amendment_dates(lines: &[&str]) -> Vec<(String, usize)> {
-    let mut dates = Vec::new();
-    let mut in_status = false;
-
-    for (i, line) in lines.iter().enumerate() {
-        if *line == "## Status" {
-            in_status = true;
-            continue;
-        }
-        if in_status {
-            if line.starts_with("## ") {
-                break;
-            }
-            if let Some(rest) = line.strip_prefix("Amended ") {
-                // Extract date: "YYYY-MM-DD — note" or just "YYYY-MM-DD"
-                let date_part = rest.split(" — ").next().unwrap_or("").trim();
-                if !date_part.is_empty() {
-                    dates.push((date_part.to_owned(), i + 1));
-                }
-            }
-        }
-    }
-
-    dates
 }
 
 /// Find all relationships in the `## Related` section.
@@ -705,33 +676,6 @@ mod tests {
         assert_eq!(max, 2, "unclosed block has 2 content lines");
         assert_eq!(count, 1);
         assert_eq!(start, 2, "opening fence at line 2 (1-indexed)");
-    }
-
-    #[test]
-    fn find_amendment_dates_extracts_dates() {
-        let lines = vec![
-            "## Status",
-            "",
-            "Accepted",
-            "",
-            "Amended 2026-04-25 — fencing mandatory",
-            "Amended 2026-05-01 — CAS guard added",
-            "",
-            "## Related",
-        ];
-        let dates = find_amendment_dates(&lines);
-        assert_eq!(dates.len(), 2);
-        assert_eq!(dates[0].0, "2026-04-25");
-        assert_eq!(dates[0].1, 5); // 1-indexed
-        assert_eq!(dates[1].0, "2026-05-01");
-        assert_eq!(dates[1].1, 6);
-    }
-
-    #[test]
-    fn find_amendment_dates_none_when_no_amendments() {
-        let lines = vec!["## Status", "", "Accepted", "", "## Related"];
-        let dates = find_amendment_dates(&lines);
-        assert!(dates.is_empty());
     }
 
     #[test]

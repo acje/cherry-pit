@@ -11,12 +11,12 @@ governance rules. Never modifies files. stdout = output, stderr = errors.
 ## Usage
 
 ```text
-adr-fmt [ADR_DIR]                     # lint all ADRs
-adr-fmt --critique <ADR_ID> [ADR_DIR] # focal ADR + transitive closure
-adr-fmt --context <CRATE> [ADR_DIR]   # decision rules for a crate
-adr-fmt --index [DOMAIN] [ADR_DIR]    # domain dependency tree
-adr-fmt --report [ADR_DIR]            # computed children (reverse-link index)
-adr-fmt --guidelines [ADR_DIR]        # generated governance reference
+adr-fmt [ADR_DIR]                          # default: print governance guidelines
+adr-fmt --lint [ADR_DIR]                   # lint all ADRs
+adr-fmt --critique <ADR_ID> [ADR_DIR]      # focal ADR + direct neighbors
+adr-fmt --critique <ADR_ID> --depth N      # bounded transitive closure (default: 1)
+adr-fmt --context <CRATE> [ADR_DIR]        # decision rules for a crate
+adr-fmt --tree [DOMAIN] [ADR_DIR]          # domain dependency tree
 ```
 
 Run via `cargo run -p adr-fmt` or `cargo run -p adr-fmt -- <args>`.
@@ -31,9 +31,16 @@ Auto-discovers `docs/adr/` by walking up from CWD looking for
 
 ## Modes
 
-### Lint (default)
+### Guidelines (default, no flag)
 
-Runs all rules (template, link, naming, structure) across every ADR.
+Two behaviors:
+- **No config:** Prints prescriptive setup guide (quickstart template).
+- **Config present:** Prints complete governance reference derived from hardcoded
+  rule catalog + config domains/overrides. Human-readable formatting.
+
+### Lint
+
+`--lint` — Runs all rules (template, link, naming, structure) across every ADR.
 Diagnostic output format:
 
 ```text
@@ -44,11 +51,11 @@ Diagnostic output format:
 
 ### Critique
 
-`--critique CHE-0042` — BFS transitive closure around focal ADR.
-Follows fan-out (forward relationships) and fan-in (reverse/children).
-Stale ADRs filtered with count note. Output uses Alternative 4 markdown:
-`◆ FOCAL`, `◇ CONNECTED`, `◈ EXCLUDED` headers. Connected blocks sorted
-by tier (S→D) then ID.
+`--critique CHE-0042` — BFS transitive closure around focal ADR, bounded by
+`--depth N` (default: 1). Follows fan-out (forward relationships) and fan-in
+(reverse/children). Stale ADRs are included without filtering. Output uses
+Alternative 4 markdown: `◆ FOCAL`, `◇ CONNECTED` headers. Connected blocks
+sorted by tier (S→D) then ID.
 
 ### Context
 
@@ -60,34 +67,24 @@ Foundation domains (e.g., COM) always included. Output sorted: foundation
 first, then by tier, then ID.
 Exits 1 if crate not found in any domain.
 
-### Index
+### Tree
 
-`--index [DOMAIN]` — domain tree with ADR listings. Optional domain prefix
-filter (e.g., `--index CHE`). Shows stale counts per domain.
-
-### Report
-
-`--report` — computed children index. Inverts forward relationships to
-show `parent ← verb child` entries. Grouped by domain prefix.
-
-### Guidelines
-
-`--guidelines` — complete generated ADR governance reference from rule
-catalog, tier/lifecycle definitions, and config. Replaces prescriptive
-sections of GOVERNANCE.md.
+`--tree [DOMAIN]` — domain tree with ADR listings. Optional domain prefix
+filter (e.g., `--tree CHE`). Shows stale counts per domain.
 
 ## SSOT Architecture
 
 | Source | Scope |
 |--------|-------|
 | `adr-fmt` (code) | Invariant rules: template, naming, vocabulary, lifecycle, links |
-| `adr-fmt.toml` | Configurable: domains, crate mappings, rule params, stale directory |
-| `--guidelines` output | Generated complete reference |
+| `adr-fmt.toml` | Configurable: domains, crate mappings, rule param overrides, stale directory |
+| Default mode output | Generated complete governance reference |
 | `GOVERNANCE.md` | Rationale, process, judgment only |
 
 ## Rule Catalog
 
-All rules currently emit warnings. `adr-fmt` is advisory.
+All rules emit warnings. `adr-fmt` is advisory. Rules are hardcoded in the
+binary; config only provides parameter overrides.
 
 ### Template (T001–T016)
 
@@ -98,17 +95,16 @@ All rules currently emit warnings. `adr-fmt` is advisory.
 | T003 | `Last-reviewed:` field present (all tiers) |
 | T004 | `Tier:` field present |
 | T005 | `## Status` section with status line present |
-| T006 | Status value recognized; no parenthetical annotations |
+| T006 | Status value recognized; rejects `Amended`; no parenthetical annotations |
 | T007 | `## Related` has ≥1 relationship (no orphans, no placeholders) |
 | T008 | `## Context` section present |
 | T009 | `## Decision` section present |
 | T010 | `## Consequences` section present |
-| T011 | Code block exceeds 20 lines |
-| T012 | Amendment date ≥ creation date; valid ISO 8601 |
+| T011 | Code block exceeds 30 lines |
 | T013 | *(reserved)* |
 | T014 | Section order: Status → Related → Context → Decision → Consequences (+ Retirement for stale) |
-| T015 | Prose section below minimum word count (configurable `min_words`, default 10) |
-| T016 | Decision section lacks tagged rules (`- **RN**: text`) or has non-sequential IDs. Exempt: Draft, Proposed |
+| T015 | Prose section word count 7–50 (Context, Consequences, Retirement). Configurable: `min_words`, `max_words` |
+| T016 | Decision section tagged rules: ≥1 rule, sequential IDs, max 10, 7–50 words each. Exempt: Draft, Proposed |
 
 ### Link (L001–L009)
 
@@ -116,8 +112,6 @@ All rules currently emit warnings. `adr-fmt` is advisory.
 |------|-------------|
 | L001 | Dangling link — target ADR not found in any domain |
 | L003 | Supersedes verb without matching `Superseded by` status on target |
-| L004 | Cross-domain reference to unmigrated ADR |
-| L006 | Legacy relationship verb used |
 | L007 | Stale reference — target ADR is in stale archive |
 | L008 | Root verb target does not match own ID |
 | L009 | Root and References coexist — Root ADRs may not also use References |
@@ -153,10 +147,14 @@ All rules currently emit warnings. `adr-fmt` is advisory.
 
 ### Lifecycle States
 
-`Draft` → `Proposed` → `Accepted` → `Amended YYYY-MM-DD — note`
+`Draft` → `Proposed` → `Accepted`
 
 Terminal: `Rejected`, `Deprecated`, `Superseded by PREFIX-NNNN`
+
 Terminal states require: move to stale directory + `## Retirement` section.
+
+Note: `Amended` is no longer a valid status. ADRs with Amended status should
+be changed to `Accepted`. T006 fires on Amended.
 
 ### Relationship Vocabulary
 
@@ -168,19 +166,21 @@ Three permitted verbs:
 | References | Soft citation — citing another ADR |
 | Supersedes | Replaces target entirely; target becomes Superseded |
 
-Constraints: Root + References cannot coexist. Root + Supersedes can.
-Legacy verbs (Depends on, Extends, Illustrates, etc.) trigger L006.
+Constraints: Root + References cannot coexist (L009). Root + Supersedes can.
+Legacy verbs (Depends on, Extends, Illustrates, etc.) are parsed but produce
+no L006 warning (rule removed); they remain as documentation of migration path.
 
 ### Tagged Rules
 
 Decision sections must contain tagged rules:
 
 ```markdown
-- **R1**: First rule or decision statement
-- **R2**: Second rule or decision statement
+- **R1**: First rule or decision statement (7–50 words)
+- **R2**: Second rule or decision statement (7–50 words)
 ```
 
 Global identifier: `PREFIX-NNNN:RN` (e.g., `CHE-0042:R1`).
+Constraints: sequential IDs, max 10 per ADR, 7–50 words each.
 When no tagged rules found, entire Decision text is captured as R0 (triggers T016).
 
 ### Crates Metadata
@@ -193,7 +193,11 @@ Placed after Date/Tier, before `## Status`. Used by `--context` mode.
 
 ## Configuration
 
-`docs/adr/adr-fmt.toml` — required. Config errors are hard failures (exit 1).
+`docs/adr/adr-fmt.toml` — required for `--lint`, `--critique`, `--context`,
+`--tree` modes. Default mode shows setup guide if missing.
+
+Rules are hardcoded in the binary. Config provides only domain definitions
+and optional parameter overrides.
 
 ```toml
 [stale]
@@ -207,20 +211,20 @@ description = "Architecture decisions"
 crates = ["cherry-pit-core"]
 foundation = false            # true = included in every --context query
 
+# Optional: override hardcoded rule parameters
 [[rules]]
 id = "T015"
-category = "template"
-description = "Prose section below minimum word count"
-internal = false              # true = hidden from user-facing output
-[rules.params]
-min_words = 10
+params = { min_words = 7, max_words = 50 }
 ```
+
+Legacy config format (with `category`/`description` fields in `[[rules]]`)
+still parses but emits a deprecation warning to stderr.
 
 ## Workflow
 
 After creating or editing any ADR:
 
-1. `cargo run -p adr-fmt` — parse stdout for warnings
+1. `cargo run -p adr-fmt -- --lint` — parse stdout for warnings
 2. Fix reported issues
 3. Re-run to confirm clean output
 4. Commit

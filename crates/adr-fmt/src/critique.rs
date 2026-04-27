@@ -1,8 +1,8 @@
-//! Critique mode — transitive closure analysis of a focal ADR.
+//! Critique mode — bounded transitive closure analysis of a focal ADR.
 //!
 //! `--critique CHE-0042` builds the transitive closure of all ADRs
-//! reachable from the focal ADR (both fan-out and fan-in), filters
-//! stale ADRs, and produces Alternative 4 output blocks.
+//! reachable from the focal ADR (both fan-out and fan-in), bounded by
+//! `--depth N` (default 1). Stale ADRs are included without filtering.
 
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fs;
@@ -12,11 +12,15 @@ use crate::model::{AdrId, AdrRecord, RelVerb, Tier};
 use crate::nav::{self, ChildEntry};
 use crate::output::{self, OutputBlock};
 
-/// Run critique mode for a focal ADR.
+/// Run critique mode for a focal ADR with depth bounding.
 ///
-/// Returns output blocks: focal first, connected sorted by tier then
-/// ID, excluded stale count last.
-pub fn critique(focal_id: &AdrId, records: &[AdrRecord], config: &Config) -> Vec<OutputBlock> {
+/// Returns output blocks: focal first, connected sorted by tier then ID.
+pub fn critique(
+    focal_id: &AdrId,
+    records: &[AdrRecord],
+    config: &Config,
+    max_depth: usize,
+) -> Vec<OutputBlock> {
     // Find focal record
     let Some(focal) = records.iter().find(|r| r.id == *focal_id) else {
         eprintln!("error: ADR {focal_id} not found");
@@ -27,14 +31,18 @@ pub fn critique(focal_id: &AdrId, records: &[AdrRecord], config: &Config) -> Vec
     let by_id: HashMap<&AdrId, &AdrRecord> = records.iter().map(|r| (&r.id, r)).collect();
     let children = nav::compute_children(records);
 
-    // BFS transitive closure — both directions
+    // BFS transitive closure — both directions, bounded by depth
     let mut visited: HashSet<&AdrId> = HashSet::new();
-    let mut queue: VecDeque<&AdrId> = VecDeque::new();
+    let mut queue: VecDeque<(&AdrId, usize)> = VecDeque::new();
 
     visited.insert(&focal.id);
-    queue.push_back(&focal.id);
+    queue.push_back((&focal.id, 0));
 
-    while let Some(current_id) = queue.pop_front() {
+    while let Some((current_id, depth)) = queue.pop_front() {
+        if depth >= max_depth {
+            continue;
+        }
+
         let Some(current) = by_id.get(current_id) else {
             continue;
         };
@@ -48,7 +56,7 @@ pub fn critique(focal_id: &AdrId, records: &[AdrRecord], config: &Config) -> Vec
                 continue;
             }
             if visited.insert(&rel.target) {
-                queue.push_back(&rel.target);
+                queue.push_back((&rel.target, depth + 1));
             }
         }
 
@@ -56,26 +64,21 @@ pub fn critique(focal_id: &AdrId, records: &[AdrRecord], config: &Config) -> Vec
         if let Some(child_entries) = children.get(current_id) {
             for entry in child_entries {
                 if visited.insert(&entry.child) {
-                    queue.push_back(&entry.child);
+                    queue.push_back((&entry.child, depth + 1));
                 }
             }
         }
     }
 
-    // Partition into non-stale and stale
+    // Collect connected records (no stale filtering)
     let mut connected: Vec<&AdrRecord> = Vec::new();
-    let mut stale_count = 0usize;
 
     for id in &visited {
         if **id == focal.id {
             continue;
         }
         if let Some(record) = by_id.get(id) {
-            if record.is_stale {
-                stale_count += 1;
-            } else {
-                connected.push(record);
-            }
+            connected.push(record);
         }
     }
 
@@ -111,14 +114,6 @@ pub fn critique(focal_id: &AdrId, records: &[AdrRecord], config: &Config) -> Vec
         });
     }
 
-    // Excluded note
-    if stale_count > 0 {
-        blocks.push(OutputBlock::Excluded {
-            count: stale_count,
-            reason: "stale ADRs filtered from closure".into(),
-        });
-    }
-
     blocks
 }
 
@@ -134,7 +129,6 @@ fn build_relationship_path(
     records: &[AdrRecord],
     children: &HashMap<AdrId, Vec<ChildEntry>>,
 ) -> String {
-    // Simple path: check direct relationships first
     let by_id: HashMap<&AdrId, &AdrRecord> = records.iter().map(|r| (&r.id, r)).collect();
 
     // Check fan-out from focal
@@ -184,11 +178,6 @@ name = "Cherry"
 directory = "cherry"
 description = "Test"
 crates = []
-
-[[rules]]
-id = "T001"
-category = "template"
-description = "test"
 "#,
         )
         .unwrap()
@@ -235,8 +224,7 @@ description = "test"
             vec![(RelVerb::Root, make_id("CHE", 1))],
         )];
         let config = make_config();
-        let blocks = critique(&make_id("CHE", 1), &records, &config);
-        // Should have 1 focal block only
+        let blocks = critique(&make_id("CHE", 1), &records, &config, 1);
         assert_eq!(blocks.len(), 1);
         assert!(matches!(blocks[0], OutputBlock::Focal { .. }));
     }
@@ -248,15 +236,15 @@ description = "test"
             make_record("CHE", 2, vec![(RelVerb::References, make_id("CHE", 1))]),
         ];
         let config = make_config();
-        let blocks = critique(&make_id("CHE", 1), &records, &config);
-        // Focal + 1 connected
+        let blocks = critique(&make_id("CHE", 1), &records, &config, 1);
+        // Focal + 1 connected (fan-in from CHE-0002)
         assert_eq!(blocks.len(), 2);
         assert!(matches!(blocks[0], OutputBlock::Focal { .. }));
         assert!(matches!(blocks[1], OutputBlock::Connected { .. }));
     }
 
     #[test]
-    fn critique_excludes_stale() {
+    fn critique_includes_stale() {
         let mut stale = make_record("CHE", 3, vec![(RelVerb::References, make_id("CHE", 1))]);
         stale.is_stale = true;
 
@@ -266,10 +254,31 @@ description = "test"
             stale,
         ];
         let config = make_config();
-        let blocks = critique(&make_id("CHE", 1), &records, &config);
-        // Focal + 1 connected + 1 excluded
+        let blocks = critique(&make_id("CHE", 1), &records, &config, 1);
+        // Focal + 2 connected (stale NOT filtered)
         assert_eq!(blocks.len(), 3);
-        assert!(matches!(blocks[2], OutputBlock::Excluded { count: 1, .. }));
+        assert!(matches!(blocks[0], OutputBlock::Focal { .. }));
+        assert!(matches!(blocks[1], OutputBlock::Connected { .. }));
+        assert!(matches!(blocks[2], OutputBlock::Connected { .. }));
+    }
+
+    #[test]
+    fn critique_respects_depth_bound() {
+        // Chain: CHE-0001 ← CHE-0002 ← CHE-0003
+        let records = vec![
+            make_record("CHE", 1, vec![(RelVerb::Root, make_id("CHE", 1))]),
+            make_record("CHE", 2, vec![(RelVerb::References, make_id("CHE", 1))]),
+            make_record("CHE", 3, vec![(RelVerb::References, make_id("CHE", 2))]),
+        ];
+        let config = make_config();
+
+        // Depth 1: focal CHE-0001 sees CHE-0002 (fan-in), NOT CHE-0003
+        let blocks = critique(&make_id("CHE", 1), &records, &config, 1);
+        assert_eq!(blocks.len(), 2, "depth=1 should reach 1 neighbor");
+
+        // Depth 2: focal CHE-0001 sees CHE-0002 and CHE-0003
+        let blocks = critique(&make_id("CHE", 1), &records, &config, 2);
+        assert_eq!(blocks.len(), 3, "depth=2 should reach 2 neighbors");
     }
 
     #[test]
@@ -279,8 +288,19 @@ description = "test"
             make_record("CHE", 2, vec![(RelVerb::References, make_id("CHE", 1))]),
         ];
         let config = make_config();
-        let blocks = critique(&make_id("CHE", 1), &records, &config);
+        let blocks = critique(&make_id("CHE", 1), &records, &config, 5);
         // Should terminate and include both
         assert!(blocks.len() >= 2);
+    }
+
+    #[test]
+    fn critique_depth_zero_returns_focal_only() {
+        let records = vec![
+            make_record("CHE", 1, vec![(RelVerb::Root, make_id("CHE", 1))]),
+            make_record("CHE", 2, vec![(RelVerb::References, make_id("CHE", 1))]),
+        ];
+        let config = make_config();
+        let blocks = critique(&make_id("CHE", 1), &records, &config, 0);
+        assert_eq!(blocks.len(), 1, "depth=0 should return focal only");
     }
 }

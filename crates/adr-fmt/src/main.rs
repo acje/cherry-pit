@@ -1,17 +1,16 @@
 //! ADR template and link-integrity validator for cherry-pit.
 //!
-//! Read-only, agent-first analysis tool. Single source of truth for
-//! all invariant ADR governance rules.
+//! Read-only analysis tool. Single source of truth for all invariant
+//! ADR governance rules.
 //!
 //! # Modes
 //!
 //! ```text
-//! adr-fmt [<ADR_DIR>]                     # default: lint all ADRs
-//! adr-fmt --critique <ADR_ID> [<ADR_DIR>] # focal ADR + transitive closure
+//! adr-fmt [<ADR_DIR>]                     # default: print governance guidelines
+//! adr-fmt --lint [<ADR_DIR>]              # lint all ADRs
+//! adr-fmt --critique <ADR_ID> [<ADR_DIR>] # focal ADR + direct neighbors
 //! adr-fmt --context <CRATE> [<ADR_DIR>]   # decision rules for a crate
-//! adr-fmt --index [DOMAIN] [<ADR_DIR>]    # domain tree overview
-//! adr-fmt --report [<ADR_DIR>]            # computed children report
-//! adr-fmt --guidelines [<ADR_DIR>]        # print ADR guidelines
+//! adr-fmt --tree [DOMAIN] [<ADR_DIR>]     # domain tree overview
 //! ```
 //!
 //! Exit codes:
@@ -43,25 +42,25 @@ use model::{DomainDir, parse_adr_id_from_str};
 #[derive(Parser)]
 #[command(name = "adr-fmt", version)]
 struct Cli {
-    /// Critique a focal ADR: show transitive closure with full content
+    /// Lint all ADRs, report diagnostics to stdout
+    #[arg(long, group = "mode")]
+    lint: bool,
+
+    /// Critique a focal ADR: show direct neighbors with full content
     #[arg(long, value_name = "ADR_ID", group = "mode")]
     critique: Option<String>,
+
+    /// Depth of transitive closure for critique (default: 1)
+    #[arg(long, value_name = "N", default_value = "1", requires = "critique")]
+    depth: usize,
 
     /// Show decision rules applicable to a crate
     #[arg(long, value_name = "CRATE", group = "mode")]
     context: Option<String>,
 
-    /// Print domain index tree (optionally filtered by domain prefix)
+    /// Print domain tree (optionally filtered by domain prefix)
     #[arg(long, value_name = "DOMAIN", num_args = 0..=1, default_missing_value = "", group = "mode")]
-    index: Option<String>,
-
-    /// Print computed children report (reverse-link index)
-    #[arg(long, group = "mode")]
-    report: bool,
-
-    /// Print complete ADR guidelines (plain text to stdout)
-    #[arg(long, group = "mode")]
-    guidelines: bool,
+    tree: Option<String>,
 
     /// Path to ADR root directory (default: auto-discover docs/adr/)
     #[arg(value_name = "ADR_DIR")]
@@ -71,16 +70,53 @@ struct Cli {
 fn main() {
     let cli = Cli::parse();
 
+    // Resolve ADR root directory (may not exist for guidelines setup mode)
     let adr_root = match cli.adr_directory {
         Some(ref p) => {
             if p.is_dir() {
-                p.clone()
+                Some(p.clone())
             } else {
                 eprintln!("error: {} is not a directory", p.display());
                 process::exit(1);
             }
         }
-        None => resolve_adr_root_auto(),
+        None => resolve_adr_root_optional(),
+    };
+
+    // Default mode: guidelines
+    // If no mode flag is specified and no config exists, show setup guide
+    let is_non_default_mode =
+        cli.lint || cli.critique.is_some() || cli.context.is_some() || cli.tree.is_some();
+
+    if !is_non_default_mode {
+        // Guidelines mode — handles both setup and governance display
+        match &adr_root {
+            Some(root) => match config::try_load(root) {
+                Ok(Some(config)) => {
+                    guidelines::print_governance(&config);
+                    return;
+                }
+                Ok(None) => {
+                    guidelines::print_setup_guide();
+                    return;
+                }
+                Err(e) => {
+                    eprintln!("error: {e}");
+                    process::exit(1);
+                }
+            },
+            None => {
+                guidelines::print_setup_guide();
+                return;
+            }
+        }
+    }
+
+    // Non-default modes require a valid root and config
+    let Some(adr_root) = adr_root else {
+        eprintln!("error: could not find docs/adr/ in any parent directory");
+        eprintln!("       run from the workspace root or pass an explicit path");
+        process::exit(1);
     };
 
     let config = match config::load(&adr_root) {
@@ -90,12 +126,6 @@ fn main() {
             process::exit(1);
         }
     };
-
-    // --guidelines: print guidelines to stdout and exit
-    if cli.guidelines {
-        guidelines::print(&config);
-        return;
-    }
 
     let domain_dirs = discover_domains(&adr_root, &config);
 
@@ -127,14 +157,14 @@ fn main() {
             eprintln!("error: '{adr_id_str}' is not a valid ADR ID (expected PREFIX-NNNN)");
             process::exit(1);
         };
-        let blocks = critique::critique(&focal_id, &all_records, &config);
+        let blocks = critique::critique(&focal_id, &all_records, &config, cli.depth);
         print!("{}", output::render_blocks(&blocks));
     } else if let Some(ref crate_name) = cli.context {
         // --context mode
         let rules = context::context(crate_name, &all_records, &config);
         print!("{}", output::render_rules(crate_name, &rules));
-    } else if let Some(ref domain_filter) = cli.index {
-        // --index mode
+    } else if let Some(ref domain_filter) = cli.tree {
+        // --tree mode
         let filter = if domain_filter.is_empty() {
             None
         } else {
@@ -142,14 +172,10 @@ fn main() {
         };
         print!(
             "{}",
-            output::render_index(&all_records, &domain_dirs, &config, filter)
+            output::render_tree(&all_records, &domain_dirs, &config, filter)
         );
-    } else if cli.report {
-        // --report mode
-        let children = nav::compute_children(&all_records);
-        print!("{}", output::render_report(&all_records, &children));
-    } else {
-        // Default lint mode
+    } else if cli.lint {
+        // --lint mode
         let diagnostics = rules::run_all(&all_records, &config);
         print!(
             "{}",
@@ -158,25 +184,23 @@ fn main() {
     }
 }
 
-/// Walk up from CWD looking for `docs/adr/GOVERNANCE.md`.
-fn resolve_adr_root_auto() -> PathBuf {
-    if let Ok(cwd) = std::env::current_dir() {
-        let mut dir = cwd.as_path();
-        loop {
-            let candidate = dir.join("docs/adr/GOVERNANCE.md");
-            if candidate.is_file() {
-                return dir.join("docs/adr");
-            }
-            match dir.parent() {
-                Some(parent) => dir = parent,
-                None => break,
-            }
+/// Walk up from CWD looking for `docs/adr/`. Returns None if not found.
+fn resolve_adr_root_optional() -> Option<PathBuf> {
+    let Ok(cwd) = std::env::current_dir() else {
+        return None;
+    };
+    let mut dir = cwd.as_path();
+    loop {
+        let candidate = dir.join("docs/adr/GOVERNANCE.md");
+        if candidate.is_file() {
+            return Some(dir.join("docs/adr"));
+        }
+        match dir.parent() {
+            Some(parent) => dir = parent,
+            None => break,
         }
     }
-
-    eprintln!("error: could not find docs/adr/GOVERNANCE.md in any parent directory");
-    eprintln!("       run from the workspace root or pass an explicit path");
-    process::exit(1);
+    None
 }
 
 /// Build domain directories from config.

@@ -1,10 +1,7 @@
 # adr-fmt configuration
 #
-# Single source of truth for domain definitions, crate mappings,
-# stale directory config, and validation rules.
-#
-# adr-fmt is the SSOT for all invariant ADR governance rules.
-# This file is the SSOT for all configurable aspects.
+# Domain definitions, crate mappings, and stale directory config.
+# Rules are hardcoded in the binary — only parameter overrides go here.
 
 [stale]
 directory = "stale"
@@ -89,164 +86,16 @@ description = """\
     binary's own architectural decisions as a Rust CLI tool."""
 crates = ["adr-fmt"]
 
-# ── Rule catalog ────────────────────────────────────────────────────
+# ── Rule parameter overrides ────────────────────────────────────────
 #
-# All rules emit warnings. adr-fmt is advisory: exit 0 for lint
-# findings, exit 1 only for infrastructure errors (missing config,
-# no domains found).
-
-# Template rules (T001–T015)
-
-[[rules]]
-id = "T001"
-category = "template"
-description = "H1 title present"
-
-[[rules]]
-id = "T002"
-category = "template"
-description = "Date field present"
-
-[[rules]]
-id = "T003"
-category = "template"
-description = "Last-reviewed field present (required for all tiers)"
-
-[[rules]]
-id = "T004"
-category = "template"
-description = "Tier field present"
-
-[[rules]]
-id = "T005"
-category = "template"
-description = "Status section with status line present"
-
-[[rules]]
-id = "T006"
-category = "template"
-description = "Status value is recognized; no parenthetical annotations"
-
-[[rules]]
-id = "T007"
-category = "template"
-description = "Related section has ≥1 relationship (no orphans, no placeholders)"
-
-[[rules]]
-id = "T008"
-category = "template"
-description = "Context section present"
-
-[[rules]]
-id = "T009"
-category = "template"
-description = "Decision section present"
-
-[[rules]]
-id = "T010"
-category = "template"
-description = "Consequences section present"
-
-[[rules]]
-id = "T011"
-category = "template"
-description = "Code block exceeds 20 lines"
-
-[[rules]]
-id = "T012"
-category = "template"
-description = "Amendment date >= creation date; valid ISO 8601"
-
-[[rules]]
-id = "T014"
-category = "template"
-description = "Section ordering: Status → Related → Context → Decision → Consequences (+ Retirement for stale)"
+# Only declare rules whose defaults you want to change.
+# Hardcoded defaults: T015 min_words=7, max_words=50
+#                     T016 max_rules=10, min_rule_words=7, max_rule_words=50
 
 [[rules]]
 id = "T015"
-category = "template"
-description = "Prose section below minimum word count"
-
-[rules.params]
-min_words = 10
+params = { min_words = 7, max_words = 50 }
 
 [[rules]]
 id = "T016"
-category = "template"
-description = "Decision section lacks tagged rules (- **RN**: pattern) or has non-sequential rule IDs"
-
-# Link rules (L001–L009)
-
-[[rules]]
-id = "L001"
-category = "link"
-description = "Dangling link — target ADR not found in any domain"
-
-[[rules]]
-id = "L003"
-category = "link"
-description = "Supersedes verb without matching Superseded-by status on target"
-
-[[rules]]
-id = "L004"
-category = "link"
-description = "Cross-domain reference to unmigrated ADR"
-
-[[rules]]
-id = "L006"
-category = "link"
-description = "Legacy relationship verb used (Depends on, Extends, Illustrates, Contrasts with, Scoped by, or any reverse verb)"
-
-[[rules]]
-id = "L007"
-category = "link"
-description = "Stale reference — target ADR is in stale archive"
-
-[[rules]]
-id = "L008"
-category = "link"
-description = "Root verb target does not match the ADR's own ID (self-reference mismatch)"
-
-[[rules]]
-id = "L009"
-category = "link"
-description = "Root and References verbs coexist — Root ADRs may not also use References"
-
-# Naming rules (N001–N004)
-
-[[rules]]
-id = "N001"
-category = "naming"
-description = "Filename matches PREFIX-NNNN-kebab-slug.md pattern"
-
-[[rules]]
-id = "N002"
-category = "naming"
-description = "Number in filename matches H1 title ID"
-
-[[rules]]
-id = "N003"
-category = "naming"
-description = "Slug is valid lowercase kebab-case"
-
-[[rules]]
-id = "N004"
-category = "naming"
-description = "Domain prefix not found in configuration"
-
-# Structure rules (S004–S006)
-
-[[rules]]
-id = "S004"
-category = "structure"
-description = "Stale ADR missing required Retirement section (≥10 words)"
-
-[[rules]]
-id = "S005"
-category = "structure"
-description = "Active ADR has Retirement section (forbidden outside stale/)"
-
-[[rules]]
-id = "S006"
-category = "structure"
-description = "Terminal-status ADR (Rejected/Deprecated/Superseded) not in stale directory"
+params = { max_rules = 10, min_rule_words = 7, max_rule_words = 50 }

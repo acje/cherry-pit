@@ -76,9 +76,6 @@ pub struct AdrRecord {
     pub max_code_block_line: usize,
     #[allow(dead_code)] // reserved for future T-rules
     pub code_block_count: usize,
-    /// All `Amended YYYY-MM-DD — note` dates found in the Status section,
-    /// paired with their 1-indexed line numbers.
-    pub amendment_dates: Vec<(String, usize)>,
     /// True when the Related section contains a `—` placeholder (no
     /// relationships).
     #[allow(dead_code)] // Parsed for completeness
@@ -130,7 +127,6 @@ impl Default for AdrRecord {
             max_code_block_lines: 0,
             max_code_block_line: 0,
             code_block_count: 0,
-            amendment_dates: Vec::new(),
             related_has_placeholder: false,
             section_order: Vec::new(),
             section_word_counts: HashMap::new(),
@@ -202,13 +198,14 @@ impl Tier {
         match self {
             Self::S => "Immutable post-1.0",
             Self::A => "Near-immutable; changes require RFC-level discussion",
-            Self::B => "Stable; changes documented via Amended status",
+            Self::B => "Stable; changes documented via git history",
             Self::C => "Flexible; changes append monotonically",
             Self::D => "Mutable; may be superseded freely",
         }
     }
 
     /// Assignment guide — the question to ask when choosing a tier.
+    #[allow(dead_code)] // Used by tests; retained for future guidelines
     pub fn assignment_guide(self) -> &'static str {
         match self {
             Self::S => "If this changed, would we need to rewrite the framework?",
@@ -242,10 +239,6 @@ pub enum Status {
     Draft,
     Proposed,
     Accepted,
-    Amended {
-        date: Option<String>,
-        note: Option<String>,
-    },
     Rejected,
     Deprecated,
     SupersededBy(AdrId),
@@ -272,20 +265,6 @@ impl Status {
         }
         if trimmed == "Rejected" {
             return Self::Rejected;
-        }
-
-        // "Amended" or "Amended YYYY-MM-DD — note"
-        if trimmed == "Amended" {
-            return Self::Amended {
-                date: None,
-                note: None,
-            };
-        }
-        if let Some(rest) = trimmed.strip_prefix("Amended ") {
-            let parts: Vec<&str> = rest.splitn(2, " — ").collect();
-            let date = Some(parts[0].to_owned());
-            let note = parts.get(1).map(|s| (*s).to_owned());
-            return Self::Amended { date, note };
         }
 
         // "Superseded by PREFIX-NNNN"
@@ -317,14 +296,12 @@ impl Status {
     }
 
     /// Human-readable description of this lifecycle state.
+    #[allow(dead_code)] // Retained for documentation tooling
     pub fn description(&self) -> &'static str {
         match self {
             Self::Draft => "Under development, not yet proposed for review. May be incomplete.",
             Self::Proposed => "Ready for review. All required fields present.",
             Self::Accepted => "Decision is binding. Implementation may be pending.",
-            Self::Amended { .. } => {
-                "Accepted with recorded modifications. Previous text preserved."
-            }
             Self::Rejected => {
                 "Decision was proposed but deliberately not adopted. \
                               Remains in record for context."
@@ -344,7 +321,6 @@ impl Status {
             "Draft",
             "Proposed",
             "Accepted",
-            "Amended [YYYY-MM-DD — note]",
             "Rejected",
             "Deprecated",
             "Superseded by PREFIX-NNNN",
@@ -357,7 +333,6 @@ impl Status {
             Self::Draft => "Draft".into(),
             Self::Proposed => "Proposed".into(),
             Self::Accepted => "Accepted".into(),
-            Self::Amended { .. } => "Amended".into(),
             Self::Rejected => "Rejected".into(),
             Self::Deprecated => "Deprecated".into(),
             Self::SupersededBy(id) => format!("Superseded by {id}"),
@@ -382,7 +357,7 @@ pub struct Relationship {
 /// - `Root` — self-reference marking this ADR as a tree root
 ///
 /// Legacy verbs are retained so the parser can recognize them and
-/// L006 can produce migration warnings.
+/// guidelines output can show migration paths.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum RelVerb {
     // === Permitted verbs ===
@@ -390,14 +365,14 @@ pub enum RelVerb {
     Supersedes,
     Root,
 
-    // === Legacy verbs (L006 warns on these) ===
+    // === Legacy verbs (parsed for recognition; no lint rule) ===
     DependsOn,
     Extends,
     Illustrates,
     ContrastsWith,
     ScopedBy,
 
-    // === Legacy reverse verbs (also L006) ===
+    // === Legacy reverse verbs (parsed for recognition; no lint rule) ===
     Informs,
     ExtendedBy,
     IllustratedBy,
@@ -408,6 +383,7 @@ pub enum RelVerb {
 
 impl RelVerb {
     /// True for the three permitted verbs.
+    #[allow(dead_code)] // Retained for parser validation
     pub fn is_permitted(self) -> bool {
         matches!(self, Self::References | Self::Supersedes | Self::Root)
     }
@@ -605,27 +581,15 @@ mod tests {
     }
 
     #[test]
-    fn parse_status_amended_with_date() {
+    fn parse_status_amended_is_invalid() {
         let s = Status::parse("Amended 2026-04-25 — added fencing");
-        match s {
-            Status::Amended { date, note } => {
-                assert_eq!(date.as_deref(), Some("2026-04-25"));
-                assert_eq!(note.as_deref(), Some("added fencing"));
-            }
-            other => panic!("expected Amended, got {other:?}"),
-        }
+        assert!(matches!(s, Status::Invalid(_)));
     }
 
     #[test]
-    fn parse_status_amended_bare() {
+    fn parse_status_amended_bare_is_invalid() {
         let s = Status::parse("Amended");
-        assert_eq!(
-            s,
-            Status::Amended {
-                date: None,
-                note: None
-            }
-        );
+        assert!(matches!(s, Status::Invalid(_)));
     }
 
     #[test]
@@ -698,13 +662,6 @@ mod tests {
         assert!(!Status::Draft.is_terminal());
         assert!(!Status::Proposed.is_terminal());
         assert!(!Status::Accepted.is_terminal());
-        assert!(
-            !Status::Amended {
-                date: None,
-                note: None
-            }
-            .is_terminal()
-        );
         assert!(Status::Rejected.is_terminal());
         assert!(Status::Deprecated.is_terminal());
         assert!(
@@ -722,10 +679,6 @@ mod tests {
             Status::Draft,
             Status::Proposed,
             Status::Accepted,
-            Status::Amended {
-                date: None,
-                note: None,
-            },
             Status::Rejected,
             Status::Deprecated,
             Status::SupersededBy(AdrId {

@@ -1,8 +1,7 @@
-//! Computed children report — inverts forward links to produce a
+//! Computed children index — inverts forward links to produce a
 //! reverse-link index on demand.
 //!
-//! Replaces stored reverse verbs with a computed index that can be
-//! printed via `adr-fmt --report`.
+//! Used by critique mode for fan-in resolution.
 
 use std::collections::HashMap;
 
