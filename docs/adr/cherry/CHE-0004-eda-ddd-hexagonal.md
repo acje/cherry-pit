@@ -1,12 +1,15 @@
 # CHE-0004. Event-Driven Architecture with DDD and Hexagonal Architecture
 
 Date: 2026-04-24
-Last-reviewed: 2026-04-25
+Last-reviewed: 2026-04-27
 Tier: S
 
 ## Status
 
 Accepted
+
+Amended 2026-04-27 — expanded Context with forces-in-tension and
+  alternatives analysis; added negative consequences
 
 ## Related
 
@@ -15,11 +18,41 @@ Accepted
 ## Context
 
 Cherry-pit is a composable systems-kernel for agent-first building.
-Agents need full audit trails, replayable history, and decoupled I/O.
-The kernel must handle "undifferentiated heavy lifting" — persistence,
-transport, and fan-out — so users focus on domain logic.
+Three forces are in tension:
 
-Three architectural patterns were evaluated:
+1. **Audit completeness.** Agents require full, replayable history of
+   every state change. Audit is not a bolt-on; it is the primary data
+   model. Any architecture that does not store the complete causal
+   chain of state transitions fails this requirement.
+
+2. **Domain model fidelity.** The system must preserve command intent
+   (what the user asked for) separately from state changes (what
+   happened). CRUD systems collapse intent into state mutations —
+   the "why" is lost, making replay non-deterministic and debugging
+   forensically impossible.
+
+3. **Infrastructure decoupling.** The kernel handles "undifferentiated
+   heavy lifting" — persistence, transport, and fan-out — so users
+   focus on domain logic. Domain code must not know about
+   serialization formats, database schemas, or message brokers.
+
+Four architectural approaches were evaluated:
+
+| Approach | Audit | Intent | Decoupling | Complexity |
+|----------|-------|--------|------------|------------|
+| EDA + Event Sourcing + DDD + Hex | Full | Preserved | Full | High |
+| CRUD + Change Data Capture | Partial | Lost | Partial | Medium |
+| Bi-temporal Database | Full | Partial | Low | High |
+| State-based + Audit Log | Partial | Partial | Partial | Low |
+
+CRUD+CDC loses command intent: a CDC record says "field X changed
+to Y" but not "user issued command Z that caused the change."
+Bi-temporal databases preserve temporal state but do not naturally
+decompose into aggregates and bounded contexts. State-based+audit-log
+duplicates data (state + log) with no guarantee of consistency
+between them.
+
+The chosen approach composes three mutually reinforcing patterns:
 
 - **Event-Driven Architecture (EDA)** structures the system around
   events as the primary communication and coordination mechanism.
@@ -31,12 +64,9 @@ Three architectural patterns were evaluated:
 - **Hexagonal architecture (ports and adapters)** decouples domain
   logic from infrastructure, enabling testability and composability.
 
-These patterns are mutually reinforcing: EDA supplies the
-communication and data model, DDD supplies the consistency model, and
-hexagonal architecture supplies the integration model.
-
-Alternative: CRUD with change-data-capture was considered but rejected
-because it loses intent (commands) and makes replay non-deterministic.
+EDA supplies the communication and data model, DDD supplies the
+consistency model, and hexagonal architecture supplies the
+integration model.
 
 ## Decision
 
@@ -56,3 +86,17 @@ source of truth; aggregates are the consistency boundary.
   this is the point: users opt in knowingly.
 - The three patterns together provide auditability, replayability,
   testability, and composability.
+- **Steep learning curve.** EDA + event sourcing + DDD is one of the
+  most conceptually demanding architectural patterns in software
+  engineering. Developers must internalize commands, events,
+  aggregates, projections, policies, and eventual consistency before
+  being productive. This is the primary adoption barrier.
+- **Eventual consistency is inherent.** Read models are projections
+  rebuilt from events. They are always eventually consistent with
+  the write model. Developers accustomed to strong consistency
+  (read-after-write) must adapt their mental model. No amount of
+  framework design can eliminate this fundamental property.
+- **Event schema is append-only forever.** Once an event type is
+  persisted, it cannot be removed or renamed without migration
+  infrastructure. The event log is an append-only ledger of the
+  system's entire history — every schema decision is permanent.

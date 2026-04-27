@@ -1,5 +1,7 @@
 # Key concepts
 
+> **Superseded** — canonical glossary is now at [docs/glossary.md](../glossary.md).
+
 Terms used throughout cherry-pit documentation. Definitions match the
 trait designs in [cherry-pit-core](cherry-pit-core.md).
 

@@ -45,45 +45,43 @@ What cannot compile:
 ## Status
 
 Active development. `cherry-pit-core` traits are implemented and stable.
-`cherry-pit-gateway` has a working `MsgpackFileStore` event store. Remaining
-infrastructure crates (cherry-pit-web, cherry-pit-projection) are planned. Pardosa
-(event storage layer and binary serialization) is in progress.
+`cherry-pit-gateway` provides a working `MsgpackFileStore` event store with
+atomic writes, process-level fencing, and optimistic concurrency. `pardosa`
+has a complete fiber state machine and dragline (append-only log with fiber
+lookup). `pardosa-genome` has the crate scaffold — traits (`GenomeSafe`,
+`GenomeOrd`), binary format constants, error catalog, and derive macro — but
+the serializer and deserializer are not yet implemented. Remaining
+infrastructure crates (`cherry-pit-web`, `cherry-pit-projection`) are planned.
 
 ## Components
 
 | Component      | Status      | Description                                         |
 |----------------|-------------|-----------------------------------------------------|
 | **cherry-pit-core**   | implemented | Aggregate, command, event, policy, projection traits. Port traits: CommandGateway, CommandBus, EventStore, EventBus |
-| **cherry-pit-gateway**| in progress | Event store implementations (MsgpackFileStore)      |
-| **pardosa**    | in progress | EDA storage layer implementing fiber semantics      |
-| **pardosa-genome** | in progress | Binary serialization format with zero-copy reads and serde integration |
-| **pardosa-genome-derive** | in progress | Derive macro for pardosa-genome GenomeSafe trait |
+| **cherry-pit-gateway**| implemented | `MsgpackFileStore` event store with atomic writes, process fencing, optimistic concurrency |
+| **pardosa**    | implemented | Fiber state machine, dragline (append-only log), CRUD + migration operations. Persistence and NATS integration not yet built |
+| **pardosa-genome** | scaffold | `GenomeSafe`/`GenomeOrd` traits, binary format constants, error catalog. Serializer and deserializer not yet implemented |
+| **pardosa-genome-derive** | implemented | `#[derive(GenomeSafe)]` proc macro with compile-time serde attribute validation |
+| **adr-fmt**    | implemented | ADR governance CLI: template validation, naming, relationship integrity, README index generation |
 | **cherry-pit-web**    | planned     | Web serving adapter (axum)                          |
 | **cherry-pit-projection** | planned | Read model storage and query serving                |
-
-## Documentation
-
-| Document | Contents |
-|----------|----------|
-| [cherry-pit-core trait design](docs/plans/cherry-pit-core.md) | All trait signatures, single-aggregate design rationale, type-safety guarantees |
-| [Build plan](docs/plans/build-plan.md) | Crate dependency DAG, dependency mapping, design decisions |
-| [Pardosa](docs/plans/pardosa.md) | EDA storage layer implementing fiber semantics |
-| [Infrastructure](docs/plans/infrastructure.md) | Infrastructure crate catalogue |
-| [Key concepts](docs/plans/glossary.md) | Glossary of DDD and EDA terms |
 
 ## Repository structure
 
 ```
 cherry-pit/
 ├── crates/
-│   ├── cherry-pit-core/          # Aggregate, command, event, port traits
-│   ├── cherry-pit-gateway/       # EventStore implementations
-│   ├── pardosa/           # EDA storage layer (fiber semantics)
-│   ├── pardosa-genome/    # Binary serialization format
+│   ├── cherry-pit-core/       # Aggregate, command, event, port traits
+│   ├── cherry-pit-gateway/    # EventStore implementations
+│   ├── pardosa/               # EDA storage layer (fiber semantics)
+│   ├── pardosa-genome/        # Binary serialization format
 │   ├── pardosa-genome-derive/ # GenomeSafe derive macro
-│   └── adr-fmt/           # ADR formatting tool
+│   └── adr-fmt/               # ADR governance tool
 ├── docs/
-└── Cargo.toml             # Workspace manifest (edition 2024, rust 1.95+)
+│   ├── adr/                   # Architecture decision records (governed by adr-fmt)
+│   ├── plans/                 # Ephemeral working drafts (consumed into code and ADRs)
+│   └── glossary.md            # Domain vocabulary across all crates
+└── Cargo.toml                 # Workspace manifest (edition 2024, rust 1.95+)
 ```
 
 Licensed under [MIT](LICENSE).

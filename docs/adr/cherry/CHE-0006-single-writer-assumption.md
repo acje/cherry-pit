@@ -1,16 +1,18 @@
 # CHE-0006. Single-Writer Assumption Per Aggregate
 
 Date: 2026-04-24
-Last-reviewed: 2026-04-25
+Last-reviewed: 2026-04-27
 Tier: S
 
 ## Status
 
 Accepted
 
+Amended 2026-04-27 — added PAR-0004 cross-reference
+
 ## Related
 
-- References: CHE-0004
+- References: CHE-0004, PAR-0004
 
 ## Context
 

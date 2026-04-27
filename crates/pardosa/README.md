@@ -4,7 +4,7 @@ EDA storage layer implementing [fiber semantics](https://github.com/acje/fiber-s
 
 Pardosa enforces event-driven correctness, auditability, and deletion policy for Event Carried State Transfer (ECST). Each domain entity's history is a **fiber** — a singly linked list of immutable events — interleaved into an append-only **line** (dragline). A per-fiber state machine (5 states, 10 transitions) governs the lifecycle: Create, Update, Detach, Rescue for application operations; Migrate(Keep), Migrate(Purge), Migrate(LockAndPrune) for schema upgrades and deletion policies.
 
-Ported from a [Go prototype](https://github.com/acje/web-service-gin) with improvements planned for concurrency, NATS/JetStream persistence, and proper migration support.
+Ported from a Go prototype with improvements for concurrency, persistence, and migration support.
 
 ## Fiber State Machine
 
@@ -16,4 +16,4 @@ The state machine defines a partial function over S × A → S where |S| = 5, |A
 
 **Migration ops** (during migration pass): Migrate(Keep), Migrate(Purge), Migrate(LockAndPrune)
 
-See [pardosa.md](pardosa.md) for research notes and design.
+Part of the [cherry-pit](../../README.md) workspace.

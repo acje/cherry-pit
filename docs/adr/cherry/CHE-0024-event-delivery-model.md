@@ -1,12 +1,15 @@
 # CHE-0024. Event Delivery Model
 
 Date: 2026-04-25
-Last-reviewed: 2026-04-25
+Last-reviewed: 2026-04-27
 Tier: B
 
 ## Status
 
 Accepted
+
+Amended 2026-04-27 — expanded Context with delivery guarantee
+  comparison
 
 ## Related
 
@@ -14,10 +17,31 @@ Accepted
 
 ## Context
 
+Event delivery systems offer three guarantee levels, each with
+different costs:
+
+| Guarantee | Mechanism | Cost | Risk |
+|-----------|-----------|------|------|
+| At-most-once | Fire and forget | None | Lost events |
+| At-least-once | ACK + retry | Retry logic, dedup | Duplicate events |
+| Exactly-once | Distributed transaction | 2PC or idempotent consumers | Complexity, latency |
+
+For event-sourced systems, exactly-once is typically achieved by
+combining at-least-once delivery with idempotent consumers — the
+event store provides the deduplication mechanism (events have unique
+IDs and are immutable once stored).
+
 `EventBus` defines `publish()` but no `subscribe()`. No code wires
 policies or projections to the bus. The CommandBus (unbuilt) owns the
 persist-then-publish lifecycle. The gap: how events flow from
 `EventBus::publish()` to `Policy::react()` and `Projection::apply()`.
+
+Cherry-pit's position: the `EventStore` provides the persistence
+guarantee (events are durably stored). The `EventBus` provides
+best-effort notification. If notification fails, consumers catch up
+by replaying from the store. This is effectively at-least-once
+delivery at the system level, even though the bus itself provides no
+delivery guarantee.
 
 ## Decision
 

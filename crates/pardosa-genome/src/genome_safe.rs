@@ -69,7 +69,8 @@ pub trait GenomeSafe {
 /// - **Platform-independent** — no locale, environment, or runtime state dependency
 ///
 /// `GenomeOrd` is a safe trait — the compiler cannot verify ordering properties.
-/// [`verify_roundtrip`] provides defense-in-depth against incorrect implementations.
+/// A planned `verify_roundtrip` function will provide defense-in-depth against
+/// incorrect implementations (genome Phase 2).
 ///
 /// # Derive Macro Integration
 ///

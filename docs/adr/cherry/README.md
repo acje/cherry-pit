@@ -15,7 +15,7 @@ Governed by [GOVERNANCE.md](../GOVERNANCE.md).
 | [CHE-0003](CHE-0003-compile-time-error-preference.md) | Compile-Time Error Preference | S | Accepted | CHE-0001, CHE-0002, CHE-0028 |
 | [CHE-0004](CHE-0004-eda-ddd-hexagonal.md) | Event-Driven Architecture with DDD and Hexagonal Architecture | S | Accepted | CHE-0001 |
 | [CHE-0005](CHE-0005-single-aggregate-design.md) | Single-Aggregate Design with Compile-Time Type Safety | S | Accepted | CHE-0001, CHE-0004, CHE-0011, CHE-0013, COM-0002 |
-| [CHE-0006](CHE-0006-single-writer-assumption.md) | Single-Writer Assumption Per Aggregate | S | Accepted | CHE-0004 |
+| [CHE-0006](CHE-0006-single-writer-assumption.md) | Single-Writer Assumption Per Aggregate | S | Accepted | CHE-0004, PAR-0004 |
 | [CHE-0007](CHE-0007-forbid-unsafe-code.md) | Forbid Unsafe Code | A | Accepted | CHE-0001 |
 | [CHE-0008](CHE-0008-pure-command-handling.md) | Pure Command Handling | A | Accepted | CHE-0001, CHE-0004, CHE-0014 |
 | [CHE-0009](CHE-0009-infallible-apply.md) | Infallible apply() on Aggregate and Projection | A | Accepted | CHE-0004, COM-0005 |
@@ -112,6 +112,7 @@ CHE-0034 jiff::Timestamp as Temporal Foundation
 |-----|--------|------|
 | CHE-0001 | COM-0001 | References |
 | CHE-0005 | COM-0002 | References |
+| CHE-0006 | PAR-0004 | References |
 | CHE-0009 | COM-0005 | References |
 | CHE-0016 | COM-0003 | References |
 | CHE-0019 | COM-0004 | References |

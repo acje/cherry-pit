@@ -1,12 +1,14 @@
 # GEN-0005. Two-Pass Serialization Architecture
 
 Date: 2026-04-25
-Last-reviewed: 2026-04-25
+Last-reviewed: 2026-04-27
 Tier: A
 
 ## Status
 
 Accepted
+
+Amended 2026-04-27 — expanded alternatives comparison in Context
 
 ## Related
 
@@ -14,11 +16,31 @@ Accepted
 
 ## Context
 
-Fixed-layout formats need to write inline scalar data and variable-length heap data
-(strings, vecs, maps, option payloads) into a single contiguous buffer. FlatBuffers
-uses a builder with back-patching. An intermediate AST approach allocates proportionally
-to the data. A two-pass approach avoids both: first pass computes sizes, second pass
-writes with exact pre-allocation.
+Fixed-layout formats need to write inline scalar data and variable-length
+heap data (strings, vecs, maps, option payloads) into a single contiguous
+buffer. Three serialization strategies were evaluated:
+
+1. **Intermediate AST.** Build a tree of nodes representing the
+   serialized structure, then flatten to bytes. Memory cost: O(n)
+   proportional to the data. Used by JSON serializers. Simple
+   implementation but high peak memory.
+
+2. **Back-patching (FlatBuffers approach).** Write data in-order,
+   patching offsets retroactively as later data resolves positions.
+   Single pass, but complex cursor management and mutable offset
+   fixups. Requires mutable offsets — incompatible with streaming
+   writes.
+
+3. **Two-pass (sizing then writing).** First pass computes exact
+   buffer size. Second pass writes with zero reallocation. Memory
+   cost: O(1) beyond the output buffer. Requires the input to be
+   traversed twice — safe for immutable serde `Serialize` impls.
+
+| Strategy | Passes | Peak memory | Complexity | Streaming |
+|----------|--------|-------------|------------|-----------|
+| AST | 1 | O(n) | Low | No |
+| Back-patching | 1 | O(1) | High | No |
+| Two-pass | 2 | O(1) | Medium | No |
 
 ## Decision
 

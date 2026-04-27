@@ -8,6 +8,8 @@ Provenance: Conversational evaluation artifact (2026-04-27), not a formal ADR
 Verified: 2026-04-27 — code-level audit against source, ADRs, and POSIX
   specifications. Two false positives removed; see Appendix A.
 
+See also: [ADR Quality Refinements](adr-quality-refinements.md)
+
 This document consolidates all improvements identified during an
 architectural review of the cherry-pit ADR corpus across 6 domains.
 Items are grouped by category and ranked by priority.
@@ -106,7 +108,8 @@ exist** — the only reference in the codebase is a doc comment at
 `genome_safe.rs:72`:
 
 ```rust
-/// [`verify_roundtrip`] provides defense-in-depth against incorrect implementations.
+/// A planned `verify_roundtrip` function will provide defense-in-depth against
+/// incorrect implementations (genome Phase 2).
 ```
 
 No function, method, or macro named `verify_roundtrip` is defined
@@ -126,10 +129,11 @@ system has no runtime check to catch the violation.
    + deliberately non-deterministic `Ord` (e.g., `AtomicU64` counter
    in the `cmp` implementation). Prove `verify_roundtrip` detects the
    canonical encoding violation.
-3. **Fix dangling doc reference:** `genome_safe.rs:72` references
+3. ~~**Fix dangling doc reference:** `genome_safe.rs:72` references
    `[verify_roundtrip]` as if it exists — this generates a broken
    intra-doc link. Update the doc comment when the function is
-   implemented.
+   implemented.~~ Done (2026-04-27) — doc comment updated to say
+   "planned" with "(genome Phase 2)" qualifier.
 
 ### 3. Cross-stream ordering semantics ADR
 
@@ -320,7 +324,9 @@ command ingestion boundary. Consider:
 
 ### 12. Amend CHE-0006 consequences for multi-node deployment
 
-**Status:** Blocked — pardosa is not yet operational with NATS.
+**Status:** Partial (2026-04-27) — cross-reference from CHE-0006 to
+PAR-0004 added. Broader amendment (multi-node routing documentation)
+remains deferred until pardosa is operational with NATS.
 
 **Finding:** CHE-0006 states "Multi-node deployment requires an
 external mechanism (NATS subject partitioning, process registry) to
@@ -341,7 +347,7 @@ deployments.
 | # | Category | Priority | Domain | Status | Action |
 |---|----------|----------|--------|--------|--------|
 | 1 | Correctness | **Lynchpin** | CHE + PAR | Blocked (design research) | Resolve composition model, then write boundary ADR |
-| 2 | Safety | Low | GEN | Deferred (genome Phase 2) | Implement verify_roundtrip when serializer exists |
+| 2 | Safety | Low | GEN | Partial (doc link fixed; steps 1-2 deferred) | Implement verify_roundtrip when serializer exists |
 | 3 | New ADR | High | PAR | Deferred (depends on #1) | Cross-stream ordering semantics |
 | 4 | Safety | Medium | PAR | Blocked (no NATS) | Orphan stream cleanup protocol |
 | 5 | New ADR | Medium | CHE/PAR | Open | CAP positioning (consolidation) |
@@ -351,7 +357,7 @@ deployments.
 | 9 | Refinement | Low | PAR | Blocked (no NATS) | Circuit breaker threshold tuning |
 | 10 | Test | Low | PAR | Blocked (no NATS) | Migration cutover under partition |
 | 11 | Refinement | Low | CHE/PAR | Blocked (no impl) | CommandGateway backpressure |
-| 12 | Refinement | Low | CHE | Blocked (no NATS) | Multi-node command routing |
+| 12 | Refinement | Low | CHE | Partial (cross-ref added) | Multi-node command routing |
 
 ---
 

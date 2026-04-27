@@ -3,6 +3,7 @@
 Date: 2026-04-27
 Updated: 2026-04-27 — evaluation verdicts and corrections added
 Source: Systematic review of ADRs against industry best practices
+See also: [ADR Improvement Backlog](adr-improvements.md)
 Provenance: Quality evaluation artifact (2026-04-27), not a formal ADR
 Benchmark: Nygard (2011), Zimmermann (2023), Fowler (2026), MADR,
   Henderson canonical repository, Michael R. David exemplar ADRs

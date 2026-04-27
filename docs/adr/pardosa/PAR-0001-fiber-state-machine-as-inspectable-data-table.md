@@ -1,12 +1,15 @@
 # PAR-0001. Fiber State Machine as Inspectable Data Table
 
 Date: 2026-04-25
-Last-reviewed: 2026-04-25
+Last-reviewed: 2026-04-27
 Tier: B
 
 ## Status
 
 Accepted
+
+Amended 2026-04-27 — prepended domain context for self-contained
+  comprehension
 
 ## Related
 
@@ -14,10 +17,21 @@ Accepted
 
 ## Context
 
-Pardosa's fiber lifecycle defines a partial function over S × A → S where |S| = 5,
-|A| = 7, yielding 35 possible pairs. Only 10 transitions are valid; the remaining
-25 are rejected. The Rust ecosystem offers several state machine crates (`statig`,
-`rust-fsm`, `sm`), but they encode transitions in macros or trait impls that are
+Pardosa models each aggregate instance's lifecycle as a **fiber** — a
+named entity with an event history anchored to a specific position in
+the line (pardosa's append-only event log). Fibers transition through
+five states: Undefined → Defined → Active → Locked → Detached. Seven
+actions drive these transitions (Create, Advance, Lock, Rescue, Detach,
+Reattach, Drop). The lifecycle must be enforced at runtime: invalid
+transitions (e.g., advancing a locked fiber) must be rejected with
+specific error messages. The design question is how to encode the
+transition function.
+
+Pardosa's fiber lifecycle defines a partial function over S × A → S
+where |S| = 5, |A| = 7, yielding 35 possible pairs. Only 10
+transitions are valid; the remaining 25 are rejected. The Rust
+ecosystem offers several state machine crates (`statig`, `rust-fsm`,
+`sm`), but they encode transitions in macros or trait impls that are
 opaque to tooling and visualization.
 
 ## Decision
