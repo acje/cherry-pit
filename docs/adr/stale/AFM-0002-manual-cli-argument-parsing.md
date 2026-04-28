@@ -3,10 +3,11 @@
 Date: 2026-04-27
 Last-reviewed: 2026-04-28
 Tier: D
-Status: Accepted
+Status: Superseded by AFM-0013
 
 ## Related
 
+Superseded-by: AFM-0013
 References: AFM-0001
 
 ## Context
@@ -40,3 +41,12 @@ output must be manually kept in sync with behavior — acceptable
 given the infrequent argument surface changes. Shell completions
 are unavailable but unnecessary for an internal dev tool invoked
 via `cargo run`.
+
+## Retirement
+
+Superseded-by: AFM-0013
+Moved-to-stale: 2026-04-28
+Reason: The argument surface grew beyond the five-flag reassessment
+trigger in R4. Six modes with additional parameters now require
+mutual exclusivity groups, help generation, and error formatting
+that clap handles automatically. Migrated to clap derive API.

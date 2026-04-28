@@ -1,12 +1,13 @@
 # AFM-0007. Compiler-Style Diagnostics on Stderr
 
 Date: 2026-04-27
-Last-reviewed: 2026-04-27
+Last-reviewed: 2026-04-28
 Tier: B
-Status: Accepted
+Status: Superseded by AFM-0014
 
 ## Related
 
+Superseded-by: AFM-0014
 References: AFM-0003
 
 ## Context
@@ -41,3 +42,13 @@ all T015 warnings"). The stderr/stdout split enables clean piping
 (`--guidelines > file.md`). Future `--format json` is compatible
 as an alternative mode. The `Diagnostic` struct is intentionally
 simple (~30 lines, no diagnostic rendering dependencies).
+
+## Retirement
+
+Superseded-by: AFM-0014
+Moved-to-stale: 2026-04-28
+Reason: All six output modes now produce unified markdown on stdout.
+The compiler-style stderr format was abandoned as adr-fmt expanded
+beyond lint-only usage. The print_diagnostic function in report.rs
+is dead code. Markdown formatting provides richer presentation
+while maintaining greppable rule IDs.

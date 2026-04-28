@@ -3,7 +3,7 @@
 Date: 2026-04-27
 Last-reviewed: 2026-04-28
 Tier: B
-Status: Accepted
+Status: Deprecated
 
 ## Related
 
@@ -40,3 +40,11 @@ never touch. The marker convention is documented in `--guidelines`.
 Generated READMEs are committed to version control for GitHub web
 UI navigation. The skip-with-warning behavior is informational, not
 blocking (per AFM-0003).
+
+## Retirement
+
+Moved-to-stale: 2026-04-28
+Reason: The marker-protected write feature was never implemented.
+The tool evolved as a read-only linter and analyzer without file
+generation capabilities. README index generation is no longer a
+planned feature.
