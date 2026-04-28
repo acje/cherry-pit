@@ -76,25 +76,25 @@ cross-references.
 
 ## 2. Tier System
 
-Tiers classify ADRs by systemic leverage, derived from Abson et al.
-(2017) and Donella Meadows' twelve leverage points. Higher tiers
-represent deeper intervention in the system — changing them reshapes
-everything below. Every ADR must be assigned a tier.
+Tiers classify ADRs by systemic leverage, derived from Donella
+Meadows' twelve leverage points. Higher tiers represent deeper
+intervention in the system — changing them reshapes everything below.
+Every ADR must be assigned a tier.
 
 Canonical tier metadata (name, description, stability) is output by
 `cargo run -p adr-fmt -- --guidelines`.
 
 ### Theoretical Foundation
 
-Abson et al. group Meadows' twelve leverage points into four system
-characteristics: Intent, Design, Feedbacks, and Parameters. This
-workspace splits Abson's "Design" grouping at the self-organization
-boundary because Meadows level 4 (the power to create new structures)
-is a distinct leverage type from levels 5–6 (rules and information
-flows governing existing structures). In software: "EventStore is a
-trait" (enables new backends — level 4) is a different kind of
-decision from "EventStore::load returns `Result<Vec<EventEnvelope>,
-StoreError>`" (constrains the contract — level 5).
+Meadows' twelve leverage points form a spectrum from shallow
+(parameter adjustments) to deep (paradigm shifts). This workspace
+groups them into five tiers by splitting at the self-organization
+boundary: Meadows level 4 (the power to create new structures) is a
+distinct leverage type from levels 5–6 (rules and information flows
+governing existing structures). In software: "EventStore is a trait"
+(enables new backends — level 4) is a different kind of decision from
+"EventStore::load returns `Result<Vec<EventEnvelope>, StoreError>`"
+(constrains the contract — level 5).
 
 ### Tier Table
 

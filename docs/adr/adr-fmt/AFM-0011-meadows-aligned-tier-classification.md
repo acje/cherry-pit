@@ -34,12 +34,13 @@ systematic ways:
    tier) — higher leverage than feedback loops (levels 7–8). This
    was a Meadows inversion.
 
-Abson et al. (2017) group Meadows' twelve leverage points into four
-system characteristics: Intent, Design, Feedbacks, Parameters. This
-workspace splits Abson's "Design" into Self-organization (Meadows
-level 4) and Rules + Information Flows (levels 5–6) because they
-represent distinct leverage types: the capacity to evolve new
-structure vs. the constraints governing existing structure.
+Meadows' twelve leverage points cluster into five distinct types when
+mapped to software architecture (a grouping inspired by Abson et
+al.'s system-characteristics taxonomy, adapted and split at the
+self-organization boundary). Level 4 — the capacity to evolve new
+structure — is separated from levels 5–6 — rules and information
+flows governing existing structure — because they represent different
+kinds of architectural decisions.
 
 Three alternatives evaluated:
 
@@ -47,10 +48,10 @@ Three alternatives evaluated:
    the decision *is* (paradigm, extension point, rule, feedback
    loop, parameter). Aligns with Meadows. Requires reframing all
    questions from "If this changed..." to "Does this define...".
-2. **Blast-radius framing, 4 tiers** — collapse to Abson's four
-   groupings, keep "If this changed..." questions. Fixes the
-   Meadows inversion but overloads the Design tier (levels 4–6 in
-   one bucket).
+2. **Blast-radius framing, 4 tiers** — collapse to four groupings
+   (levels 1–3, 4–6, 7–8, 9–12), keep "If this changed..."
+   questions. Fixes the Meadows inversion but overloads the Design
+   tier (levels 4–6 in one bucket).
 3. **Keep AFM-0010 as-is** — accept the Meadows misalignment.
 
 Option 1 chosen: system-characteristic framing provides correct

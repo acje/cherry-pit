@@ -104,8 +104,8 @@ signal.
 Tier: A
 ```
 
-Architectural significance level derived from Meadows' leverage
-points via Abson et al. (2017). Determines sort order in `--context`
+Architectural significance level derived from Donella Meadows' twelve
+leverage points. Determines sort order in `--context`
 output (S first, D last). Uses **system-characteristic framing** —
 classify by what the decision *is*, not by blast radius. First-yes-
 wins: start at S, assign the first tier whose question yields "yes."
