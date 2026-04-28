@@ -21,6 +21,9 @@ R1 [10]: Write all data to a temporary file then rename to the target
   path for atomic writes
 R2 [10]: On rename failure clean up the temp file on a best-effort
   basis
+R3 [10]: Call File::sync_all on the temp file before rename and sync
+  the parent directory after rename to guarantee data durability
+  across power failure
 
 1. Serialize envelopes to bytes in memory.
 2. Write bytes to `{filename}.tmp` in the store directory.

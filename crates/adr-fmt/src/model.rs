@@ -237,6 +237,56 @@ impl Tier {
             Self::D => 4,
         }
     }
+
+    /// Tier-scaling factor for word count and rule limits.
+    ///
+    /// S-tier decisions are broad (paradigm-level) and get more room.
+    /// D-tier decisions are narrow (parameters) and should be tighter.
+    /// Applied as a multiplier to `max_words` and `max_rules` base values.
+    #[must_use]
+    pub fn factor(self) -> f64 {
+        match self {
+            Self::S => 1.5,
+            Self::A => 1.2,
+            Self::B => 1.0,
+            Self::C => 0.8,
+            Self::D => 0.6,
+        }
+    }
+
+    /// Tier-scaled minimum word count for prose sections.
+    ///
+    /// Higher-tier ADRs need more substance; lower-tier can be brief.
+    #[must_use]
+    pub fn min_words(self) -> u64 {
+        match self {
+            Self::S => 15,
+            Self::A => 12,
+            Self::B => 10,
+            Self::C => 7,
+            Self::D => 7,
+        }
+    }
+
+    /// Tier-scaled maximum reference count (References: targets only).
+    ///
+    /// Root and Supersedes are structural, not content dependencies,
+    /// and do not count toward the load limit.
+    ///
+    /// The curve is non-monotonic: C-tier peaks at 8 (feedback loops
+    /// often coordinate many components) while D-tier drops to 5
+    /// (parameter decisions should have narrow scope). S-tier is
+    /// tightest at 3 — paradigm decisions reference few peers.
+    #[must_use]
+    pub fn max_refs(self) -> usize {
+        match self {
+            Self::S => 3,
+            Self::A => 5,
+            Self::B => 7,
+            Self::C => 8,
+            Self::D => 5,
+        }
+    }
 }
 
 /// ADR lifecycle status.
@@ -668,6 +718,32 @@ mod tests {
         assert!(Tier::B.rank() < Tier::C.rank());
         assert!(Tier::C.rank() < Tier::D.rank());
         assert_eq!(Tier::D.rank(), 4);
+    }
+
+    #[test]
+    fn tier_factor_ordering() {
+        assert!(Tier::S.factor() > Tier::A.factor());
+        assert!(Tier::A.factor() > Tier::B.factor());
+        assert!((Tier::B.factor() - 1.0).abs() < f64::EPSILON);
+        assert!(Tier::C.factor() < Tier::B.factor());
+        assert!(Tier::D.factor() < Tier::C.factor());
+    }
+
+    #[test]
+    fn tier_min_words_ordering() {
+        assert!(Tier::S.min_words() >= Tier::A.min_words());
+        assert!(Tier::A.min_words() >= Tier::B.min_words());
+        assert!(Tier::B.min_words() >= Tier::C.min_words());
+        assert!(Tier::C.min_words() >= Tier::D.min_words());
+    }
+
+    #[test]
+    fn tier_max_refs_values() {
+        assert_eq!(Tier::S.max_refs(), 3);
+        assert_eq!(Tier::A.max_refs(), 5);
+        assert_eq!(Tier::B.max_refs(), 7);
+        assert_eq!(Tier::C.max_refs(), 8);
+        assert_eq!(Tier::D.max_refs(), 5);
     }
 
     #[test]

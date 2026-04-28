@@ -28,6 +28,9 @@ R3 [5]: Configuration parameters must have sensible defaults that
   produce correct behavior without caller configuration
 R4 [6]: When a module can handle an error internally through retry,
   fallback, or default, it must not propagate the error to the caller
+R5 [6]: When a module absorbs an error internally, emit a structured
+  log entry or metric at the absorption point so failure patterns
+  remain observable
 
 ## Consequences
 

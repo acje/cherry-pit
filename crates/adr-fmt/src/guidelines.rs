@@ -222,22 +222,43 @@ fn print_template() {
     println!("    T011  Code block size limit (max 20 lines)");
     println!("    T014  Section order (Related → Context → Decision → Consequences)");
     println!(
-        "    T015  Section word count — signal, not gate. Exceeding the limit"
+        "    T015  Section word count — tier-scaled signal, not gate."
     );
     println!(
-        "          (default 7–100) flags the section for review: it may be"
+        "          Limits scale with tier: S-tier ADRs get more room,"
     );
     println!(
-        "          overloaded or genuinely need the space. Override in adr-fmt.toml."
+        "          D-tier must be tighter. Flags the section for review."
     );
     println!(
-        "    T016  Tagged rules — signal, not gate. Limits (max 10 rules,"
+        "    T016  Tagged rules — tier-scaled signal, not gate. Max rules"
     );
     println!(
-        "          7–60 words, sequential IDs, layer 1–12) flag ADRs for review."
+        "          scales with tier. Word count (7–60), sequential IDs,"
     );
     println!(
-        "          Exceeding max rules may indicate the ADR covers multiple decisions."
+        "          layer 1–12 still enforced. Exceeding may indicate"
+    );
+    println!(
+        "          the ADR covers multiple decisions."
+    );
+    println!(
+        "    T019  Rule-tier tension — flags rules whose Meadows layer"
+    );
+    println!(
+        "          implies a tier >1 rank from the ADR's tier. Move rule"
+    );
+    println!(
+        "          to a matching-tier ADR or adjust the layer annotation."
+    );
+    println!(
+        "    T020  Reference load — tier-scaled limit on References:"
+    );
+    println!(
+        "          count. Root and Supersedes are structural and don't"
+    );
+    println!(
+        "          count. High reference count signals broad scope."
     );
     println!();
 }
@@ -263,10 +284,20 @@ fn print_tagged_rules() {
     println!();
     println!("  Constraints (signals — exceeding warrants review, not rejection):");
     println!("    • At least 1 tagged rule per Decision section (all statuses)");
-    println!("    • Maximum 10 rules per ADR — more may indicate overloaded scope");
+    println!("    • Max rules are tier-scaled (S=15, A=12, B=10, C=8, D=6)");
     println!("    • IDs must be sequential (R1, R2, R3 — no gaps)");
     println!("    • Each rule: 7–60 words");
     println!("    • Layer must be 1–12 (Meadows leverage points)");
+    println!("    • Rule-tier tension: layer-derived tier should be within");
+    println!("      1 rank of the ADR's tier (T019)");
+    println!();
+
+    println!("  Tier scaling (applied to max_words and max_rules base values):");
+    println!("    S  factor=1.5  min_words=15  max_refs=3");
+    println!("    A  factor=1.2  min_words=12  max_refs=5");
+    println!("    B  factor=1.0  min_words=10  max_refs=7");
+    println!("    C  factor=0.8  min_words=7   max_refs=8");
+    println!("    D  factor=0.6  min_words=7   max_refs=5");
     println!();
 }
 
@@ -324,6 +355,7 @@ fn print_link_rules() {
     println!("    L007  Stale reference — link to stale archive ADR");
     println!("    L008  Root self-reference mismatch");
     println!("    L009  Root + References coexistence");
+    println!("    T020  Reference load — tier-scaled max on References: count");
     println!();
 }
 

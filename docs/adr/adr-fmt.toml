@@ -104,8 +104,11 @@ crates = ["adr-fmt"]
 # Only declare rules whose defaults you want to change.
 # Hardcoded defaults: T015 min_words=7, max_words=50
 #                     T016 max_rules=10, min_rule_words=7, max_rule_words=60
+#                     T019 tier-distance threshold=1 (not configurable)
+#                     T020 max_refs per tier: S=3 A=5 B=7 C=8 D=5 (not configurable)
 #
-# T015 and T016 are signals, not gates. Exceeding the limit flags
+# T015 and T016 limits are scaled by tier factor (S=1.5 A=1.2 B=1.0 C=0.8 D=0.6).
+# All four are signals, not gates. Exceeding the limit flags
 # an ADR for review — it may be overloaded or genuinely need the
 # space. A warning here is interesting, not necessarily wrong.
 

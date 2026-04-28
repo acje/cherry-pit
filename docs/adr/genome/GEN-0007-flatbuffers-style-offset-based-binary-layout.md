@@ -41,6 +41,8 @@ R3 [5]: Strings and bytes use 4-byte offset inline pointing to heap
   len-prefixed data
 R4 [5]: Enums use discriminant-u32 plus offset-u32 inline pointing to
   heap variant data
+R5 [5]: All u32 offsets are absolute byte positions measured from the
+  start of the message buffer data region
 
 ## Consequences
 

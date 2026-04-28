@@ -1,4 +1,4 @@
-//! Template compliance rules (T001–T016) and structure rules (S004–S006).
+//! Template compliance rules (T001–T020) and structure rules (S004–S006).
 //!
 //! T001: H1 title present
 //! T002: Date field present
@@ -14,14 +14,16 @@
 //! T010: Consequences section present
 //! T011: Code block exceeds 20 lines (warning)
 //! T014: Section ordering — H2 sections in canonical order
-//! T015: Section word count range (min 7, max 50; configurable)
-//! T016: Tagged rules validation (exist, sequential, max 10, 7-50 words each)
+//! T015: Section word count range — tier-scaled (configurable base)
+//! T016: Tagged rules validation — tier-scaled max count, 7–60 words each
+//! T019: Rule-tier tension — layer-derived tier >1 rank from ADR tier
+//! T020: Reference load — tier-scaled max on References: count
 //! S004: Stale ADR missing Retirement section
 //! S005: Active ADR has Retirement section (location/status mismatch)
 //! S006: Terminal-status ADR not in stale directory
 
 use crate::config::Config;
-use crate::model::{AdrRecord, Status};
+use crate::model::{AdrRecord, Status, Tier, layer_to_tier};
 use crate::report::Diagnostic;
 
 /// Maximum lines in a single fenced code block before T011 fires.
@@ -74,26 +76,37 @@ pub fn check(record: &AdrRecord, config: &Config, diags: &mut Vec<Diagnostic>) {
     check_structure(record, diags);
     check_section_order(record, diags);
 
-    // T015: Section word count range (applies to Context, Consequences, Retirement)
-    let min_words = config
-        .rule_param_u64("T015", "min_words")
-        .unwrap_or(DEFAULT_MIN_WORDS);
-    let max_words = config
+    // Resolve tier for scaling (default to B when missing — T004 fires separately)
+    let tier = record.tier.unwrap_or(Tier::B);
+
+    // T015: Section word count range — tier-scaled
+    let base_max_words = config
         .rule_param_u64("T015", "max_words")
         .unwrap_or(DEFAULT_MAX_WORDS);
-    check_section_word_counts(record, min_words, max_words, diags);
+    let effective_min = tier.min_words();
+    #[allow(clippy::cast_sign_loss)]
+    let effective_max = (base_max_words as f64 * tier.factor()).round() as u64;
+    check_section_word_counts(record, effective_min, effective_max, tier, diags);
 
-    // T016: Tagged rules in Decision section
-    let max_rules = config
+    // T016: Tagged rules in Decision section — tier-scaled max
+    let base_max_rules = config
         .rule_param_u64("T016", "max_rules")
         .unwrap_or(DEFAULT_MAX_RULES);
+    #[allow(clippy::cast_sign_loss)]
+    let effective_max_rules = (base_max_rules as f64 * tier.factor()).round() as u64;
     let min_rule_words = config
         .rule_param_u64("T016", "min_rule_words")
         .unwrap_or(DEFAULT_MIN_RULE_WORDS);
     let max_rule_words = config
         .rule_param_u64("T016", "max_rule_words")
         .unwrap_or(DEFAULT_MAX_RULE_WORDS);
-    check_tagged_rules(record, max_rules, min_rule_words, max_rule_words, diags);
+    check_tagged_rules(record, tier, effective_max_rules, min_rule_words, max_rule_words, diags);
+
+    // T019: Rule-tier tension — fire when Meadows layer implies a tier >1 rank from ADR tier
+    check_rule_tier_tension(record, tier, diags);
+
+    // T020: Reference load — tier-scaled limit on References: count
+    check_reference_load(record, tier, diags);
 
     check_stale_lifecycle(record, config, diags);
 }
@@ -383,10 +396,13 @@ fn check_section_order(record: &AdrRecord, diags: &mut Vec<Diagnostic>) {
 ///
 /// Applies to Context, Consequences, and Retirement only.
 /// Decision section is validated by T016 (rule count, not word count).
+/// Min and max are tier-scaled: higher-tier ADRs need more substance,
+/// lower-tier ADRs should be tighter.
 fn check_section_word_counts(
     record: &AdrRecord,
     min_words: u64,
     max_words: u64,
+    tier: Tier,
     diags: &mut Vec<Diagnostic>,
 ) {
     let prose_sections = ["Context", "Consequences"];
@@ -399,8 +415,8 @@ fn check_section_word_counts(
                     &record.file_path,
                     0,
                     format!(
-                        "`## {section}` has {count} word(s) (minimum {min_words}) — \
-                         provide meaningful content"
+                        "`## {section}` has {count} word(s) ({tier}-tier minimum {min_words}) — \
+                         provide more context"
                     ),
                 ));
             } else if (count as u64) > max_words {
@@ -409,8 +425,8 @@ fn check_section_word_counts(
                     &record.file_path,
                     0,
                     format!(
-                        "`## {section}` has {count} word(s) (maximum {max_words}) — \
-                         be concise, split into multiple ADRs if needed"
+                        "`## {section}` has {count} word(s) ({tier}-tier limit {max_words}) — \
+                         consider tightening prose, splitting, or re-tiering"
                     ),
                 ));
             }
@@ -427,7 +443,7 @@ fn check_section_word_counts(
                 &record.file_path,
                 0,
                 format!(
-                    "`## Retirement` has {count} word(s) (minimum {min_words}) — \
+                    "`## Retirement` has {count} word(s) ({tier}-tier minimum {min_words}) — \
                      explain why this ADR was retired"
                 ),
             ));
@@ -437,7 +453,7 @@ fn check_section_word_counts(
                 &record.file_path,
                 0,
                 format!(
-                    "`## Retirement` has {count} word(s) (maximum {max_words}) — \
+                    "`## Retirement` has {count} word(s) ({tier}-tier limit {max_words}) — \
                      be concise"
                 ),
             ));
@@ -450,11 +466,12 @@ fn check_section_word_counts(
 /// Checks:
 /// - At least one tagged rule present (all statuses)
 /// - Sequential IDs (R1, R2, R3 — no gaps)
-/// - Maximum rule count (default 10)
-/// - Word count per rule (default 7-50)
+/// - Maximum rule count (tier-scaled)
+/// - Word count per rule (default 7-60)
 /// - Layer range: 1-12 (Meadows leverage points)
 fn check_tagged_rules(
     record: &AdrRecord,
+    tier: Tier,
     max_rules: u64,
     min_rule_words: u64,
     max_rule_words: u64,
@@ -471,15 +488,15 @@ fn check_tagged_rules(
         return;
     }
 
-    // Check maximum rule count
+    // Check maximum rule count (tier-scaled)
     if record.decision_rules.len() as u64 > max_rules {
         diags.push(Diagnostic::warning(
             "T016",
             &record.file_path,
             0,
             format!(
-                "Decision section has {} tagged rules (maximum {max_rules}) — \
-                 split into multiple ADRs",
+                "Decision section has {} tagged rules ({tier}-tier limit {max_rules}) — \
+                 some tension is expected; consider splitting or re-tiering if scope is broad",
                 record.decision_rules.len(),
             ),
         ));
@@ -555,6 +572,66 @@ fn check_tagged_rules(
     }
 }
 
+/// T019: Rule-tier tension — flag rules whose Meadows layer implies
+/// a tier more than 1 rank from the ADR's tier.
+///
+/// A D-tier ADR with S-tier rules (or vice versa) signals the rule is
+/// at the wrong level of abstraction. Move it to a higher/lower-tier
+/// ADR or adjust the layer annotation.
+fn check_rule_tier_tension(record: &AdrRecord, adr_tier: Tier, diags: &mut Vec<Diagnostic>) {
+    let adr_rank = adr_tier.rank();
+
+    for rule in &record.decision_rules {
+        let Some(rule_tier) = layer_to_tier(rule.layer) else {
+            continue; // Invalid layer already caught by T016
+        };
+        let rule_rank = rule_tier.rank();
+        let distance = adr_rank.abs_diff(rule_rank);
+        if distance > 1 {
+            diags.push(Diagnostic::warning(
+                "T019",
+                &record.file_path,
+                rule.line,
+                format!(
+                    "Rule {} at layer {} ({rule_tier:?}-tier) is {distance} tiers \
+                     from ADR tier {adr_tier} — tension may be intentional; \
+                     consider adjusting layer, splitting rule to a {rule_tier:?}-tier ADR, \
+                     or re-tiering this ADR",
+                    rule.id, rule.layer,
+                ),
+            ));
+        }
+    }
+}
+
+/// T020: Reference load — tier-scaled limit on `References:` count.
+///
+/// Only `References:` targets count toward load. `Root:` and `Supersedes:`
+/// are structural relationships, not content dependencies. High reference
+/// count signals broad scope that may warrant splitting.
+fn check_reference_load(record: &AdrRecord, tier: Tier, diags: &mut Vec<Diagnostic>) {
+    use crate::model::RelVerb;
+
+    let ref_count = record
+        .relationships
+        .iter()
+        .filter(|r| r.verb == RelVerb::References)
+        .count();
+
+    let max_refs = tier.max_refs();
+    if ref_count > max_refs {
+        diags.push(Diagnostic::warning(
+            "T020",
+            &record.file_path,
+            0,
+            format!(
+                "{ref_count} references ({tier}-tier limit {max_refs}) — \
+                 may indicate broad scope; consider splitting or promoting to a higher tier",
+            ),
+        ));
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -626,6 +703,7 @@ params = { max_rules = 10, min_rule_words = 7, max_rule_words = 60 }
     fn valid_record_produces_no_diagnostics() {
         use crate::model::{RelVerb, Relationship, TaggedRule};
         let mut record = make_record();
+        record.tier = Some(Tier::B); // B-tier so layer 5 aligns (no T019)
         record.relationships = vec![Relationship {
             verb: RelVerb::Root,
             target: record.id.clone(),
@@ -823,13 +901,14 @@ params = { max_rules = 10, min_rule_words = 7, max_rule_words = 60 }
     #[test]
     fn section_too_many_words_produces_t015() {
         let mut record = make_record();
+        record.tier = Some(Tier::B); // B-tier: factor 1.0, max=50
         record.section_word_counts.insert("Context".into(), 60);
         let config = make_config();
         let mut diags = Vec::new();
         check(&record, &config, &mut diags);
         let t015 = diags
             .iter()
-            .find(|d| d.rule == "T015" && d.message.contains("maximum"));
+            .find(|d| d.rule == "T015" && d.message.contains("limit"));
         assert!(
             t015.is_some(),
             "60 words should trigger T015 max, got: {diags:?}"
@@ -1022,12 +1101,13 @@ params = { max_rules = 10, min_rule_words = 7, max_rule_words = 60 }
     fn too_many_rules_produces_t016() {
         use crate::model::TaggedRule;
         let mut record = make_record();
+        record.tier = Some(Tier::B); // B-tier: factor 1.0, max_rules=10
         record.decision_rules = (1..=11)
             .map(|i| TaggedRule {
                 id: format!("R{i}"),
                 text: "This rule has enough words to pass the minimum check here".into(),
                 line: 10 + i,
-                layer: 5,
+                layer: 5, // B-tier layer — no T019 tension
             })
             .collect();
         let config = make_config();
@@ -1035,10 +1115,10 @@ params = { max_rules = 10, min_rule_words = 7, max_rule_words = 60 }
         check(&record, &config, &mut diags);
         let t016_max = diags
             .iter()
-            .find(|d| d.rule == "T016" && d.message.contains("maximum"));
+            .find(|d| d.rule == "T016" && d.message.contains("limit"));
         assert!(
             t016_max.is_some(),
-            "11 rules should trigger T016 max (limit 10), got: {diags:?}"
+            "11 rules should trigger T016 max (B-tier limit 10), got: {diags:?}"
         );
     }
 
@@ -1046,12 +1126,13 @@ params = { max_rules = 10, min_rule_words = 7, max_rule_words = 60 }
     fn ten_rules_within_limit() {
         use crate::model::TaggedRule;
         let mut record = make_record();
+        record.tier = Some(Tier::B); // B-tier: factor 1.0, max_rules=10
         record.decision_rules = (1..=10)
             .map(|i| TaggedRule {
                 id: format!("R{i}"),
                 text: "This rule has enough words to pass the minimum check here".into(),
                 line: 10 + i,
-                layer: 5,
+                layer: 5, // B-tier layer — no T019 tension
             })
             .collect();
         let config = make_config();
@@ -1059,7 +1140,7 @@ params = { max_rules = 10, min_rule_words = 7, max_rule_words = 60 }
         check(&record, &config, &mut diags);
         let t016_max = diags
             .iter()
-            .find(|d| d.rule == "T016" && d.message.contains("maximum"));
+            .find(|d| d.rule == "T016" && d.message.contains("limit"));
         assert!(
             t016_max.is_none(),
             "10 rules should not trigger T016 max, got: {diags:?}"
@@ -1283,6 +1364,386 @@ params = { max_rules = 10, min_rule_words = 7, max_rule_words = 60 }
         assert!(
             !diags.iter().any(|d| d.rule == "T005c"),
             "missing status should not produce T005c, got: {diags:?}"
+        );
+    }
+
+    // ── T015 tier-scaling tests ────────────────────────────────────
+
+    #[test]
+    fn t015_s_tier_allows_more_words() {
+        let mut record = make_record();
+        record.tier = Some(Tier::S); // factor 1.5, max=75
+        record.section_word_counts.insert("Context".into(), 70);
+        let config = make_config();
+        let mut diags = Vec::new();
+        check(&record, &config, &mut diags);
+        assert!(
+            !diags.iter().any(|d| d.rule == "T015"),
+            "70 words should be within S-tier limit (75), got: {diags:?}"
+        );
+    }
+
+    #[test]
+    fn t015_d_tier_tighter_limit() {
+        let mut record = make_record();
+        record.tier = Some(Tier::D); // factor 0.6, max=30
+        record.section_word_counts.insert("Context".into(), 35);
+        let config = make_config();
+        let mut diags = Vec::new();
+        check(&record, &config, &mut diags);
+        let t015 = diags
+            .iter()
+            .find(|d| d.rule == "T015" && d.message.contains("D-tier"));
+        assert!(
+            t015.is_some(),
+            "35 words should trigger T015 at D-tier (limit 30), got: {diags:?}"
+        );
+    }
+
+    #[test]
+    fn t015_s_tier_higher_minimum() {
+        let mut record = make_record();
+        record.tier = Some(Tier::S); // min_words=15
+        record.section_word_counts.insert("Context".into(), 10);
+        let config = make_config();
+        let mut diags = Vec::new();
+        check(&record, &config, &mut diags);
+        let t015 = diags
+            .iter()
+            .find(|d| d.rule == "T015" && d.message.contains("S-tier minimum"));
+        assert!(
+            t015.is_some(),
+            "10 words should trigger T015 min at S-tier (min 15), got: {diags:?}"
+        );
+    }
+
+    // ── T016 tier-scaling tests ────────────────────────────────────
+
+    #[test]
+    fn t016_d_tier_fewer_rules_allowed() {
+        use crate::model::TaggedRule;
+        let mut record = make_record();
+        record.tier = Some(Tier::D); // factor 0.6, max_rules=6
+        record.decision_rules = (1..=7)
+            .map(|i| TaggedRule {
+                id: format!("R{i}"),
+                text: "This rule has enough words to pass the minimum check here".into(),
+                line: 10 + i,
+                layer: 10, // D-tier layer — no T019 tension
+            })
+            .collect();
+        let config = make_config();
+        let mut diags = Vec::new();
+        check(&record, &config, &mut diags);
+        let t016 = diags
+            .iter()
+            .find(|d| d.rule == "T016" && d.message.contains("D-tier"));
+        assert!(
+            t016.is_some(),
+            "7 rules should trigger T016 at D-tier (limit 6), got: {diags:?}"
+        );
+    }
+
+    // ── T019 rule-tier tension tests ───────────────────────────────
+
+    #[test]
+    fn t019_aligned_rules_no_warning() {
+        use crate::model::TaggedRule;
+        let mut record = make_record();
+        record.tier = Some(Tier::B);
+        record.decision_rules = vec![TaggedRule {
+            id: "R1".into(),
+            text: "All events must be versioned with semantic version numbers always".into(),
+            line: 10,
+            layer: 5, // B-tier layer, B-tier ADR → distance 0
+        }];
+        let config = make_config();
+        let mut diags = Vec::new();
+        check(&record, &config, &mut diags);
+        assert!(
+            !diags.iter().any(|d| d.rule == "T019"),
+            "aligned rules should not trigger T019, got: {diags:?}"
+        );
+    }
+
+    #[test]
+    fn t019_adjacent_tier_no_warning() {
+        use crate::model::TaggedRule;
+        let mut record = make_record();
+        record.tier = Some(Tier::B);
+        record.decision_rules = vec![TaggedRule {
+            id: "R1".into(),
+            text: "All events must be versioned with semantic version numbers always".into(),
+            line: 10,
+            layer: 4, // A-tier layer, B-tier ADR → distance 1 (OK)
+        }];
+        let config = make_config();
+        let mut diags = Vec::new();
+        check(&record, &config, &mut diags);
+        assert!(
+            !diags.iter().any(|d| d.rule == "T019"),
+            "distance-1 should not trigger T019, got: {diags:?}"
+        );
+    }
+
+    #[test]
+    fn t019_large_distance_produces_warning() {
+        use crate::model::TaggedRule;
+        let mut record = make_record();
+        record.tier = Some(Tier::D); // rank 4
+        record.decision_rules = vec![TaggedRule {
+            id: "R1".into(),
+            text: "All events must be versioned with semantic version numbers always".into(),
+            line: 10,
+            layer: 1, // S-tier layer, rank 0 → distance 4
+        }];
+        let config = make_config();
+        let mut diags = Vec::new();
+        check(&record, &config, &mut diags);
+        let t019 = diags.iter().find(|d| d.rule == "T019");
+        assert!(t019.is_some(), "distance 4 should trigger T019, got: {diags:?}");
+        assert!(
+            t019.unwrap().message.contains("4 tiers"),
+            "message should mention distance: {}",
+            t019.unwrap().message
+        );
+    }
+
+    #[test]
+    fn t019_distance_two_produces_warning() {
+        use crate::model::TaggedRule;
+        let mut record = make_record();
+        record.tier = Some(Tier::S); // rank 0
+        record.decision_rules = vec![TaggedRule {
+            id: "R1".into(),
+            text: "All events must be versioned with semantic version numbers always".into(),
+            line: 10,
+            layer: 5, // B-tier layer, rank 2 → distance 2
+        }];
+        let config = make_config();
+        let mut diags = Vec::new();
+        check(&record, &config, &mut diags);
+        let t019 = diags.iter().find(|d| d.rule == "T019");
+        assert!(t019.is_some(), "distance 2 should trigger T019, got: {diags:?}");
+    }
+
+    // ── T020 reference load tests ──────────────────────────────────
+
+    #[test]
+    fn t020_within_limit_no_warning() {
+        use crate::model::{AdrId, RelVerb, Relationship};
+        let mut record = make_record();
+        record.tier = Some(Tier::B); // max_refs=7
+        record.relationships = (1..=7)
+            .map(|i| Relationship {
+                verb: RelVerb::References,
+                target: AdrId {
+                    prefix: "CHE".into(),
+                    number: i,
+                },
+                line: 10 + i as usize,
+            })
+            .collect();
+        let config = make_config();
+        let mut diags = Vec::new();
+        check(&record, &config, &mut diags);
+        assert!(
+            !diags.iter().any(|d| d.rule == "T020"),
+            "7 refs at B-tier (limit 7) should not trigger T020, got: {diags:?}"
+        );
+    }
+
+    #[test]
+    fn t020_over_limit_produces_warning() {
+        use crate::model::{AdrId, RelVerb, Relationship};
+        let mut record = make_record();
+        record.tier = Some(Tier::B); // max_refs=7
+        record.relationships = (1..=8)
+            .map(|i| Relationship {
+                verb: RelVerb::References,
+                target: AdrId {
+                    prefix: "CHE".into(),
+                    number: i,
+                },
+                line: 10 + i as usize,
+            })
+            .collect();
+        let config = make_config();
+        let mut diags = Vec::new();
+        check(&record, &config, &mut diags);
+        let t020 = diags.iter().find(|d| d.rule == "T020");
+        assert!(
+            t020.is_some(),
+            "8 refs at B-tier (limit 7) should trigger T020, got: {diags:?}"
+        );
+    }
+
+    #[test]
+    fn t020_root_and_supersedes_not_counted() {
+        use crate::model::{AdrId, RelVerb, Relationship};
+        let mut record = make_record();
+        record.tier = Some(Tier::S); // max_refs=3
+        record.relationships = vec![
+            Relationship {
+                verb: RelVerb::Root,
+                target: record.id.clone(),
+                line: 10,
+            },
+            Relationship {
+                verb: RelVerb::Supersedes,
+                target: AdrId {
+                    prefix: "CHE".into(),
+                    number: 99,
+                },
+                line: 11,
+            },
+            Relationship {
+                verb: RelVerb::References,
+                target: AdrId {
+                    prefix: "CHE".into(),
+                    number: 2,
+                },
+                line: 12,
+            },
+        ];
+        let config = make_config();
+        let mut diags = Vec::new();
+        check(&record, &config, &mut diags);
+        assert!(
+            !diags.iter().any(|d| d.rule == "T020"),
+            "only 1 References: should not trigger T020 at S-tier (limit 3), got: {diags:?}"
+        );
+    }
+
+    #[test]
+    fn t020_s_tier_tight_limit() {
+        use crate::model::{AdrId, RelVerb, Relationship};
+        let mut record = make_record();
+        record.tier = Some(Tier::S); // max_refs=3
+        record.relationships = (1..=4)
+            .map(|i| Relationship {
+                verb: RelVerb::References,
+                target: AdrId {
+                    prefix: "COM".into(),
+                    number: i,
+                },
+                line: 10 + i as usize,
+            })
+            .collect();
+        let config = make_config();
+        let mut diags = Vec::new();
+        check(&record, &config, &mut diags);
+        let t020 = diags.iter().find(|d| d.rule == "T020");
+        assert!(
+            t020.is_some(),
+            "4 refs at S-tier (limit 3) should trigger T020, got: {diags:?}"
+        );
+        assert!(
+            t020.unwrap().message.contains("S-tier"),
+            "message should mention tier"
+        );
+    }
+
+    // ── Rounding edge case tests ───────────────────────────────────
+
+    #[test]
+    fn t015_fractional_rounding_uses_round_not_floor() {
+        // base_max_words=33, D-tier factor=0.6 → 33*0.6=19.8 → round=20
+        let mut record = make_record();
+        record.tier = Some(Tier::D);
+        // 20 words should be within limit (rounded up from 19.8)
+        record.section_word_counts.insert("Context".into(), 20);
+        let config: Config = toml::from_str(
+            r#"
+[stale]
+directory = "stale"
+
+[[domains]]
+prefix = "CHE"
+name = "Cherry"
+directory = "cherry"
+description = "Test"
+crates = []
+
+[[rules]]
+id = "T015"
+params = { min_words = 7, max_words = 33 }
+
+[[rules]]
+id = "T016"
+params = { max_rules = 10, min_rule_words = 7, max_rule_words = 60 }
+"#,
+        )
+        .unwrap();
+        let mut diags = Vec::new();
+        check(&record, &config, &mut diags);
+        assert!(
+            !diags.iter().any(|d| d.rule == "T015" && d.message.contains("limit")),
+            "20 words should be within D-tier limit (33*0.6=19.8→20), got: {diags:?}"
+        );
+    }
+
+    #[test]
+    fn t015_fractional_rounding_boundary_plus_one_fires() {
+        // base_max_words=33, D-tier factor=0.6 → round(19.8)=20 → 21 exceeds
+        let mut record = make_record();
+        record.tier = Some(Tier::D);
+        record.section_word_counts.insert("Context".into(), 21);
+        let config: Config = toml::from_str(
+            r#"
+[stale]
+directory = "stale"
+
+[[domains]]
+prefix = "CHE"
+name = "Cherry"
+directory = "cherry"
+description = "Test"
+crates = []
+
+[[rules]]
+id = "T015"
+params = { min_words = 7, max_words = 33 }
+
+[[rules]]
+id = "T016"
+params = { max_rules = 10, min_rule_words = 7, max_rule_words = 60 }
+"#,
+        )
+        .unwrap();
+        let mut diags = Vec::new();
+        check(&record, &config, &mut diags);
+        assert!(
+            diags.iter().any(|d| d.rule == "T015" && d.message.contains("D-tier limit 20")),
+            "21 words should trigger T015 at D-tier (limit 20), got: {diags:?}"
+        );
+    }
+
+    // ── T019 missing tier fallback test ─────────────────────────────
+
+    #[test]
+    fn t019_missing_tier_defaults_to_b() {
+        use crate::model::TaggedRule;
+        let mut record = make_record();
+        record.tier = None; // defaults to B (rank 2)
+        record.decision_rules = vec![TaggedRule {
+            id: "R1".into(),
+            text: "All events must be versioned with semantic version numbers always".into(),
+            line: 10,
+            layer: 1, // S-tier (rank 0) → distance 2 from B → fires
+        }];
+        let config = make_config();
+        let mut diags = Vec::new();
+        check(&record, &config, &mut diags);
+        let t019 = diags.iter().find(|d| d.rule == "T019");
+        assert!(
+            t019.is_some(),
+            "S-tier rule in missing-tier (default B) ADR should trigger T019, got: {diags:?}"
+        );
+        assert!(
+            t019.unwrap().message.contains("2 tiers"),
+            "distance should be 2 (B→S): {}",
+            t019.unwrap().message
         );
     }
 }
