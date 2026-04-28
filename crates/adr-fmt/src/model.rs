@@ -162,11 +162,11 @@ impl Tier {
     /// Human-readable tier name.
     pub fn name(self) -> &'static str {
         match self {
-            Self::S => "Foundational",
-            Self::A => "Core",
-            Self::B => "Behavioural",
-            Self::C => "Tooling",
-            Self::D => "Detail",
+            Self::S => "Intent",
+            Self::A => "Self-organization",
+            Self::B => "Design",
+            Self::C => "Feedbacks",
+            Self::D => "Parameters",
         }
     }
 
@@ -174,22 +174,25 @@ impl Tier {
     pub fn description(self) -> &'static str {
         match self {
             Self::S => {
-                "Design philosophy or architecture pattern — changing \
-                        reverberates through every crate and every downstream consumer."
+                "Paradigm, goals, or governance — changing reshapes the \
+                        system's purpose and every tier below it."
             }
             Self::A => {
-                "Core trait design or invariant — changing requires major \
-                        refactoring across multiple crates."
+                "Extension points and structural evolvability — changing \
+                        alters what the system can become."
             }
             Self::B => {
-                "Behavioural contracts and API semantics — changing requires \
-                        coordinated updates across call sites."
+                "Type contracts, API boundaries, and information flows — \
+                        changing requires coordinated updates across crates."
             }
             Self::C => {
-                "Tooling, DX, and build decisions — changing is localized to \
-                        configuration or test infrastructure."
+                "Runtime behaviour and interaction dynamics — changing \
+                        requires coordinated call-site updates."
             }
-            Self::D => "Implementation detail — changing affects one crate's internals.",
+            Self::D => {
+                "Implementation details and tooling configuration — \
+                        changing affects only crate internals."
+            }
         }
     }
 
@@ -199,7 +202,7 @@ impl Tier {
             Self::S => "Immutable post-1.0",
             Self::A => "Near-immutable; changes require RFC-level discussion",
             Self::B => "Stable; changes documented via git history",
-            Self::C => "Flexible; changes append monotonically",
+            Self::C => "Stable; changes require integration testing",
             Self::D => "Mutable; may be superseded freely",
         }
     }
@@ -208,11 +211,29 @@ impl Tier {
     #[allow(dead_code)] // Used by tests; retained for future guidelines
     pub fn assignment_guide(self) -> &'static str {
         match self {
-            Self::S => "If this changed, would we need to rewrite the framework?",
-            Self::A => "If this changed, would trait signatures or type bounds change?",
-            Self::B => "If this changed, would call sites or runtime behaviour change?",
-            Self::C => "If this changed, would only CI, lints, or test setup change?",
-            Self::D => "If this changed, would only one crate's internal implementation change?",
+            Self::S => {
+                "Does this decision define the system's paradigm, \
+                        system-wide architectural pattern, or decision governance?"
+            }
+            Self::A => {
+                "Does this decision introduce or remove trait definitions, \
+                        generic type parameters, or plugin boundaries that \
+                        enable new implementations?"
+            }
+            Self::B => {
+                "Does this decision prescribe a structural rule or establish \
+                        an information flow — a type contract, API boundary, \
+                        visibility constraint, enforcement gate, or \
+                        observability requirement?"
+            }
+            Self::C => {
+                "Does this decision define how components observe, notify, \
+                        retry, or react to each other at runtime?"
+            }
+            Self::D => {
+                "Is this only a crate-internal implementation detail or \
+                        tooling configuration value?"
+            }
         }
     }
 
@@ -658,6 +679,15 @@ mod tests {
     }
 
     #[test]
+    fn tier_names_match_meadows_alignment() {
+        assert_eq!(Tier::S.name(), "Intent");
+        assert_eq!(Tier::A.name(), "Self-organization");
+        assert_eq!(Tier::B.name(), "Design");
+        assert_eq!(Tier::C.name(), "Feedbacks");
+        assert_eq!(Tier::D.name(), "Parameters");
+    }
+
+    #[test]
     fn status_is_terminal() {
         assert!(!Status::Draft.is_terminal());
         assert!(!Status::Proposed.is_terminal());
@@ -729,7 +759,9 @@ mod tests {
     fn tier_rank_ordering() {
         assert!(Tier::S.rank() < Tier::A.rank());
         assert!(Tier::A.rank() < Tier::B.rank());
-        assert!(Tier::D.rank() == 4);
+        assert!(Tier::B.rank() < Tier::C.rank());
+        assert!(Tier::C.rank() < Tier::D.rank());
+        assert_eq!(Tier::D.rank(), 4);
     }
 
     #[test]

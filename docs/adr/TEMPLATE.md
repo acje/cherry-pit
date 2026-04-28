@@ -104,22 +104,22 @@ signal.
 Tier: A
 ```
 
-Architectural significance level. Determines sort order in `--context`
-output (S first, D last). Assignment questions (answer "Yes" → assign
-that tier, start from S):
+Architectural significance level derived from Meadows' leverage
+points via Abson et al. (2017). Determines sort order in `--context`
+output (S first, D last). Uses **system-characteristic framing** —
+classify by what the decision *is*, not by blast radius. First-yes-
+wins: start at S, assign the first tier whose question yields "yes."
 
-| Tier | Test question |
-|------|---------------|
-| S | "If this changed, would we rewrite the framework?" |
-| A | "If this changed, would trait signatures or type bounds change?" |
-| B | "If this changed, would call sites or runtime behaviour change?" |
-| C | "If this changed, would only CI, lints, or test setup change?" |
-| D | "If this changed, would only one crate's internals change?" |
+| Tier | System characteristic | Meadows levels | Classification question |
+|------|----------------------|----------------|------------------------|
+| S | **Intent** — paradigm, goals, governance | 1–3 | Does this decision define the system's paradigm, system-wide architectural pattern, or decision governance? |
+| A | **Self-organization** — capacity to evolve structure | 4 | Does this decision introduce or remove trait definitions, generic type parameters, or plugin boundaries that enable new implementations? |
+| B | **Design** — rules, information flows | 5–6 | Does this decision prescribe a structural rule or establish an information flow — a type contract, API boundary, visibility constraint, enforcement gate, or observability requirement? |
+| C | **Feedbacks** — reinforcing and balancing loops | 7–8 | Does this decision define how components observe, notify, retry, or react to each other at runtime? |
+| D | **Parameters** — constants, stocks, flows, delays | 9–12 | Is this only a crate-internal implementation detail or tooling configuration value? |
 
-Higher tiers appear first in `--context` output — the agent sees
-foundational constraints before implementation details. This
-exploits primacy bias: LLMs attend more strongly to rules at the
-start of context.
+For theoretical foundation, assignment guidance, and disambiguation
+rules, see [GOVERNANCE.md § 2](GOVERNANCE.md#2-tier-system).
 
 **Enforced by:** T004.
 
@@ -467,7 +467,7 @@ Retirement), S006 (terminal ADR not in stale/).
 
 Date: 2026-04-25
 Last-reviewed: 2026-04-25
-Tier: A
+Tier: B
 Crates: cherry-pit-core, cherry-pit-gateway
 
 ## Status
@@ -540,7 +540,7 @@ flat list. The worked example above renders as:
 These rules are mandatory constraints for all code in crate `cherry-pit-core`.
 Follow every rule without exception.
 
-## A-tier
+## B-tier
 - Construct EventEnvelope exclusively through EventEnvelope::new(), which validates non-nil event_id and returns Result<Self, EnvelopeError> [CHE-0042:R1]
 - Use NonZeroU64 for the EventEnvelope sequence field so zero sequences are rejected at the type level [CHE-0042:R2]
 - Access EventEnvelope fields through accessor methods (event_id(), aggregate_id(), sequence(), timestamp(), payload()) [CHE-0042:R3]

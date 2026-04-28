@@ -76,21 +76,81 @@ cross-references.
 
 ## 2. Tier System
 
-Tiers classify ADRs by architectural significance and stability
-expectations. Every ADR must be assigned a tier.
+Tiers classify ADRs by systemic leverage, derived from Abson et al.
+(2017) and Donella Meadows' twelve leverage points. Higher tiers
+represent deeper intervention in the system — changing them reshapes
+everything below. Every ADR must be assigned a tier.
 
-Tier values, descriptions, and stability expectations are documented
-in `cargo run -p adr-fmt -- --guidelines`. The assignment guidelines
-below help determine the correct tier:
+Canonical tier metadata (name, description, stability) is output by
+`cargo run -p adr-fmt -- --guidelines`.
 
-- **S** — "If this changed, would we need to rewrite the framework?"
-- **A** — "If this changed, would trait signatures or type bounds change?"
-- **B** — "If this changed, would call sites or runtime behaviour change?"
-- **C** — "If this changed, would only CI, lints, or test setup change?"
-- **D** — "If this changed, would only one crate's internal
-  implementation change?"
+### Theoretical Foundation
 
-Answer "Yes" to assign that tier. Start from S and work down.
+Abson et al. group Meadows' twelve leverage points into four system
+characteristics: Intent, Design, Feedbacks, and Parameters. This
+workspace splits Abson's "Design" grouping at the self-organization
+boundary because Meadows level 4 (the power to create new structures)
+is a distinct leverage type from levels 5–6 (rules and information
+flows governing existing structures). In software: "EventStore is a
+trait" (enables new backends — level 4) is a different kind of
+decision from "EventStore::load returns `Result<Vec<EventEnvelope>,
+StoreError>`" (constrains the contract — level 5).
+
+### Tier Table
+
+| Tier | System characteristic | Meadows levels | Classification question |
+|------|----------------------|----------------|------------------------|
+| S | **Intent** — paradigm, goals, governance | 1–3 | Does this decision define the system's paradigm, system-wide architectural pattern, or decision governance? |
+| A | **Self-organization** — capacity to evolve structure | 4 | Does this decision introduce or remove trait definitions, generic type parameters, or plugin boundaries that enable new implementations? |
+| B | **Design** — rules, information flows | 5–6 | Does this decision prescribe a structural rule or establish an information flow — a type contract, API boundary, visibility constraint, enforcement gate, or observability requirement? |
+| C | **Feedbacks** — reinforcing and balancing loops | 7–8 | Does this decision define how components observe, notify, retry, or react to each other at runtime? |
+| D | **Parameters** — constants, stocks, flows, delays | 9–12 | Is this only a crate-internal implementation detail or tooling configuration value? |
+
+### Tree Metaphor
+
+The tiers form a tree: S-tier decisions are roots — few in number,
+deepest leverage, most abstract. D-tier decisions are leaves — many
+in number, most concrete, greatest surface area with real-world code.
+
+Each deeper tier constrains everything shallower: Intent defines what
+the system is for, Self-organization determines how it can evolve,
+Design sets the rules and feedback structures it must follow,
+Feedbacks govern runtime dynamics, Parameters fill in the remaining
+degrees of freedom.
+
+Higher tiers appear first in `--context` output — the agent sees
+foundational constraints before implementation details. This exploits
+primacy bias: LLMs attend more strongly to rules at the start of
+context.
+
+### Assignment Protocol
+
+Questions use **system-characteristic framing** — they classify by
+what the decision *is*, not by what would change if the decision
+changed. This aligns with Meadows' leverage hierarchy: a parameter
+change can have large blast radius, but it is still a parameter.
+
+**First-yes-wins:** Start at S and work down. The first question
+answered "Yes" determines the tier.
+
+### Tier-Assignment Guidance
+
+- **Self-organization vs. Design (A vs. B):** A-tier is about *what
+  can be extended* — trait definitions, generic type parameters, plugin
+  boundaries. B-tier is about *how existing things must behave* —
+  specific trait signatures, type bounds, public API contracts. Example:
+  "EventStore is a trait" → A. "EventStore::load returns
+  `Result<Vec<EventEnvelope>, StoreError>`" → B.
+
+- **CI, lints, and tests:** B-tier (Design) when they enforce
+  architectural boundaries or encode structural invariants — module-
+  boundary lints, property-based test suites, architectural CI gates.
+  D-tier (Parameters) when they configure tooling internals — cache
+  paths, lint versions, timeout values.
+
+- **Meta-decisions** about the decision process itself (TEMPLATE.md,
+  GOVERNANCE.md, ADR workflow) are S-tier: Meadows level 1 (power to
+  transcend paradigms).
 
 ---
 

@@ -6,7 +6,7 @@ Tier: A
 
 ## Status
 
-Accepted
+Superseded by AFM-0011
 
 ## Related
 
@@ -111,3 +111,16 @@ also appears in `--report` output alongside each ADR.
   S-tier for naming and vocabulary decisions that affect every ADR,
   A-tier for template and lifecycle decisions, B-tier for
   implementation strategy decisions.
+
+## Retirement
+
+Superseded by AFM-0011. The blast-radius framing ("If this changed,
+would X change?") diverged from Meadows' leverage-point hierarchy in
+two systematic ways: high-impact parameters were over-classified
+(a timeout change triggered C-tier Feedbacks, but Meadows places
+parameter values at the shallowest level), and information flows
+were under-classified (CI gates landed in old C-tier, but Meadows
+places information flows in the Design tier above Feedbacks).
+AFM-0011 replaces blast-radius framing with system-characteristic
+framing ("Does this decision define X?"), aligned with Abson et al.
+(2017) and Meadows' twelve leverage points.
