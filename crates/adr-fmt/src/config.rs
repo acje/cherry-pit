@@ -50,10 +50,6 @@ pub struct RuleConfig {
     /// Optional rule parameters (e.g., `min_words = 7`).
     #[serde(default)]
     pub params: HashMap<String, toml::Value>,
-    /// Internal rules are self-checks, not user-facing governance.
-    #[serde(default)]
-    #[allow(dead_code)] // Retained for legacy config compatibility
-    pub internal: bool,
 }
 
 impl Config {
@@ -116,24 +112,12 @@ fn emit_legacy_rule_warnings(config: &Config) {
         .count();
 
     if legacy_count > 0 {
-        eprintln!(
-            "warning: adr-fmt.toml contains {legacy_count} legacy rule declaration(s)"
-        );
-        eprintln!(
-            "         Rules are now hardcoded in the binary. Only parameter overrides"
-        );
-        eprintln!(
-            "         are needed in config. Remove `category` and `description` fields."
-        );
-        eprintln!(
-            "         Example override: [[rules]]"
-        );
-        eprintln!(
-            "         id = \"T015\""
-        );
-        eprintln!(
-            "         params = {{ min_words = 7, max_words = 50 }}"
-        );
+        eprintln!("warning: adr-fmt.toml contains {legacy_count} legacy rule declaration(s)");
+        eprintln!("         Rules are now hardcoded in the binary. Only parameter overrides");
+        eprintln!("         are needed in config. Remove `category` and `description` fields.");
+        eprintln!("         Example override: [[rules]]");
+        eprintln!("         id = \"T015\"");
+        eprintln!("         params = {{ min_words = 7, max_words = 50 }}");
     }
 }
 
@@ -330,25 +314,5 @@ description = "Date field present"
 "#;
         let config: Config = toml::from_str(toml_str).unwrap();
         assert_eq!(config.rules.len(), 2);
-    }
-
-    #[test]
-    fn internal_flag_defaults_to_false() {
-        let toml_str = r#"
-[stale]
-directory = "stale"
-
-[[domains]]
-prefix = "CHE"
-name = "Cherry"
-directory = "cherry"
-description = "Test"
-crates = []
-
-[[rules]]
-id = "T001"
-"#;
-        let config: Config = toml::from_str(toml_str).unwrap();
-        assert!(!config.rules[0].internal);
     }
 }

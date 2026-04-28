@@ -380,15 +380,11 @@ fn adr_root(dir: &TempDir) -> String {
 fn default_mode_with_config_shows_governance() {
     let dir = setup_corpus(MINIMAL_CONFIG, &[("TST-0001-valid-test-adr.md", VALID_ADR)]);
 
-    adr_fmt()
-        .arg(adr_root(&dir))
-        .assert()
-        .success()
-        .stdout(
-            predicate::str::contains("ADR Governance Reference")
-                .and(predicate::str::contains("MODES"))
-                .and(predicate::str::contains("TAGGED RULES")),
-        );
+    adr_fmt().arg(adr_root(&dir)).assert().success().stdout(
+        predicate::str::contains("ADR Governance Reference")
+            .and(predicate::str::contains("MODES"))
+            .and(predicate::str::contains("TAGGED RULES")),
+    );
 }
 
 #[test]
@@ -403,10 +399,7 @@ fn default_mode_without_config_shows_setup_guide() {
         .arg(root.to_str().unwrap())
         .assert()
         .success()
-        .stdout(
-            predicate::str::contains("adr-fmt")
-                .and(predicate::str::contains("QUICK START")),
-        );
+        .stdout(predicate::str::contains("adr-fmt").and(predicate::str::contains("QUICK START")));
 }
 
 // ── lint mode ──────────────────────────────────────────────────────
@@ -618,10 +611,7 @@ fn critique_includes_stale() {
         .args(["--critique", "TST-0001", &adr_root(&dir)])
         .assert()
         .success()
-        .stdout(
-            predicate::str::contains("◆ FOCAL")
-                .and(predicate::str::contains("TST-0010")),
-        );
+        .stdout(predicate::str::contains("◆ FOCAL").and(predicate::str::contains("TST-0010")));
 }
 
 #[test]
@@ -640,8 +630,7 @@ fn critique_depth_limits_traversal() {
         .assert()
         .success()
         .stdout(
-            predicate::str::contains("◆ FOCAL")
-                .and(predicate::str::contains("◇ CONNECTED").not()),
+            predicate::str::contains("◆ FOCAL").and(predicate::str::contains("◇ CONNECTED").not()),
         );
 }
 
@@ -809,12 +798,8 @@ fn context_end_to_end_output_format() {
     );
 
     // ── Tier headers in correct order ──
-    let s_pos = stdout
-        .find("## S-tier")
-        .expect("S-tier header missing");
-    let b_pos = stdout
-        .find("## B-tier")
-        .expect("B-tier header missing");
+    let s_pos = stdout.find("## S-tier").expect("S-tier header missing");
+    let b_pos = stdout.find("## B-tier").expect("B-tier header missing");
     assert!(
         s_pos < b_pos,
         "S-tier ({s_pos}) must appear before B-tier ({b_pos})"

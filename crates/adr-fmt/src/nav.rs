@@ -21,6 +21,7 @@ pub struct ChildEntry {
 ///
 /// For each forward link `A -[verb]→ B`, inserts `B → (verb, A)`.
 /// Root self-references are skipped (they are tree markers, not edges).
+#[must_use]
 pub fn compute_children(records: &[AdrRecord]) -> HashMap<AdrId, Vec<ChildEntry>> {
     let mut children: HashMap<AdrId, Vec<ChildEntry>> = HashMap::new();
 
@@ -82,10 +83,6 @@ mod tests {
             })
             .collect();
 
-        let is_self_referencing = relationships
-            .iter()
-            .any(|rel| rel.verb == RelVerb::Root && rel.target == id);
-
         AdrRecord {
             id,
             file_path: PathBuf::from(format!("docs/adr/test/{prefix}-{num:04}-test.md")),
@@ -100,7 +97,6 @@ mod tests {
             has_context: true,
             has_decision: true,
             has_consequences: true,
-            is_self_referencing,
             ..AdrRecord::default()
         }
     }

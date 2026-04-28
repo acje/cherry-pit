@@ -123,7 +123,11 @@ fn print_domains(config: &Config) {
             ""
         };
         println!("  {} ({}){marker}", domain.name, domain.prefix);
-        let desc: String = domain.description.split_whitespace().collect::<Vec<_>>().join(" ");
+        let desc: String = domain
+            .description
+            .split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" ");
         println!("    {desc}");
         println!("    Directory: {}/", domain.directory);
         if !domain.crates.is_empty() {
@@ -217,8 +221,12 @@ fn print_template() {
     println!("    T010  Consequences section present");
     println!("    T011  Code block size limit (max 20 lines)");
     println!("    T014  Section order (Related → Context → Decision → Consequences)");
-    println!("    T015  Prose section word count (default 7–50, override via adr-fmt.toml: Context, Consequences, Retirement)");
-    println!("    T016  Tagged rules in Decision (≥1 rule, sequential IDs, max 10, 7–60 words, layer 1–12)");
+    println!(
+        "    T015  Prose section word count (default 7–50, override via adr-fmt.toml: Context, Consequences, Retirement)"
+    );
+    println!(
+        "    T016  Tagged rules in Decision (≥1 rule, sequential IDs, max 10, 7–60 words, layer 1–12)"
+    );
     println!();
 }
 
@@ -338,7 +346,11 @@ fn print_overrides(config: &Config) {
         if rule.params.is_empty() {
             continue;
         }
-        let pairs: Vec<String> = rule.params.iter().map(|(k, v)| format!("{k}={v}")).collect();
+        let pairs: Vec<String> = rule
+            .params
+            .iter()
+            .map(|(k, v)| format!("{k}={v}"))
+            .collect();
         println!("  {}  {}", rule.id, pairs.join(", "));
     }
     println!();

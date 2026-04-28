@@ -9,6 +9,7 @@ use crate::model::AdrRecord;
 use crate::report::Diagnostic;
 
 /// Run all rule modules and collect diagnostics.
+#[must_use]
 pub fn run_all(records: &[AdrRecord], config: &Config) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
 

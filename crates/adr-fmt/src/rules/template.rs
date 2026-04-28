@@ -68,8 +68,38 @@ const STALE_SECTION_ORDER: &[&str] = &[
     "Retirement",
 ];
 
-#[allow(clippy::too_many_lines)]
 pub fn check(record: &AdrRecord, config: &Config, diags: &mut Vec<Diagnostic>) {
+    check_metadata(record, diags);
+    check_status_validity(record, diags);
+    check_structure(record, diags);
+    check_section_order(record, diags);
+
+    // T015: Section word count range (applies to Context, Consequences, Retirement)
+    let min_words = config
+        .rule_param_u64("T015", "min_words")
+        .unwrap_or(DEFAULT_MIN_WORDS);
+    let max_words = config
+        .rule_param_u64("T015", "max_words")
+        .unwrap_or(DEFAULT_MAX_WORDS);
+    check_section_word_counts(record, min_words, max_words, diags);
+
+    // T016: Tagged rules in Decision section
+    let max_rules = config
+        .rule_param_u64("T016", "max_rules")
+        .unwrap_or(DEFAULT_MAX_RULES);
+    let min_rule_words = config
+        .rule_param_u64("T016", "min_rule_words")
+        .unwrap_or(DEFAULT_MIN_RULE_WORDS);
+    let max_rule_words = config
+        .rule_param_u64("T016", "max_rule_words")
+        .unwrap_or(DEFAULT_MAX_RULE_WORDS);
+    check_tagged_rules(record, max_rules, min_rule_words, max_rule_words, diags);
+
+    check_stale_lifecycle(record, config, diags);
+}
+
+/// T001–T005c: Preamble metadata field checks.
+fn check_metadata(record: &AdrRecord, diags: &mut Vec<Diagnostic>) {
     // T001: H1 title
     if record.title.is_none() {
         diags.push(Diagnostic::warning(
@@ -133,8 +163,6 @@ pub fn check(record: &AdrRecord, config: &Config, diags: &mut Vec<Diagnostic>) {
     }
 
     // T005c: Legacy ## Status section — migrate to preamble field
-    // Invariant: status_from_section implies !has_dual_status
-    // (status_field must be None for status_from_section to be true)
     if record.status_from_section {
         diags.push(Diagnostic::warning(
             "T005c",
@@ -145,7 +173,10 @@ pub fn check(record: &AdrRecord, config: &Config, diags: &mut Vec<Diagnostic>) {
                 .into(),
         ));
     }
+}
 
+/// T006–T007: Status value and relationship validity checks.
+fn check_status_validity(record: &AdrRecord, diags: &mut Vec<Diagnostic>) {
     // T006: Status value validity — strict keyword
     if let Some(ref raw) = record.status_raw {
         if Status::has_parenthetical(raw) {
@@ -191,7 +222,10 @@ pub fn check(record: &AdrRecord, config: &Config, diags: &mut Vec<Diagnostic>) {
                 .into(),
         ));
     }
+}
 
+/// T008–T011: Required sections and code block checks.
+fn check_structure(record: &AdrRecord, diags: &mut Vec<Diagnostic>) {
     // T008: Context section
     if !record.has_context {
         diags.push(Diagnostic::warning(
@@ -236,31 +270,10 @@ pub fn check(record: &AdrRecord, config: &Config, diags: &mut Vec<Diagnostic>) {
             ),
         ));
     }
+}
 
-    // T014: Section ordering
-    check_section_order(record, diags);
-
-    // T015: Section word count range (applies to Context, Consequences, Retirement)
-    let min_words = config
-        .rule_param_u64("T015", "min_words")
-        .unwrap_or(DEFAULT_MIN_WORDS);
-    let max_words = config
-        .rule_param_u64("T015", "max_words")
-        .unwrap_or(DEFAULT_MAX_WORDS);
-    check_section_word_counts(record, min_words, max_words, diags);
-
-    // T016: Tagged rules in Decision section
-    let max_rules = config
-        .rule_param_u64("T016", "max_rules")
-        .unwrap_or(DEFAULT_MAX_RULES);
-    let min_rule_words = config
-        .rule_param_u64("T016", "min_rule_words")
-        .unwrap_or(DEFAULT_MIN_RULE_WORDS);
-    let max_rule_words = config
-        .rule_param_u64("T016", "max_rule_words")
-        .unwrap_or(DEFAULT_MAX_RULE_WORDS);
-    check_tagged_rules(record, max_rules, min_rule_words, max_rule_words, diags);
-
+/// S004–S006: Stale/active lifecycle alignment checks.
+fn check_stale_lifecycle(record: &AdrRecord, config: &Config, diags: &mut Vec<Diagnostic>) {
     // S004: Stale ADR must have Retirement section
     if record.is_stale && !record.has_retirement {
         diags.push(Diagnostic::warning(
@@ -296,6 +309,9 @@ pub fn check(record: &AdrRecord, config: &Config, diags: &mut Vec<Diagnostic>) {
             Status::SupersededBy(id) => format!("Superseded by {id}"),
             _ => format!("{status:?}"),
         };
+        let min_words = config
+            .rule_param_u64("T015", "min_words")
+            .unwrap_or(DEFAULT_MIN_WORDS);
         diags.push(Diagnostic::warning(
             "S006",
             &record.file_path,
@@ -402,29 +418,29 @@ fn check_section_word_counts(
     }
 
     // Retirement section word count range (if present)
-    if record.has_retirement {
-        if let Some(&count) = record.section_word_counts.get("Retirement") {
-            if (count as u64) < min_words {
-                diags.push(Diagnostic::warning(
-                    "S004",
-                    &record.file_path,
-                    0,
-                    format!(
-                        "`## Retirement` has {count} word(s) (minimum {min_words}) — \
-                         explain why this ADR was retired"
-                    ),
-                ));
-            } else if (count as u64) > max_words {
-                diags.push(Diagnostic::warning(
-                    "T015",
-                    &record.file_path,
-                    0,
-                    format!(
-                        "`## Retirement` has {count} word(s) (maximum {max_words}) — \
-                         be concise"
-                    ),
-                ));
-            }
+    if record.has_retirement
+        && let Some(&count) = record.section_word_counts.get("Retirement")
+    {
+        if (count as u64) < min_words {
+            diags.push(Diagnostic::warning(
+                "S004",
+                &record.file_path,
+                0,
+                format!(
+                    "`## Retirement` has {count} word(s) (minimum {min_words}) — \
+                     explain why this ADR was retired"
+                ),
+            ));
+        } else if (count as u64) > max_words {
+            diags.push(Diagnostic::warning(
+                "T015",
+                &record.file_path,
+                0,
+                format!(
+                    "`## Retirement` has {count} word(s) (maximum {max_words}) — \
+                     be concise"
+                ),
+            ));
         }
     }
 }
@@ -615,7 +631,6 @@ params = { max_rules = 10, min_rule_words = 7, max_rule_words = 60 }
             target: record.id.clone(),
             line: 10,
         }];
-        record.is_self_referencing = true;
         record.decision_rules = vec![TaggedRule {
             id: "R1".into(),
             text: "All events must be versioned with semantic version numbers".into(),
@@ -675,9 +690,7 @@ params = { max_rules = 10, min_rule_words = 7, max_rule_words = 60 }
     fn amended_status_produces_t006() {
         let mut record = make_record();
         record.status_raw = Some("Amended 2026-04-25 — note".into());
-        record.status = Some(Status::Invalid(
-            "Amended 2026-04-25 — note".into(),
-        ));
+        record.status = Some(Status::Invalid("Amended 2026-04-25 — note".into()));
         let config = make_config();
         let mut diags = Vec::new();
         check(&record, &config, &mut diags);
@@ -692,7 +705,6 @@ params = { max_rules = 10, min_rule_words = 7, max_rule_words = 60 }
         let mut record = make_record();
         record.has_related = true;
         record.relationships = vec![];
-        record.related_has_placeholder = true;
         let config = make_config();
         let mut diags = Vec::new();
         check(&record, &config, &mut diags);
@@ -815,7 +827,9 @@ params = { max_rules = 10, min_rule_words = 7, max_rule_words = 60 }
         let config = make_config();
         let mut diags = Vec::new();
         check(&record, &config, &mut diags);
-        let t015 = diags.iter().find(|d| d.rule == "T015" && d.message.contains("maximum"));
+        let t015 = diags
+            .iter()
+            .find(|d| d.rule == "T015" && d.message.contains("maximum"));
         assert!(
             t015.is_some(),
             "60 words should trigger T015 max, got: {diags:?}"
@@ -1141,7 +1155,9 @@ params = { max_rules = 10, min_rule_words = 7, max_rule_words = 60 }
         let config = make_config();
         let mut diags = Vec::new();
         check(&record, &config, &mut diags);
-        let t016 = diags.iter().find(|d| d.rule == "T016" && d.message.contains("gap"));
+        let t016 = diags
+            .iter()
+            .find(|d| d.rule == "T016" && d.message.contains("gap"));
         assert!(t016.is_some(), "gap in IDs should trigger T016");
     }
 
@@ -1155,7 +1171,6 @@ params = { max_rules = 10, min_rule_words = 7, max_rule_words = 60 }
             target: record.id.clone(),
             line: 10,
         }];
-        record.is_self_referencing = true;
         record.decision_rules = vec![TaggedRule {
             id: "R1".into(),
             text: "All events must be versioned with semantic version numbers".into(),
@@ -1184,7 +1199,6 @@ params = { max_rules = 10, min_rule_words = 7, max_rule_words = 60 }
             target: record.id.clone(),
             line: 10,
         }];
-        record.is_self_referencing = true;
         record.decision_rules = vec![TaggedRule {
             id: "R1".into(),
             text: "All events must be versioned with semantic version numbers".into(),

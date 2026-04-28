@@ -8,23 +8,26 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::fs;
 
 use crate::config::Config;
-use crate::model::{layer_to_tier, AdrId, AdrRecord, RelVerb, Tier};
+use crate::model::{AdrId, AdrRecord, RelVerb, Tier, layer_to_tier};
 use crate::nav::{self, ChildEntry};
 use crate::output::{self, OutputBlock};
 
 /// Run critique mode for a focal ADR with depth bounding.
 ///
 /// Returns output blocks: focal first, connected sorted by tier then ID.
+///
+/// # Errors
+///
+/// Returns an error if the focal ADR ID is not found in the parsed records.
 pub fn critique(
     focal_id: &AdrId,
     records: &[AdrRecord],
     config: &Config,
     max_depth: usize,
-) -> Vec<OutputBlock> {
+) -> Result<Vec<OutputBlock>, String> {
     // Find focal record
     let Some(focal) = records.iter().find(|r| r.id == *focal_id) else {
-        eprintln!("error: ADR {focal_id} not found");
-        std::process::exit(1);
+        return Err(format!("ADR {focal_id} not found"));
     };
 
     // Build indexes
@@ -123,7 +126,7 @@ pub fn critique(
         });
     }
 
-    blocks
+    Ok(blocks)
 }
 
 /// Compute tension summary for an ADR's rules.
@@ -233,9 +236,6 @@ crates = []
                 line: 10 + i,
             })
             .collect();
-        let is_self_referencing = relationships
-            .iter()
-            .any(|rel| rel.verb == RelVerb::Root && rel.target == id);
 
         AdrRecord {
             id,
@@ -250,7 +250,6 @@ crates = []
             has_context: true,
             has_decision: true,
             has_consequences: true,
-            is_self_referencing,
             ..AdrRecord::default()
         }
     }
@@ -263,7 +262,7 @@ crates = []
             vec![(RelVerb::Root, make_id("CHE", 1))],
         )];
         let config = make_config();
-        let blocks = critique(&make_id("CHE", 1), &records, &config, 1);
+        let blocks = critique(&make_id("CHE", 1), &records, &config, 1).unwrap();
         assert_eq!(blocks.len(), 1);
         assert!(matches!(blocks[0], OutputBlock::Focal { .. }));
     }
@@ -275,7 +274,7 @@ crates = []
             make_record("CHE", 2, vec![(RelVerb::References, make_id("CHE", 1))]),
         ];
         let config = make_config();
-        let blocks = critique(&make_id("CHE", 1), &records, &config, 1);
+        let blocks = critique(&make_id("CHE", 1), &records, &config, 1).unwrap();
         // Focal + 1 connected (fan-in from CHE-0002)
         assert_eq!(blocks.len(), 2);
         assert!(matches!(blocks[0], OutputBlock::Focal { .. }));
@@ -293,7 +292,7 @@ crates = []
             stale,
         ];
         let config = make_config();
-        let blocks = critique(&make_id("CHE", 1), &records, &config, 1);
+        let blocks = critique(&make_id("CHE", 1), &records, &config, 1).unwrap();
         // Focal + 2 connected (stale NOT filtered)
         assert_eq!(blocks.len(), 3);
         assert!(matches!(blocks[0], OutputBlock::Focal { .. }));
@@ -312,11 +311,11 @@ crates = []
         let config = make_config();
 
         // Depth 1: focal CHE-0001 sees CHE-0002 (fan-in), NOT CHE-0003
-        let blocks = critique(&make_id("CHE", 1), &records, &config, 1);
+        let blocks = critique(&make_id("CHE", 1), &records, &config, 1).unwrap();
         assert_eq!(blocks.len(), 2, "depth=1 should reach 1 neighbor");
 
         // Depth 2: focal CHE-0001 sees CHE-0002 and CHE-0003
-        let blocks = critique(&make_id("CHE", 1), &records, &config, 2);
+        let blocks = critique(&make_id("CHE", 1), &records, &config, 2).unwrap();
         assert_eq!(blocks.len(), 3, "depth=2 should reach 2 neighbors");
     }
 
@@ -327,7 +326,7 @@ crates = []
             make_record("CHE", 2, vec![(RelVerb::References, make_id("CHE", 1))]),
         ];
         let config = make_config();
-        let blocks = critique(&make_id("CHE", 1), &records, &config, 5);
+        let blocks = critique(&make_id("CHE", 1), &records, &config, 5).unwrap();
         // Should terminate and include both
         assert!(blocks.len() >= 2);
     }
@@ -339,7 +338,7 @@ crates = []
             make_record("CHE", 2, vec![(RelVerb::References, make_id("CHE", 1))]),
         ];
         let config = make_config();
-        let blocks = critique(&make_id("CHE", 1), &records, &config, 0);
+        let blocks = critique(&make_id("CHE", 1), &records, &config, 0).unwrap();
         assert_eq!(blocks.len(), 1, "depth=0 should return focal only");
     }
 
@@ -422,10 +421,28 @@ crates = []
             },
         ];
         let summary = compute_tension_summary(&record);
-        assert!(!summary.contains("R1"), "R1 has zero tension, should be skipped");
+        assert!(
+            !summary.contains("R1"),
+            "R1 has zero tension, should be skipped"
+        );
         assert!(
             summary.contains("Tension: R2 (+3 from A→D)"),
             "expected A→D tension:\n{summary}"
         );
+    }
+
+    #[test]
+    fn critique_unknown_adr_returns_error() {
+        let records = vec![make_record(
+            "CHE",
+            1,
+            vec![(RelVerb::Root, make_id("CHE", 1))],
+        )];
+        let config = make_config();
+        let result = critique(&make_id("CHE", 99), &records, &config, 1);
+        match result {
+            Err(e) => assert!(e.contains("not found"), "error: {e}"),
+            Ok(_) => panic!("expected error for unknown ADR"),
+        }
     }
 }

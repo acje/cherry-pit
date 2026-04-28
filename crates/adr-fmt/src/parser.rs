@@ -3,6 +3,7 @@
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
+use std::sync::LazyLock;
 
 use regex::Regex;
 
@@ -105,9 +106,9 @@ pub fn parse_adr_file(path: &Path, expected_prefix: &str, is_stale: bool) -> Opt
     let (id, title, title_line) = parse_title(&lines, expected_prefix)?;
 
     // --- Metadata fields ---
-    let (date, date_line) = find_field(&lines, "Date:");
-    let (last_reviewed, last_reviewed_line) = find_field(&lines, "Last-reviewed:");
-    let (tier, tier_line) = find_tier_field(&lines);
+    let (date, _) = find_field(&lines, "Date:");
+    let (last_reviewed, _) = find_field(&lines, "Last-reviewed:");
+    let (tier, _) = find_tier_field(&lines);
 
     // --- Status ---
     // Try metadata field first (`Status: value`), then fall back to section
@@ -125,19 +126,13 @@ pub fn parse_adr_file(path: &Path, expected_prefix: &str, is_stale: bool) -> Opt
     };
 
     // --- Related ---
-    let (relationships, has_related, related_has_placeholder) = find_relationships(&lines);
-
-    // --- Self-referencing detection (Root verb targeting own ID) ---
-    let is_self_referencing = relationships
-        .iter()
-        .any(|rel| rel.verb == RelVerb::Root && rel.target == id);
+    let (relationships, has_related, _related_has_placeholder) = find_relationships(&lines);
 
     // --- Required sections ---
     let has_context = has_heading(&lines, "Context");
     let has_decision = has_heading(&lines, "Decision");
     let has_consequences = has_heading(&lines, "Consequences");
     let has_retirement = has_heading(&lines, "Retirement");
-    let has_rejection_rationale = has_heading(&lines, "Rejection Rationale");
 
     // --- Section ordering and word counts ---
     let (section_order, section_word_counts) = analyze_sections(&lines);
@@ -149,7 +144,8 @@ pub fn parse_adr_file(path: &Path, expected_prefix: &str, is_stale: bool) -> Opt
     let decision_rules = extract_tagged_rules(&lines);
 
     // --- Code block metrics ---
-    let (max_code_block_lines, code_block_count, max_code_block_line) = measure_code_blocks(&lines);
+    let (max_code_block_lines, _code_block_count, max_code_block_line) =
+        measure_code_blocks(&lines);
 
     Some(AdrRecord {
         id,
@@ -157,11 +153,8 @@ pub fn parse_adr_file(path: &Path, expected_prefix: &str, is_stale: bool) -> Opt
         title: Some(title),
         title_line,
         date,
-        date_line,
         last_reviewed,
-        last_reviewed_line,
         tier,
-        tier_line,
         status,
         status_line,
         status_raw,
@@ -171,15 +164,11 @@ pub fn parse_adr_file(path: &Path, expected_prefix: &str, is_stale: bool) -> Opt
         has_decision,
         has_consequences,
         has_retirement,
-        has_rejection_rationale,
         is_stale,
-        is_self_referencing,
         has_dual_status,
         status_from_section,
         max_code_block_lines,
         max_code_block_line,
-        code_block_count,
-        related_has_placeholder,
         section_order,
         section_word_counts,
         crates,
@@ -220,9 +209,12 @@ fn find_field(lines: &[&str], key: &str) -> (Option<String>, usize) {
     (None, 0)
 }
 
-/// Find `Tier:` field.
+/// Find `Tier:` field in the preamble (before first H2 heading).
 fn find_tier_field(lines: &[&str]) -> (Option<Tier>, usize) {
     for (i, line) in lines.iter().enumerate() {
+        if line.starts_with("## ") {
+            break;
+        }
         if let Some(value) = line.strip_prefix("Tier:") {
             let value = value.trim();
             return (Tier::parse(value), i + 1);
@@ -411,8 +403,11 @@ fn find_crates_field(lines: &[&str]) -> Vec<String> {
 /// A blank line terminates continuation.
 ///
 /// Returns an empty vec when no tagged rules are found.
+/// Regex for tagged rules: `R1 [5]: Rule text here`
+static TAGGED_RULE_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^R(\d+)\s*\[(\d+)\]:\s*(.+)").expect("valid regex"));
+
 fn extract_tagged_rules(lines: &[&str]) -> Vec<TaggedRule> {
-    let rule_re = Regex::new(r"^R(\d+)\s*\[(\d+)\]:\s*(.+)").expect("valid regex");
     let mut rules = Vec::new();
     let mut in_decision = false;
 
@@ -431,7 +426,7 @@ fn extract_tagged_rules(lines: &[&str]) -> Vec<TaggedRule> {
         if line.starts_with("## ") {
             break;
         }
-        if let Some(caps) = rule_re.captures(line) {
+        if let Some(caps) = TAGGED_RULE_RE.captures(line) {
             let num = caps.get(1).unwrap().as_str();
             let layer_str = caps.get(2).unwrap().as_str();
             let layer: u8 = layer_str.parse().unwrap_or(0);
@@ -451,7 +446,7 @@ fn extract_tagged_rules(lines: &[&str]) -> Vec<TaggedRule> {
                     break;
                 }
                 // New tagged rule terminates
-                if rule_re.is_match(next) {
+                if TAGGED_RULE_RE.is_match(next) {
                     break;
                 }
                 // Must be indented ≥2 spaces to be continuation
@@ -1204,7 +1199,38 @@ mod tests {
             "Date: 2026-01-01",
         ];
         let (date, _) = find_field(&lines, "Date:");
-        assert_eq!(date, None, "Date: inside a section body should not be found");
+        assert_eq!(
+            date, None,
+            "Date: inside a section body should not be found"
+        );
+    }
+
+    #[test]
+    fn find_tier_field_stops_at_h2_boundary() {
+        let lines = vec![
+            "# CHE-0001. Title",
+            "",
+            "Tier: B",
+            "",
+            "## Context",
+            "",
+            "Tier: A",
+        ];
+        let (tier, line) = find_tier_field(&lines);
+        assert_eq!(
+            tier,
+            Some(crate::model::Tier::B),
+            "should find preamble tier"
+        );
+        assert_eq!(line, 3);
+
+        // Tier: after H2 should not be found
+        let lines_after = vec!["# CHE-0001. Title", "", "## Context", "", "Tier: A"];
+        let (tier2, _) = find_tier_field(&lines_after);
+        assert_eq!(
+            tier2, None,
+            "Tier: inside a section body should not be found"
+        );
     }
 
     // ── status_from_section provenance tests ───────────────────────
@@ -1229,7 +1255,10 @@ mod tests {
         let from_section = field.is_none() && section.is_some();
         let dual = field.is_some() && section.is_some();
         assert!(from_section, "status_from_section should be true");
-        assert!(!dual, "has_dual_status must be false when status_from_section is true");
+        assert!(
+            !dual,
+            "has_dual_status must be false when status_from_section is true"
+        );
     }
 
     #[test]

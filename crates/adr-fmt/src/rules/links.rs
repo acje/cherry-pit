@@ -188,10 +188,6 @@ mod tests {
             })
             .collect();
 
-        let is_self_referencing = relationships
-            .iter()
-            .any(|rel| rel.verb == RelVerb::Root && rel.target == id);
-
         AdrRecord {
             id,
             file_path: PathBuf::from(format!("docs/adr/cherry/{prefix}-{num:04}-test.md")),
@@ -208,7 +204,6 @@ mod tests {
             has_context: true,
             has_decision: true,
             has_consequences: true,
-            is_self_referencing,
             ..AdrRecord::default()
         }
     }
@@ -221,10 +216,7 @@ mod tests {
         ];
         let mut diags = Vec::new();
         check(&records, &mut diags);
-        assert!(
-            diags.is_empty(),
-            "expected no diags, got: {diags:?}"
-        );
+        assert!(diags.is_empty(), "expected no diags, got: {diags:?}");
     }
 
     #[test]
@@ -295,7 +287,7 @@ mod tests {
 
     #[test]
     fn root_and_supersedes_no_l009() {
-        let mut record = make_record_with_rels(
+        let record = make_record_with_rels(
             "CHE",
             2,
             vec![
@@ -306,8 +298,6 @@ mod tests {
         let mut target = make_record_with_rels("CHE", 1, vec![(RelVerb::Root, make_id("CHE", 1))]);
         target.status = Some(Status::SupersededBy(make_id("CHE", 2)));
         target.status_raw = Some("Superseded by CHE-0002".into());
-
-        record.is_self_referencing = true;
 
         let records = vec![record, target];
         let mut diags = Vec::new();
@@ -388,7 +378,8 @@ mod tests {
 
     #[test]
     fn stale_source_references_stale_no_l007() {
-        let mut source = make_record_with_rels("CHE", 2, vec![(RelVerb::References, make_id("CHE", 1))]);
+        let mut source =
+            make_record_with_rels("CHE", 2, vec![(RelVerb::References, make_id("CHE", 1))]);
         source.is_stale = true;
 
         let mut target = make_record_with_rels("CHE", 1, vec![(RelVerb::Root, make_id("CHE", 1))]);

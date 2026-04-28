@@ -67,6 +67,7 @@ struct Cli {
     adr_directory: Option<PathBuf>,
 }
 
+#[allow(clippy::too_many_lines)]
 fn main() {
     let cli = Cli::parse();
 
@@ -90,8 +91,8 @@ fn main() {
 
     if !is_non_default_mode {
         // Guidelines mode — handles both setup and governance display
-        match &adr_root {
-            Some(root) => match config::try_load(root) {
+        if let Some(root) = &adr_root {
+            match config::try_load(root) {
                 Ok(Some(config)) => {
                     guidelines::print_governance(&config);
                     return;
@@ -104,11 +105,10 @@ fn main() {
                     eprintln!("error: {e}");
                     process::exit(1);
                 }
-            },
-            None => {
-                guidelines::print_setup_guide();
-                return;
             }
+        } else {
+            guidelines::print_setup_guide();
+            return;
         }
     }
 
@@ -157,11 +157,23 @@ fn main() {
             eprintln!("error: '{adr_id_str}' is not a valid ADR ID (expected PREFIX-NNNN)");
             process::exit(1);
         };
-        let blocks = critique::critique(&focal_id, &all_records, &config, cli.depth);
+        let blocks = match critique::critique(&focal_id, &all_records, &config, cli.depth) {
+            Ok(b) => b,
+            Err(e) => {
+                eprintln!("error: {e}");
+                process::exit(1);
+            }
+        };
         print!("{}", output::render_blocks(&blocks));
     } else if let Some(ref crate_name) = cli.context {
         // --context mode
-        let rules = context::context(crate_name, &all_records, &config);
+        let rules = match context::context(crate_name, &all_records, &config) {
+            Ok(r) => r,
+            Err(e) => {
+                eprintln!("error: {e}");
+                process::exit(1);
+            }
+        };
         print!("{}", output::render_rules(crate_name, &rules));
     } else if let Some(ref domain_filter) = cli.tree {
         // --tree mode
@@ -213,7 +225,6 @@ fn discover_domains(root: &Path, config: &Config) -> Vec<DomainDir> {
                 path,
                 prefix: domain.prefix.clone(),
                 name: domain.name.clone(),
-                description: domain.description.clone(),
             });
         }
     }

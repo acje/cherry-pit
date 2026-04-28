@@ -15,6 +15,7 @@ use crate::report::Diagnostic;
 // ── Output block types ─────────────────────────────────────────────
 
 /// Header metadata for an output block.
+#[derive(Debug)]
 pub struct HeaderMeta {
     pub id: AdrId,
     pub tier: Option<Tier>,
@@ -26,6 +27,7 @@ pub struct HeaderMeta {
 }
 
 /// An output block in the Alternative 4 format.
+#[derive(Debug)]
 pub enum OutputBlock {
     /// Focal ADR block — the target of a `--critique` query.
     Focal { meta: HeaderMeta, content: String },
@@ -41,16 +43,13 @@ pub enum OutputBlock {
 pub struct CrateRule {
     pub adr_id: AdrId,
     pub tier: Option<Tier>,
-    #[allow(dead_code)] // Retained for potential future metadata output
-    pub status: String,
-    #[allow(dead_code)] // Retained for potential future metadata output
-    pub domain: String,
     pub rules: Vec<TaggedRule>,
 }
 
 // ── Block rendering ────────────────────────────────────────────────
 
 /// Render output blocks to Alternative 4 markdown.
+#[must_use]
 pub fn render_blocks(blocks: &[OutputBlock]) -> String {
     let mut out = String::new();
 
@@ -83,7 +82,7 @@ pub fn render_blocks(blocks: &[OutputBlock]) -> String {
 }
 
 fn render_focal_header(out: &mut String, meta: &HeaderMeta) {
-    let tier = meta.tier.map_or_else(|| "?".into(), |t| format!("{t:?}"));
+    let tier = meta.tier.map_or_else(|| "?".into(), |t| format!("{t}"));
     writeln!(
         out,
         "## ◆ FOCAL: {} | Tier: {} | Status: {}",
@@ -107,7 +106,7 @@ fn render_focal_header(out: &mut String, meta: &HeaderMeta) {
 }
 
 fn render_connected_header(out: &mut String, meta: &HeaderMeta, path: &str) {
-    let tier = meta.tier.map_or_else(|| "?".into(), |t| format!("{t:?}"));
+    let tier = meta.tier.map_or_else(|| "?".into(), |t| format!("{t}"));
     writeln!(
         out,
         "## ◇ CONNECTED: {} | Tier: {} | Status: {}",
@@ -120,6 +119,7 @@ fn render_connected_header(out: &mut String, meta: &HeaderMeta, path: &str) {
 // ── Diagnostic rendering ───────────────────────────────────────────
 
 /// Render diagnostics as Alternative 4 markdown blocks to stdout.
+#[must_use]
 pub fn render_diagnostics(diagnostics: &[Diagnostic], record_count: usize) -> String {
     let mut out = String::new();
 
@@ -181,6 +181,7 @@ const TIER_ORDER: &[(Tier, &str)] = &[
 /// Rules are grouped by tier (S→D). Each tier with rules gets a `## X-tier`
 /// heading. Rule lines use `- {text} [{ADR_ID}:{RULE_ID}]` format with the
 /// anchoring ID at the end. Rules with `tier=None` render under D-tier.
+#[must_use]
 pub fn render_rules(crate_name: &str, rules: &[CrateRule]) -> String {
     let mut out = String::new();
 
@@ -210,8 +211,12 @@ pub fn render_rules(crate_name: &str, rules: &[CrateRule]) -> String {
 
         for cr in &tier_rules {
             for rule in &cr.rules {
-                writeln!(out, "- {} [{}:{}:L{}]", rule.text, cr.adr_id, rule.id, rule.layer)
-                    .unwrap();
+                writeln!(
+                    out,
+                    "- {} [{}:{}:L{}]",
+                    rule.text, cr.adr_id, rule.id, rule.layer
+                )
+                .unwrap();
             }
         }
     }
@@ -222,6 +227,7 @@ pub fn render_rules(crate_name: &str, rules: &[CrateRule]) -> String {
 // ── Tree rendering (--tree mode) ───────────────────────────────────
 
 /// Render the domain tree with box-drawing to stdout.
+#[must_use]
 pub fn render_tree(
     records: &[AdrRecord],
     domain_dirs: &[DomainDir],
@@ -274,7 +280,7 @@ pub fn render_tree(
 
             for record in &sorted {
                 let title = record.title.as_deref().unwrap_or("(untitled)");
-                let tier = record.tier.map_or_else(|| "?".into(), |t| format!("{t:?}"));
+                let tier = record.tier.map_or_else(|| "?".into(), |t| format!("{t}"));
                 let status = record
                     .status
                     .as_ref()
@@ -301,6 +307,7 @@ pub fn render_tree(
 // ── Helpers ────────────────────────────────────────────────────────
 
 /// Build `HeaderMeta` for a record, resolving domain name from config.
+#[must_use]
 pub fn build_header_meta(
     record: &AdrRecord,
     config: &Config,
@@ -443,8 +450,6 @@ mod tests {
         let rules = vec![CrateRule {
             adr_id: make_id("CHE", 42),
             tier: Some(Tier::A),
-            status: "Accepted".into(),
-            domain: "Cherry".into(),
             rules: vec![TaggedRule {
                 id: "R1".into(),
                 text: "All events versioned".into(),
@@ -481,8 +486,6 @@ mod tests {
             CrateRule {
                 adr_id: make_id("CHE", 1),
                 tier: Some(Tier::A),
-                status: "Accepted".into(),
-                domain: "Cherry".into(),
                 rules: vec![TaggedRule {
                     id: "R1".into(),
                     text: "A-tier rule".into(),
@@ -493,8 +496,6 @@ mod tests {
             CrateRule {
                 adr_id: make_id("COM", 1),
                 tier: Some(Tier::S),
-                status: "Accepted".into(),
-                domain: "Common".into(),
                 rules: vec![TaggedRule {
                     id: "R1".into(),
                     text: "S-tier rule".into(),
@@ -514,8 +515,6 @@ mod tests {
         let rules = vec![CrateRule {
             adr_id: make_id("CHE", 1),
             tier: Some(Tier::B),
-            status: "Accepted".into(),
-            domain: "Cherry".into(),
             rules: vec![TaggedRule {
                 id: "R1".into(),
                 text: "B-tier only".into(),
@@ -525,10 +524,22 @@ mod tests {
         }];
         let output = render_rules("cherry-pit-core", &rules);
         assert!(output.contains("## B-tier"), "output:\n{output}");
-        assert!(!output.contains("## S-tier"), "empty S-tier should be skipped");
-        assert!(!output.contains("## A-tier"), "empty A-tier should be skipped");
-        assert!(!output.contains("## C-tier"), "empty C-tier should be skipped");
-        assert!(!output.contains("## D-tier"), "empty D-tier should be skipped");
+        assert!(
+            !output.contains("## S-tier"),
+            "empty S-tier should be skipped"
+        );
+        assert!(
+            !output.contains("## A-tier"),
+            "empty A-tier should be skipped"
+        );
+        assert!(
+            !output.contains("## C-tier"),
+            "empty C-tier should be skipped"
+        );
+        assert!(
+            !output.contains("## D-tier"),
+            "empty D-tier should be skipped"
+        );
     }
 
     #[test]
@@ -536,8 +547,6 @@ mod tests {
         let rules = vec![CrateRule {
             adr_id: make_id("CHE", 1),
             tier: None,
-            status: "Accepted".into(),
-            domain: "Cherry".into(),
             rules: vec![TaggedRule {
                 id: "R1".into(),
                 text: "Unclassified rule".into(),

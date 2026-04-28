@@ -8,8 +8,6 @@ pub struct DomainDir {
     pub path: PathBuf,
     pub prefix: String,
     pub name: String,
-    #[allow(dead_code)] // Retained for guidelines output
-    pub description: String,
 }
 
 /// A tagged rule extracted from the Decision section.
@@ -22,7 +20,7 @@ pub struct TaggedRule {
     pub text: String,
     /// Meadows leverage layer (1-12). 0 indicates unparsed/invalid.
     pub layer: u8,
-    #[allow(dead_code)] // Line number for diagnostic context
+    /// 1-indexed line number where this rule appears in the source file.
     pub line: usize,
 }
 
@@ -30,6 +28,7 @@ pub struct TaggedRule {
 ///
 /// Mapping: S=1-3, A=4, B=5-6, C=7-8, D=9-12.
 /// Returns `None` for layer 0 or >12 (invalid).
+#[must_use]
 pub fn layer_to_tier(layer: u8) -> Option<Tier> {
     match layer {
         1..=3 => Some(Tier::S),
@@ -63,14 +62,8 @@ pub struct AdrRecord {
     pub title: Option<String>,
     pub title_line: usize,
     pub date: Option<String>,
-    #[allow(dead_code)]
-    pub date_line: usize,
     pub last_reviewed: Option<String>,
-    #[allow(dead_code)]
-    pub last_reviewed_line: usize,
     pub tier: Option<Tier>,
-    #[allow(dead_code)]
-    pub tier_line: usize,
     pub status: Option<Status>,
     pub status_line: usize,
     pub status_raw: Option<String>,
@@ -80,13 +73,8 @@ pub struct AdrRecord {
     pub has_decision: bool,
     pub has_consequences: bool,
     pub has_retirement: bool,
-    #[allow(dead_code)] // Parsed but unused — all terminal states use Retirement
-    pub has_rejection_rationale: bool,
     /// True when the ADR file lives in the stale archive directory.
     pub is_stale: bool,
-    /// True when the ADR has a `- Root: SELF` self-reference.
-    #[allow(dead_code)] // Used by generate tree logic (retained for future)
-    pub is_self_referencing: bool,
     /// True when both `Status:` metadata field and `## Status` section
     /// are present — the metadata field takes precedence.
     pub has_dual_status: bool,
@@ -99,12 +87,6 @@ pub struct AdrRecord {
     /// 1-indexed line number of the opening fence of the largest code
     /// block. 0 if no code blocks exist.
     pub max_code_block_line: usize,
-    #[allow(dead_code)] // reserved for future T-rules
-    pub code_block_count: usize,
-    /// True when the Related section contains a `—` placeholder (no
-    /// relationships).
-    #[allow(dead_code)] // Parsed for completeness
-    pub related_has_placeholder: bool,
     /// Ordered list of H2 section names as they appear in the file.
     pub section_order: Vec<String>,
     /// Word count per H2 section (section name → count). Code blocks
@@ -128,11 +110,8 @@ impl Default for AdrRecord {
             title: None,
             title_line: 0,
             date: None,
-            date_line: 0,
             last_reviewed: None,
-            last_reviewed_line: 0,
             tier: None,
-            tier_line: 0,
             status: None,
             status_line: 0,
             status_raw: None,
@@ -142,15 +121,11 @@ impl Default for AdrRecord {
             has_decision: false,
             has_consequences: false,
             has_retirement: false,
-            has_rejection_rationale: false,
             is_stale: false,
-            is_self_referencing: false,
             has_dual_status: false,
             status_from_section: false,
             max_code_block_lines: 0,
             max_code_block_line: 0,
-            code_block_count: 0,
-            related_has_placeholder: false,
             section_order: Vec::new(),
             section_word_counts: HashMap::new(),
             crates: Vec::new(),
@@ -169,7 +144,20 @@ pub enum Tier {
     D,
 }
 
+impl fmt::Display for Tier {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::S => f.write_str("S"),
+            Self::A => f.write_str("A"),
+            Self::B => f.write_str("B"),
+            Self::C => f.write_str("C"),
+            Self::D => f.write_str("D"),
+        }
+    }
+}
+
 impl Tier {
+    #[must_use]
     pub fn parse(s: &str) -> Option<Self> {
         match s.trim() {
             "S" => Some(Self::S),
@@ -182,6 +170,7 @@ impl Tier {
     }
 
     /// Human-readable tier name.
+    #[must_use]
     pub fn name(self) -> &'static str {
         match self {
             Self::S => "Intent",
@@ -193,6 +182,7 @@ impl Tier {
     }
 
     /// Tier meaning and scope description.
+    #[must_use]
     pub fn description(self) -> &'static str {
         match self {
             Self::S => {
@@ -219,6 +209,7 @@ impl Tier {
     }
 
     /// Stability expectation for this tier.
+    #[must_use]
     pub fn stability(self) -> &'static str {
         match self {
             Self::S => "Immutable post-1.0",
@@ -229,42 +220,14 @@ impl Tier {
         }
     }
 
-    /// Assignment guide — the question to ask when choosing a tier.
-    #[allow(dead_code)] // Used by tests; retained for future guidelines
-    pub fn assignment_guide(self) -> &'static str {
-        match self {
-            Self::S => {
-                "Does this decision define the system's paradigm, \
-                        system-wide architectural pattern, or decision governance?"
-            }
-            Self::A => {
-                "Does this decision introduce or remove trait definitions, \
-                        generic type parameters, or plugin boundaries that \
-                        enable new implementations?"
-            }
-            Self::B => {
-                "Does this decision prescribe a structural rule or establish \
-                        an information flow — a type contract, API boundary, \
-                        visibility constraint, enforcement gate, or \
-                        observability requirement?"
-            }
-            Self::C => {
-                "Does this decision define how components observe, notify, \
-                        retry, or react to each other at runtime?"
-            }
-            Self::D => {
-                "Is this only a crate-internal implementation detail or \
-                        tooling configuration value?"
-            }
-        }
-    }
-
     /// All tier variants in order.
+    #[must_use]
     pub fn all() -> &'static [Self] {
         &[Self::S, Self::A, Self::B, Self::C, Self::D]
     }
 
     /// Numeric rank for sorting (S=0, A=1, ... D=4).
+    #[must_use]
     pub fn rank(self) -> u8 {
         match self {
             Self::S => 0,
@@ -291,37 +254,30 @@ pub enum Status {
 
 impl Status {
     /// Parse a status line. Returns `Invalid` if unrecognized.
+    #[must_use]
     pub fn parse(line: &str) -> Self {
         let trimmed = line.trim();
 
-        if trimmed == "Draft" {
-            return Self::Draft;
+        match trimmed {
+            "Draft" => Self::Draft,
+            "Proposed" => Self::Proposed,
+            "Accepted" => Self::Accepted,
+            "Deprecated" => Self::Deprecated,
+            "Rejected" => Self::Rejected,
+            s if s.starts_with("Superseded by ") => {
+                let rest = &s["Superseded by ".len()..];
+                match parse_adr_id_from_str(rest.trim()) {
+                    Some(id) => Self::SupersededBy(id),
+                    None => Self::Invalid(trimmed.to_owned()),
+                }
+            }
+            _ => Self::Invalid(trimmed.to_owned()),
         }
-        if trimmed == "Proposed" {
-            return Self::Proposed;
-        }
-        if trimmed == "Accepted" {
-            return Self::Accepted;
-        }
-        if trimmed == "Deprecated" {
-            return Self::Deprecated;
-        }
-        if trimmed == "Rejected" {
-            return Self::Rejected;
-        }
-
-        // "Superseded by PREFIX-NNNN"
-        if let Some(rest) = trimmed.strip_prefix("Superseded by ")
-            && let Some(id) = parse_adr_id_from_str(rest.trim())
-        {
-            return Self::SupersededBy(id);
-        }
-
-        Self::Invalid(trimmed.to_owned())
     }
 
     /// Returns true if the raw status line has parenthetical content
     /// (e.g., `Accepted (note)`), which is not a valid status format.
+    #[must_use]
     pub fn has_parenthetical(raw: &str) -> bool {
         let trimmed = raw.trim();
         // Check for `(` after the status keyword
@@ -331,6 +287,7 @@ impl Status {
     /// Returns true for terminal lifecycle states: Rejected, Deprecated,
     /// Superseded. Terminal-state ADRs must be in the stale directory
     /// and have a `## Retirement` section.
+    #[must_use]
     pub fn is_terminal(&self) -> bool {
         matches!(
             self,
@@ -338,39 +295,8 @@ impl Status {
         )
     }
 
-    /// Human-readable description of this lifecycle state.
-    #[allow(dead_code)] // Retained for documentation tooling
-    pub fn description(&self) -> &'static str {
-        match self {
-            Self::Draft => "Under development, not yet proposed for review. May be incomplete.",
-            Self::Proposed => "Ready for review. All required fields present.",
-            Self::Accepted => "Decision is binding. Implementation may be pending.",
-            Self::Rejected => {
-                "Decision was proposed but deliberately not adopted. \
-                              Remains in record for context."
-            }
-            Self::Deprecated => "No longer applicable but preserved for historical context.",
-            Self::SupersededBy(_) => {
-                "Replaced by another ADR. The superseding ADR is authoritative."
-            }
-            Self::Invalid(_) => "Unrecognized status value.",
-        }
-    }
-
-    /// All recognized status variant names for documentation.
-    #[allow(dead_code)] // Used by --guidelines
-    pub fn all_variant_names() -> &'static [&'static str] {
-        &[
-            "Draft",
-            "Proposed",
-            "Accepted",
-            "Rejected",
-            "Deprecated",
-            "Superseded by PREFIX-NNNN",
-        ]
-    }
-
     /// Short display string for output formatting.
+    #[must_use]
     pub fn short_display(&self) -> String {
         match self {
             Self::Draft => "Draft".into(),
@@ -425,13 +351,8 @@ pub enum RelVerb {
 }
 
 impl RelVerb {
-    /// True for the three permitted verbs.
-    #[allow(dead_code)] // Retained for parser validation
-    pub fn is_permitted(self) -> bool {
-        matches!(self, Self::References | Self::Supersedes | Self::Root)
-    }
-
     /// True for legacy reverse verbs.
+    #[must_use]
     pub fn is_reverse(self) -> bool {
         matches!(
             self,
@@ -445,6 +366,7 @@ impl RelVerb {
     }
 
     /// Human-readable description of the verb's meaning.
+    #[must_use]
     pub fn description(self) -> &'static str {
         match self {
             Self::Root => "Self-reference marking this ADR as a tree root",
@@ -455,6 +377,7 @@ impl RelVerb {
     }
 
     /// Migration guidance for legacy verbs. Returns None for permitted verbs.
+    #[must_use]
     pub fn migration(self) -> Option<&'static str> {
         match self {
             Self::DependsOn
@@ -473,11 +396,13 @@ impl RelVerb {
     }
 
     /// All permitted verb variants.
+    #[must_use]
     pub fn permitted() -> &'static [Self] {
         &[Self::Root, Self::References, Self::Supersedes]
     }
 
     /// All legacy verb variants.
+    #[must_use]
     pub fn legacy() -> &'static [Self] {
         &[
             Self::DependsOn,
@@ -495,6 +420,7 @@ impl RelVerb {
     }
 
     /// Parse a verb string from the `## Related` section.
+    #[must_use]
     pub fn parse(s: &str) -> Option<Self> {
         match s.trim() {
             "Root" => Some(Self::Root),
@@ -539,11 +465,10 @@ impl fmt::Display for RelVerb {
 }
 
 /// Parse an ADR ID from a string like `CHE-0042` or `PAR-0006`.
+#[must_use]
 pub fn parse_adr_id_from_str(s: &str) -> Option<AdrId> {
     let s = s.trim();
-    let dash = s.find('-')?;
-    let prefix = &s[..dash];
-    let num_str = &s[dash + 1..];
+    let (prefix, num_str) = s.split_once('-')?;
 
     // Take only leading digits (ignore trailing annotations)
     let digits: String = num_str.chars().take_while(char::is_ascii_digit).collect();
@@ -563,43 +488,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn permitted_verbs() {
-        assert!(RelVerb::Root.is_permitted());
-        assert!(RelVerb::References.is_permitted());
-        assert!(RelVerb::Supersedes.is_permitted());
-    }
-
-    #[test]
-    fn legacy_verbs_not_permitted() {
-        let legacy = [
-            RelVerb::DependsOn,
-            RelVerb::Extends,
-            RelVerb::Illustrates,
-            RelVerb::ContrastsWith,
-            RelVerb::ScopedBy,
-        ];
-        for verb in legacy {
-            assert!(!verb.is_permitted(), "{verb} should not be permitted");
-        }
-    }
-
-    #[test]
-    fn reverse_verbs_not_permitted() {
-        let reverse = [
-            RelVerb::Informs,
-            RelVerb::ExtendedBy,
-            RelVerb::IllustratedBy,
-            RelVerb::ReferencedBy,
-            RelVerb::SupersededBy,
-            RelVerb::Scopes,
-        ];
-        for verb in reverse {
-            assert!(!verb.is_permitted(), "{verb} should not be permitted");
-            assert!(verb.is_reverse(), "{verb} should be reverse");
-        }
-    }
-
-    #[test]
     fn parse_adr_id() {
         let id = parse_adr_id_from_str("CHE-0042").unwrap();
         assert_eq!(id.prefix, "CHE");
@@ -611,6 +499,16 @@ mod tests {
     fn parse_adr_id_with_trailing_text() {
         let id = parse_adr_id_from_str("CHE-0021").unwrap();
         assert_eq!(id.number, 21);
+    }
+
+    #[test]
+    fn parse_adr_id_non_ascii_prefix() {
+        // Prefixes with multi-byte chars should still split correctly
+        let id = parse_adr_id_from_str("ÄDR-0001");
+        assert!(id.is_some());
+        let id = id.unwrap();
+        assert_eq!(id.prefix, "ÄDR");
+        assert_eq!(id.number, 1);
     }
 
     #[test]
@@ -696,7 +594,6 @@ mod tests {
             assert!(!tier.name().is_empty(), "{tier:?} name");
             assert!(!tier.description().is_empty(), "{tier:?} description");
             assert!(!tier.stability().is_empty(), "{tier:?} stability");
-            assert!(!tier.assignment_guide().is_empty(), "{tier:?} guide");
         }
     }
 
@@ -723,28 +620,6 @@ mod tests {
             })
             .is_terminal()
         );
-    }
-
-    #[test]
-    fn status_descriptions_non_empty() {
-        let variants = [
-            Status::Draft,
-            Status::Proposed,
-            Status::Accepted,
-            Status::Rejected,
-            Status::Deprecated,
-            Status::SupersededBy(AdrId {
-                prefix: "CHE".into(),
-                number: 1,
-            }),
-            Status::Invalid("bad".into()),
-        ];
-        for status in &variants {
-            assert!(
-                !status.description().is_empty(),
-                "{status:?} description is empty"
-            );
-        }
     }
 
     #[test]

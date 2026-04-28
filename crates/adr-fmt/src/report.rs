@@ -5,6 +5,7 @@ use std::path::Path;
 
 /// Diagnostic severity.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(dead_code)] // Error variant is matched in output rendering but never constructed yet
 pub enum Severity {
     Error,
     Warning,
@@ -32,18 +33,6 @@ pub struct Diagnostic {
 }
 
 impl Diagnostic {
-    #[allow(dead_code)] // Symmetric with warning(); retained for future use
-    pub fn error(rule: &'static str, file: &Path, line: usize, message: String) -> Self {
-        Self {
-            severity: Severity::Error,
-            rule,
-            file: file.display().to_string(),
-            line,
-            message,
-            internal: false,
-        }
-    }
-
     pub fn warning(rule: &'static str, file: &Path, line: usize, message: String) -> Self {
         Self {
             severity: Severity::Warning,
@@ -53,28 +42,5 @@ impl Diagnostic {
             message,
             internal: false,
         }
-    }
-}
-
-/// Print a diagnostic to stderr in a compiler-style format.
-#[allow(dead_code)] // Available for legacy/debug use
-pub fn print_diagnostic(d: &Diagnostic) {
-    if d.line > 0 {
-        eprintln!(
-            "{severity}[{rule}]: {file}:{line}: {message}",
-            severity = d.severity,
-            rule = d.rule,
-            file = d.file,
-            line = d.line,
-            message = d.message,
-        );
-    } else {
-        eprintln!(
-            "{severity}[{rule}]: {file}: {message}",
-            severity = d.severity,
-            rule = d.rule,
-            file = d.file,
-            message = d.message,
-        );
     }
 }
