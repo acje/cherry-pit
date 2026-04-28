@@ -50,5 +50,6 @@ R3 [2]: Add compile-fail tests for every type safety contract to
   compiler tests them continuously.
 - Users learn framework constraints from compiler errors, not from
   documentation or runtime panics.
+- At serialization boundaries (CHE-0022, CHE-0031), the compile-time/runtime boundary shifts — deserialized data requires runtime validation as primary enforcement since the compiler cannot verify wire-format correctness.
 - See `docs/agent-guidance.md` for prescriptive application of this
   principle during framework customization.

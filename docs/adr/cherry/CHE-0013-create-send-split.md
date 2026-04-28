@@ -61,3 +61,4 @@ R3 [5]: Model aggregate termination as a domain event, not as an
 - The naming asymmetry (`send` on Gateway vs `dispatch` on Bus) is
   intentional: Gateway is the external API, Bus is the internal
   mechanism.
+- In distributed deployments, `create` idempotency must be handled at a higher level (CHE-0041) — if a create command is retried after a network partition, duplicate detection prevents double-creation.

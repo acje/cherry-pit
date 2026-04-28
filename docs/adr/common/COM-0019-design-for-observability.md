@@ -7,7 +7,7 @@ Status: Proposed
 
 ## Related
 
-References: COM-0003, COM-0005, COM-0007, COM-0010
+References: COM-0001, COM-0003, COM-0005, COM-0007, COM-0010
 
 ## Context
 

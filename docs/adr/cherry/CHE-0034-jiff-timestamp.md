@@ -45,3 +45,4 @@ jiff = { version = "0.2", features = ["serde"] }
 - Single timestamp per batch — `build_envelopes` calls `Timestamp::now()` once (CHE-0036).
 - `jiff::Timestamp` is embedded in every serialized envelope. Switching libraries requires migrating all persisted events.
 - jiff 0.2 is pre-1.0. A golden-file regression test (CHE-0038) catches serde format changes before incompatible data is written.
+- In distributed deployments, clock skew between nodes makes timestamps unreliable for event ordering — sequence numbers (not timestamps) determine causal order within an aggregate stream.

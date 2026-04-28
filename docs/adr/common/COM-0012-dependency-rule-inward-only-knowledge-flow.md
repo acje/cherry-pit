@@ -1,7 +1,7 @@
 # COM-0012. Dependency Rule — Inward-Only Knowledge Flow
 
 Date: 2026-04-26
-Last-reviewed: 2026-04-26
+Last-reviewed: 2026-04-28
 Tier: S
 Status: Accepted
 

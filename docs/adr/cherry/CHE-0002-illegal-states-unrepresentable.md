@@ -44,5 +44,6 @@ R4 [2]: Reserve runtime guards for defense-in-depth only, never as
   failure modes at call sites.
 - Users defining aggregates, events, and commands inherit this
   discipline — the framework's trait bounds enforce it transitively.
+- At serialization boundaries (CHE-0022, CHE-0031), external data re-introduces the possibility of invalid states — validated constructors and `Deserialize` implementations become the primary enforcement, not just defense-in-depth.
 - See `docs/agent-guidance.md` for prescriptive application of this
   principle during framework customization.

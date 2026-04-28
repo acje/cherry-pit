@@ -57,3 +57,4 @@ R3 [6]: Continue event_id from the old stream's last value plus one
   At 1 billion events per second, overflow occurs after ~584 years.
 - **Negative:** `event_id` is the first field in `Event<T>` — changing its
   position breaks the genome schema hash.
+- **Dependency:** JetStream's dedup window (`max_age` on the stream) is finite (default 2 minutes). If a phantom event's retry arrives after the window expires, `Nats-Msg-Id` deduplication silently fails. The `publish_timeout` (PAR-0008) must be well within the dedup window for the idempotency guarantee to hold.

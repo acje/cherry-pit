@@ -46,3 +46,7 @@ R3 [5]: Cherry-pit-web HTTP endpoints rely on Cloud Run TLS
   rotation become deployment requirements.
 - **Development friction.** Local NATS requires self-signed certs or
   a TLS-disable flag scoped to dev profiles.
+- **Availability coupling.** Certificate expiry causes total NATS
+  connection failure — transport security becomes an availability
+  dependency (SEC-0003). Automated rotation and expiry monitoring
+  are operational prerequisites.

@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-References: PAR-0005, PAR-0007
+References: PAR-0004, PAR-0005, PAR-0007
 
 ## Context
 

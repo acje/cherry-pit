@@ -59,3 +59,4 @@ R3 [4]: handle returns Result<Vec<Event>, Error> as plain data with
 - **Purity is convention, not compiler-enforced.** `&self` prevents mutation but nothing prevents I/O, global state, or non-deterministic calls. Enforcement relies on code review.
 - No `Clone` on commands (CHE-0014) means the framework cannot retry — callers must reconstruct.
 - Zero events returned (`Ok(vec![])`) means idempotent acceptance: no persistence, no publication.
+- Pure handlers enable deterministic replay — given the same aggregate state and the same command, the same events are produced, which is critical for testing and diagnosing issues in distributed deployments.

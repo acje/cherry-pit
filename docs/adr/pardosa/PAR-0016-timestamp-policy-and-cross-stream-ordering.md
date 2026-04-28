@@ -47,3 +47,8 @@ R3 [6]: Consumers correlating events across multiple streams compare
 - **Timestamp still useful** for human-readable audit, approximate
   time-windowed queries, and single-stream ordering where event_id
   is unavailable.
+- **Cross-stream sequences are incomparable.** JetStream sequence
+  numbers are per-stream counters — sequence 42 in stream A has no
+  causal relationship to sequence 42 in stream B. Consumers
+  correlating across streams must join on domain-level keys (e.g.,
+  order_id), not on sequence equality.

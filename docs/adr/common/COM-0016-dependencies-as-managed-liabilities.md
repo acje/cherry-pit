@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-References: COM-0001
+References: COM-0001, RST-0004
 
 ## Context
 

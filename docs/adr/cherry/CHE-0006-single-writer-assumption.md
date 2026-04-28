@@ -45,4 +45,5 @@ R2 [2]: Use optimistic concurrency as defense-in-depth within the
 - Horizontal scaling per aggregate is impossible.
 - No fencing existed at the storage level. **Mitigated**: CHE-0043 adds advisory file locking (`flock`) that detects a second writer on the same directory.
 - Multi-node deployment requires external routing (NATS subject partitioning, process registry) — currently undesigned.
+- Single-writer simplifies idempotency (CHE-0041): sequence numbers are monotonic within one writer, so duplicate detection reduces to a simple high-water-mark check rather than requiring distributed deduplication.
 - The single-writer assumption is load-bearing. Changing it requires significant rearchitecture.

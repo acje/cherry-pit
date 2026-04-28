@@ -7,7 +7,7 @@ Status: Proposed
 
 ## Related
 
-References: SEC-0001, SEC-0002, SEC-0004
+References: SEC-0001, SEC-0002, SEC-0004, RST-0004
 
 ## Context
 
