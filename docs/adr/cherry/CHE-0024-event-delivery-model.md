@@ -3,13 +3,7 @@
 Date: 2026-04-25
 Last-reviewed: 2026-04-27
 Tier: B
-
-## Status
-
-Accepted
-
-Amended 2026-04-27 — expanded Context with delivery guarantee
-  comparison
+Status: Accepted
 
 ## Related
 

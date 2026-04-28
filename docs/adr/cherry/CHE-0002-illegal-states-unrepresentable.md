@@ -3,13 +3,7 @@
 Date: 2026-04-25
 Last-reviewed: 2026-04-27
 Tier: S
-
-## Status
-
-Accepted
-
-Amended 2026-04-27 — added quantitative enforcement asymmetry to
-  Context
+Status: Accepted
 
 ## Related
 

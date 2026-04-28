@@ -3,14 +3,7 @@
 Date: 2026-04-24
 Last-reviewed: 2026-04-27
 Tier: S
-
-## Status
-
-Accepted
-
-Amended 2026-04-25 — added COM cross-reference
-Amended 2026-04-27 — expanded alternatives analysis and object-safety
-  consequences
+Status: Accepted
 
 ## Related
 

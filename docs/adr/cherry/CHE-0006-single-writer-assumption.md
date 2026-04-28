@@ -3,12 +3,7 @@
 Date: 2026-04-24
 Last-reviewed: 2026-04-27
 Tier: S
-
-## Status
-
-Accepted
-
-Amended 2026-04-27 — added PAR-0004 cross-reference
+Status: Accepted
 
 ## Related
 

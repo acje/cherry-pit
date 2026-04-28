@@ -3,12 +3,7 @@
 Date: 2026-04-25
 Last-reviewed: 2026-04-25
 Tier: B
-
-## Status
-
-Accepted
-
-Amended 2026-04-25 — alternatives analysis added
+Status: Accepted
 
 ## Related
 

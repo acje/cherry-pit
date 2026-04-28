@@ -3,10 +3,7 @@
 Date: 2026-04-25
 Last-reviewed: 2026-04-25
 Tier: D
-
-## Status
-
-Accepted
+Status: Accepted
 
 ## Related
 

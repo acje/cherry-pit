@@ -3,13 +3,7 @@
 Date: 2026-04-24
 Last-reviewed: 2026-04-27
 Tier: S
-
-## Status
-
-Accepted
-
-Amended 2026-04-27 — expanded Context with forces-in-tension and
-  alternatives analysis; added negative consequences
+Status: Accepted
 
 ## Related
 

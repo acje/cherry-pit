@@ -3,14 +3,7 @@
 Date: 2026-04-25
 Last-reviewed: 2026-04-25
 Tier: A
-
-## Status
-
-Accepted
-
-Amended 2026-04-25 — structured parsing and extended type recursion
-
-Amended 2026-04-25 — serde(with) escape hatch documented
+Status: Accepted
 
 ## Related
 

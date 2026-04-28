@@ -3,12 +3,7 @@
 Date: 2026-04-25
 Last-reviewed: 2026-04-25
 Tier: S
-
-## Status
-
-Accepted
-
-Amended 2026-04-25 — fencing mandatory via Nats-Expected-Last-Subject-Sequence
+Status: Accepted
 
 ## Related
 

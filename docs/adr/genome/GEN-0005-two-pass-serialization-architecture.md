@@ -3,12 +3,7 @@
 Date: 2026-04-25
 Last-reviewed: 2026-04-27
 Tier: A
-
-## Status
-
-Accepted
-
-Amended 2026-04-27 — expanded alternatives comparison in Context
+Status: Accepted
 
 ## Related
 

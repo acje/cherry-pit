@@ -3,10 +3,7 @@
 Date: 2026-04-27
 Last-reviewed: 2026-04-27
 Tier: A
-
-## Status
-
-Superseded by AFM-0011
+Status: Superseded by AFM-0011
 
 ## Related
 
