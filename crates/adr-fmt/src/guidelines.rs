@@ -215,7 +215,7 @@ fn print_template() {
     println!("    T010  Consequences section present");
     println!("    T011  Code block size limit (max 20 lines)");
     println!("    T014  Section order (Related → Context → Decision → Consequences)");
-    println!("    T015  Prose section word count (7–50 words: Context, Consequences, Retirement)");
+    println!("    T015  Prose section word count (default 7–50, override via adr-fmt.toml: Context, Consequences, Retirement)");
     println!("    T016  Tagged rules in Decision (≥1 rule, sequential IDs, max 5, 7–60 words)");
     println!();
 }
@@ -257,7 +257,7 @@ fn print_relationships() {
     println!();
     println!("  Usage:");
     println!("    • Every ADR must have ≥1 relationship");
-    println!("    • Tree roots use `- Root: OWN-ID`");
+    println!("    • Tree roots use `Root: OWN-ID`");
     println!("    • Root + References cannot coexist (L009)");
     println!("    • Root + Supersedes may coexist");
     println!("    • Supersedes requires target status = `Superseded by PREFIX-NNNN`");

@@ -94,7 +94,7 @@ crates = ["adr-fmt"]
 
 [[rules]]
 id = "T015"
-params = { min_words = 7, max_words = 50 }
+params = { min_words = 7, max_words = 100 }
 
 [[rules]]
 id = "T016"

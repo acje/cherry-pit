@@ -10,40 +10,18 @@ Accepted
 
 ## Related
 
-- References: AFM-0001
+References: AFM-0001
 
 ## Context
 
-Lint tools face a fundamental design tension between strictness and
-adoption. A tool that fails the build on any warning creates
-pressure to suppress warnings rather than fix them. A tool that
-produces no signal on violations is ignored entirely. The useful
-middle ground is advisory output that is visible, actionable, and
-non-blocking.
-
-Rust's own `clippy` navigates this tension with lint levels:
-`warn` by default, `deny` opt-in. However, `clippy` operates
-within the compiler's diagnostic infrastructure and benefits from
-IDE integration. `adr-fmt` operates on markdown files in a
-documentation directory — a fundamentally different feedback loop.
-
-The ADR corpus is authored by humans writing prose. Draft ADRs are
-intentionally incomplete. Proposed ADRs may have placeholder
-relationships. Forcing a zero-warning state before a PR can be
-opened would discourage ADR creation — the opposite of the desired
-outcome.
-
-Two exit-code strategies exist for advisory tools:
-
-1. **Exit non-zero on warnings** — treats all diagnostics as
-   failures. CI can gate on this. Risk: authors suppress or ignore
-   warnings to unblock merges.
-
-2. **Exit zero on warnings, non-zero only on infrastructure
-   errors** — diagnostics are informational. The tool always
-   succeeds unless it cannot function (missing config, unreadable
-   files). Risk: warnings may be overlooked without process
-   discipline.
+Lint tools face a tension between strictness and adoption. Failing
+builds on any warning pressures authors to suppress rather than fix.
+ADR files are authored as prose — drafts are intentionally incomplete
+and proposed ADRs may have placeholder relationships. Forcing zero
+warnings before merge would discourage ADR creation. Two exit-code
+strategies exist: non-zero on warnings (risks suppression) or zero
+on warnings with non-zero only for infrastructure errors (risks
+overlooked warnings without process discipline).
 
 ## Decision
 
@@ -51,44 +29,19 @@ Two exit-code strategies exist for advisory tools:
 infrastructure errors. All validation rules emit warnings, never
 errors.
 
-### Exit-Code Contract
-
-- **Exit 0** — lint complete. Zero or more warnings may be present
-  on stderr. Callers must parse stderr to determine if issues
-  exist. This code means "the tool functioned correctly" not "the
-  ADRs are clean."
-
-- **Exit 1** — infrastructure failure. The tool could not complete
-  its work: missing `adr-fmt.toml`, no domain directories found,
-  unreadable files, invalid configuration. This code means "the
-  tool itself is broken or misconfigured."
-
-### Severity Model
-
-All diagnostics use a single severity level: `Warning`. There is
-no `Error` severity for rule violations. The `Diagnostic` struct
-carries a severity field for future extensibility, but the current
-rule catalog never produces errors.
-
-### Process Enforcement
-
-Warning visibility is a process concern, not a tool concern.
-Teams that want zero-warning enforcement can wrap `adr-fmt` in a
-CI script that parses stderr for warning counts and fails the
-pipeline accordingly. The tool does not embed this policy.
+- **R1**: Exit 0 means lint completed successfully; exit 1 means
+  the tool could not function (missing config, unreadable files,
+  invalid configuration)
+- **R2**: All diagnostics use warning severity; no error severity
+  exists for rule violations
+- **R3**: Zero-warning enforcement is a process concern delegated
+  to CI wrapper scripts that parse stderr for warning counts
 
 ## Consequences
 
-- Authors can write Draft ADRs with incomplete sections and still
-  get useful feedback without being blocked from committing.
-- CI integration requires a wrapper script if zero-warning
-  enforcement is desired — the tool does not provide this out of
-  the box.
-- The "exit 0 does not mean clean" semantics must be documented
-  clearly. Callers who check only exit codes will miss warnings.
-- Future addition of an `--error-on-warning` flag is compatible
-  with this architecture — it would be a mode change, not a
-  semantic change.
-- The advisory model aligns with Rust ecosystem conventions:
-  `cargo fmt` exits 0 even when it reformats files, `cargo clippy`
-  defaults to warnings not errors.
+Authors can write Draft ADRs with incomplete sections without being
+blocked. CI integration requires a wrapper if zero-warning
+enforcement is desired. The "exit 0 does not mean clean" semantics
+must be documented. Future `--error-on-warning` flag is compatible
+as a mode change. The model aligns with Rust conventions: `cargo
+fmt` and `cargo clippy` default to non-blocking output.

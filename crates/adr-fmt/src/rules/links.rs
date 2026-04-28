@@ -65,9 +65,11 @@ fn check_single_link(
     }
 
     // L007: Stale reference — target is in stale archive
+    // Exempt Supersedes relationships: they inherently target stale ADRs.
     if let Some(target_record) = by_id.get(target_id)
         && target_record.is_stale
         && !source.is_stale
+        && rel.verb != RelVerb::Supersedes
     {
         diags.push(Diagnostic::warning(
             "L007",
@@ -362,6 +364,42 @@ mod tests {
         assert!(
             diags.iter().any(|d| d.rule == "L007"),
             "expected L007, got: {diags:?}"
+        );
+    }
+
+    #[test]
+    fn supersedes_stale_no_l007() {
+        let mut target = make_record_with_rels("CHE", 1, vec![(RelVerb::Root, make_id("CHE", 1))]);
+        target.is_stale = true;
+        target.status = Some(Status::SupersededBy(make_id("CHE", 2)));
+        target.status_raw = Some("Superseded by CHE-0002".into());
+
+        let records = vec![
+            make_record_with_rels("CHE", 2, vec![(RelVerb::Supersedes, make_id("CHE", 1))]),
+            target,
+        ];
+        let mut diags = Vec::new();
+        check(&records, &mut diags);
+        assert!(
+            !diags.iter().any(|d| d.rule == "L007"),
+            "Supersedes→stale should not trigger L007, got: {diags:?}"
+        );
+    }
+
+    #[test]
+    fn stale_source_references_stale_no_l007() {
+        let mut source = make_record_with_rels("CHE", 2, vec![(RelVerb::References, make_id("CHE", 1))]);
+        source.is_stale = true;
+
+        let mut target = make_record_with_rels("CHE", 1, vec![(RelVerb::Root, make_id("CHE", 1))]);
+        target.is_stale = true;
+
+        let records = vec![source, target];
+        let mut diags = Vec::new();
+        check(&records, &mut diags);
+        assert!(
+            !diags.iter().any(|d| d.rule == "L007"),
+            "stale→stale should not trigger L007, got: {diags:?}"
         );
     }
 }
