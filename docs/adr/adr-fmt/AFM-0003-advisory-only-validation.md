@@ -1,8 +1,8 @@
 # AFM-0003. Advisory-Only Validation With Exit-Code Semantics
 
 Date: 2026-04-27
-Last-reviewed: 2026-04-27
-Tier: A
+Last-reviewed: 2026-04-28
+Tier: B
 Status: Accepted
 
 ## Related

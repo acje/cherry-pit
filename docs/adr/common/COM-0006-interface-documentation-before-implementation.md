@@ -1,8 +1,8 @@
 # COM-0006. Interface Documentation Before Implementation
 
 Date: 2026-04-25
-Last-reviewed: 2026-04-25
-Tier: C
+Last-reviewed: 2026-04-28
+Tier: B
 Status: Accepted
 
 ## Related

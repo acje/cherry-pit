@@ -1,8 +1,8 @@
 # COM-0016. Dependencies as Managed Liabilities
 
 Date: 2026-04-27
-Last-reviewed: 2026-04-27
-Tier: A
+Last-reviewed: 2026-04-28
+Tier: B
 Status: Accepted
 
 ## Related

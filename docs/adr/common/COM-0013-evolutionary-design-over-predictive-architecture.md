@@ -1,8 +1,8 @@
 # COM-0013. Evolutionary Design Over Predictive Architecture
 
 Date: 2026-04-26
-Last-reviewed: 2026-04-26
-Tier: A
+Last-reviewed: 2026-04-28
+Tier: B
 Status: Accepted
 
 ## Related

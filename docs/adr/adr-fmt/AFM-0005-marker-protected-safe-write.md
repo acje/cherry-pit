@@ -1,8 +1,8 @@
 # AFM-0005. Marker-Protected Safe-Write for Generated Files
 
 Date: 2026-04-27
-Last-reviewed: 2026-04-27
-Tier: A
+Last-reviewed: 2026-04-28
+Tier: B
 Status: Accepted
 
 ## Related

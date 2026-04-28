@@ -1,8 +1,8 @@
 # GEN-0016. xxHash64 for File Integrity Checksums
 
 Date: 2026-04-25
-Last-reviewed: 2026-04-25
-Tier: B
+Last-reviewed: 2026-04-28
+Tier: D
 Status: Accepted
 
 ## Related

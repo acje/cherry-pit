@@ -1,8 +1,8 @@
 # COM-0017. Mechanized Invariant Enforcement
 
 Date: 2026-04-27
-Last-reviewed: 2026-04-27
-Tier: A
+Last-reviewed: 2026-04-28
+Tier: B
 Status: Accepted
 
 ## Related

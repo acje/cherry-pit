@@ -1,8 +1,8 @@
 # RST-0001. Pinned Stable Toolchain with MSRV Contract
 
 Date: 2026-04-27
-Last-reviewed: 2026-04-27
-Tier: C
+Last-reviewed: 2026-04-28
+Tier: B
 Status: Accepted
 
 ## Related

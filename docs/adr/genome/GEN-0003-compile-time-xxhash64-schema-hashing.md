@@ -1,8 +1,8 @@
 # GEN-0003. Compile-Time xxHash64 Schema Hashing
 
 Date: 2026-04-25
-Last-reviewed: 2026-04-25
-Tier: A
+Last-reviewed: 2026-04-28
+Tier: B
 Status: Accepted
 
 ## Related

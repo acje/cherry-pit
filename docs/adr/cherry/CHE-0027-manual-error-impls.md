@@ -1,8 +1,8 @@
 # CHE-0027. Manual Error Trait Implementations in cherry-pit-core
 
 Date: 2026-04-25
-Last-reviewed: 2026-04-25
-Tier: C
+Last-reviewed: 2026-04-28
+Tier: D
 Status: Accepted
 
 ## Related

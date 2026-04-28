@@ -1,8 +1,8 @@
 # AFM-0002. Manual CLI Argument Parsing Over Clap
 
 Date: 2026-04-27
-Last-reviewed: 2026-04-27
-Tier: B
+Last-reviewed: 2026-04-28
+Tier: D
 Status: Accepted
 
 ## Related

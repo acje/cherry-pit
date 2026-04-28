@@ -1,8 +1,8 @@
 # GEN-0010. std-Only for Now — no_std Deferred
 
 Date: 2026-04-25
-Last-reviewed: 2026-04-25
-Tier: C
+Last-reviewed: 2026-04-28
+Tier: D
 Status: Accepted
 
 ## Related

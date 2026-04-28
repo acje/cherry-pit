@@ -1,8 +1,8 @@
 # CHE-0025. RPITIT Over async_trait
 
 Date: 2026-04-24
-Last-reviewed: 2026-04-25
-Tier: C
+Last-reviewed: 2026-04-28
+Tier: D
 Status: Accepted
 
 ## Related

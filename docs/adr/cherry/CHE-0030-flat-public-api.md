@@ -1,8 +1,8 @@
 # CHE-0030. Flat Public API via Private Modules
 
 Date: 2026-04-25
-Last-reviewed: 2026-04-25
-Tier: C
+Last-reviewed: 2026-04-28
+Tier: B
 Status: Accepted
 
 ## Related

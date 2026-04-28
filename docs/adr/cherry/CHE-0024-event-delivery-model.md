@@ -1,8 +1,8 @@
 # CHE-0024. Event Delivery Model
 
 Date: 2026-04-25
-Last-reviewed: 2026-04-27
-Tier: B
+Last-reviewed: 2026-04-28
+Tier: C
 Status: Accepted
 
 ## Related

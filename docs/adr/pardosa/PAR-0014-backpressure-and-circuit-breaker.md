@@ -1,8 +1,8 @@
 # PAR-0014. Backpressure and Circuit Breaker
 
 Date: 2026-04-25
-Last-reviewed: 2026-04-25
-Tier: D
+Last-reviewed: 2026-04-28
+Tier: C
 Status: Accepted
 
 ## Related

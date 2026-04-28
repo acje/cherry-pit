@@ -1,8 +1,8 @@
 # PAR-0011. 64-bit Target Requirement
 
 Date: 2026-04-25
-Last-reviewed: 2026-04-25
-Tier: C
+Last-reviewed: 2026-04-28
+Tier: D
 Status: Accepted
 
 ## Related

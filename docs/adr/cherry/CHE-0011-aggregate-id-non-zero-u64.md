@@ -1,8 +1,8 @@
 # CHE-0011. AggregateId as NonZeroU64 Newtype
 
 Date: 2026-04-24
-Last-reviewed: 2026-04-25
-Tier: A
+Last-reviewed: 2026-04-28
+Tier: B
 Status: Accepted
 
 ## Related

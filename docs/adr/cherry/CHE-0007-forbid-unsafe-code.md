@@ -1,8 +1,8 @@
 # CHE-0007. Forbid Unsafe Code
 
 Date: 2026-04-25
-Last-reviewed: 2026-04-25
-Tier: A
+Last-reviewed: 2026-04-28
+Tier: B
 Status: Accepted
 
 ## Related
