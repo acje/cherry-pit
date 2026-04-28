@@ -293,6 +293,35 @@ This ADR has tagged rules with a gap in numbering.
 The linter should report a T016 warning for non-sequential rule IDs.
 ";
 
+/// ADR using legacy `## Status` section format (triggers T005c).
+const LEGACY_STATUS_ADR: &str = "\
+# TST-0011. Legacy Status Format
+
+Date: 2026-04-27
+Last-reviewed: 2026-04-27
+Tier: B
+
+## Status
+
+Accepted
+
+## Related
+
+Root: TST-0011
+
+## Context
+
+This ADR uses the legacy section format for status instead of the preamble field.
+
+## Decision
+
+- **R1**: Legacy status section format should produce a T005c migration warning.
+
+## Consequences
+
+The linter should report a T005c warning suggesting migration to preamble format.
+";
+
 /// Create test corpus in a tempdir with optional multi-domain support.
 ///
 /// `domains` is a slice of (`domain_directory`, &[(filename, content)]) tuples.
@@ -485,6 +514,34 @@ fn t016_tagged_rules_present_no_warning() {
         .assert()
         .success()
         .stdout(predicate::str::contains("T016").not());
+}
+
+// ── T005c legacy status section ────────────────────────────────────
+
+#[test]
+fn t005c_legacy_status_section() {
+    let dir = setup_corpus(
+        MINIMAL_CONFIG,
+        &[("TST-0011-legacy-status-format.md", LEGACY_STATUS_ADR)],
+    );
+
+    adr_fmt()
+        .args(["--lint", &adr_root(&dir)])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("T005c"));
+}
+
+#[test]
+fn t005c_preamble_status_field_no_warning() {
+    let dir = setup_corpus(MINIMAL_CONFIG, &[("TST-0001-valid-test-adr.md", VALID_ADR)]);
+
+    // VALID_ADR uses `Status: Accepted` preamble field — no T005c
+    adr_fmt()
+        .args(["--lint", &adr_root(&dir)])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("T005c").not());
 }
 
 // ── critique mode ──────────────────────────────────────────────────

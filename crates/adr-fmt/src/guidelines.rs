@@ -208,6 +208,8 @@ fn print_template() {
     println!("    T003  Last-reviewed field present (YYYY-MM-DD)");
     println!("    T004  Tier field present (S/A/B/C/D)");
     println!("    T005  Status present (metadata field or legacy ## Status section)");
+    println!("    T005b Dual-status conflict (both preamble field and ## Status section)");
+    println!("    T005c Legacy ## Status section — migrate to Status: preamble field");
     println!("    T006  Status is a recognized keyword (rejects Amended)");
     println!("    T007  Related section present with at least one relationship");
     println!("    T008  Context section present");

@@ -5,6 +5,8 @@
 //! T003: Last-reviewed field required (all tiers)
 //! T004: Tier field present
 //! T005: Status section present
+//! T005b: Dual-status conflict (both preamble field and ## Status section)
+//! T005c: Legacy ## Status section — migrate to Status: preamble field
 //! T006: Status value valid (strict keyword, no parentheticals)
 //! T007: Related section with at least one relationship
 //! T008: Context section present
@@ -126,6 +128,20 @@ pub fn check(record: &AdrRecord, config: &Config, diags: &mut Vec<Diagnostic>) {
             record.status_line,
             "both `Status:` metadata field and `## Status` section present — \
              metadata field takes precedence; remove the `## Status` section"
+                .into(),
+        ));
+    }
+
+    // T005c: Legacy ## Status section — migrate to preamble field
+    // Invariant: status_from_section implies !has_dual_status
+    // (status_field must be None for status_from_section to be true)
+    if record.status_from_section {
+        diags.push(Diagnostic::warning(
+            "T005c",
+            &record.file_path,
+            record.status_line,
+            "status uses legacy `## Status` section — migrate to \
+             `Status:` preamble metadata field (e.g., `Status: Accepted`)"
                 .into(),
         ));
     }
@@ -1175,6 +1191,74 @@ params = { max_rules = 5, min_rule_words = 7, max_rule_words = 60 }
         assert!(
             t005b.is_none(),
             "no dual status should not produce T005b, got: {diags:?}"
+        );
+    }
+
+    #[test]
+    fn legacy_status_section_produces_t005c() {
+        let mut record = make_record();
+        record.status_from_section = true;
+        record.section_order = vec![
+            "Status".into(),
+            "Related".into(),
+            "Context".into(),
+            "Decision".into(),
+            "Consequences".into(),
+        ];
+        let config = make_config();
+        let mut diags = Vec::new();
+        check(&record, &config, &mut diags);
+        let t005c = diags.iter().find(|d| d.rule == "T005c");
+        assert!(
+            t005c.is_some(),
+            "legacy ## Status section should produce T005c, got: {diags:?}"
+        );
+        assert!(
+            t005c.unwrap().message.contains("migrate"),
+            "T005c message should mention migration"
+        );
+    }
+
+    #[test]
+    fn metadata_status_field_no_t005c() {
+        use crate::model::{RelVerb, Relationship, TaggedRule};
+        let mut record = make_record();
+        record.status_from_section = false;
+        record.relationships = vec![Relationship {
+            verb: RelVerb::Root,
+            target: record.id.clone(),
+            line: 10,
+        }];
+        record.decision_rules = vec![TaggedRule {
+            id: "R1".into(),
+            text: "All events must be versioned with semantic version numbers".into(),
+            line: 10,
+        }];
+        let config = make_config();
+        let mut diags = Vec::new();
+        check(&record, &config, &mut diags);
+        assert!(
+            !diags.iter().any(|d| d.rule == "T005c"),
+            "metadata field format should not produce T005c, got: {diags:?}"
+        );
+    }
+
+    #[test]
+    fn no_status_anywhere_no_t005c() {
+        let mut record = make_record();
+        record.status = None;
+        record.status_raw = None;
+        record.status_from_section = false;
+        let config = make_config();
+        let mut diags = Vec::new();
+        check(&record, &config, &mut diags);
+        assert!(
+            diags.iter().any(|d| d.rule == "T005"),
+            "missing status should produce T005, got: {diags:?}"
+        );
+        assert!(
+            !diags.iter().any(|d| d.rule == "T005c"),
+            "missing status should not produce T005c, got: {diags:?}"
         );
     }
 }

@@ -73,6 +73,11 @@ pub struct AdrRecord {
     /// True when both `Status:` metadata field and `## Status` section
     /// are present — the metadata field takes precedence.
     pub has_dual_status: bool,
+    /// True when status was parsed from the legacy `## Status` section
+    /// (not the `Status:` preamble metadata field). Invariant: when
+    /// this is true, `has_dual_status` is always false (because
+    /// `status_field` must be `None` for this to be set).
+    pub status_from_section: bool,
     pub max_code_block_lines: usize,
     /// 1-indexed line number of the opening fence of the largest code
     /// block. 0 if no code blocks exist.
@@ -128,6 +133,7 @@ impl Default for AdrRecord {
             is_stale: false,
             is_self_referencing: false,
             has_dual_status: false,
+            status_from_section: false,
             max_code_block_lines: 0,
             max_code_block_line: 0,
             code_block_count: 0,

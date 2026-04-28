@@ -115,6 +115,7 @@ pub fn parse_adr_file(path: &Path, expected_prefix: &str, is_stale: bool) -> Opt
     let (status_section, status_section_line, status_section_raw) = find_status_section(&lines);
 
     let has_dual_status = status_field.is_some() && status_section.is_some();
+    let status_from_section = status_field.is_none() && status_section.is_some();
 
     // Metadata field takes precedence
     let (status, status_line, status_raw) = if status_field.is_some() {
@@ -175,6 +176,7 @@ pub fn parse_adr_file(path: &Path, expected_prefix: &str, is_stale: bool) -> Opt
         is_stale,
         is_self_referencing,
         has_dual_status,
+        status_from_section,
         max_code_block_lines,
         max_code_block_line,
         code_block_count,
@@ -1263,5 +1265,48 @@ mod tests {
         ];
         let (date, _) = find_field(&lines, "Date:");
         assert_eq!(date, None, "Date: inside a section body should not be found");
+    }
+
+    // ── status_from_section provenance tests ───────────────────────
+
+    #[test]
+    fn legacy_status_section_sets_status_from_section() {
+        let lines = vec![
+            "# CHE-0001. Title",
+            "",
+            "Date: 2026-04-27",
+            "Tier: B",
+            "",
+            "## Status",
+            "",
+            "Accepted",
+        ];
+        let (field, _, _) = find_status_field(&lines);
+        let (section, _, _) = find_status_section(&lines);
+        assert!(field.is_none(), "no metadata field");
+        assert!(section.is_some(), "section found");
+
+        let from_section = field.is_none() && section.is_some();
+        let dual = field.is_some() && section.is_some();
+        assert!(from_section, "status_from_section should be true");
+        assert!(!dual, "has_dual_status must be false when status_from_section is true");
+    }
+
+    #[test]
+    fn preamble_status_field_clears_status_from_section() {
+        let lines = vec![
+            "# CHE-0001. Title",
+            "",
+            "Date: 2026-04-27",
+            "Tier: B",
+            "Status: Accepted",
+            "",
+            "## Related",
+        ];
+        let (field, _, _) = find_status_field(&lines);
+        let (section, _, _) = find_status_section(&lines);
+
+        let from_section = field.is_none() && section.is_some();
+        assert!(!from_section, "status_from_section should be false");
     }
 }
