@@ -276,18 +276,28 @@ R2 [5]: Continuation-capable rule that wraps to
   are joined with a space.
 - Global identifier: `PREFIX-NNNN:RN:LN` (e.g., `CHE-0042:R1:L5`)
 - Layer [N]: Meadows leverage point classifying intervention type:
-  - 1–3 → S-tier (paradigm/goals/mindset)
-  - 4 → A-tier (self-organization)
-  - 5–6 → B-tier (rules/information flows)
-  - 7–8 → C-tier (feedback loops/delays)
-  - 9–12 → D-tier (parameters/buffers)
-- Constraints: sequential IDs starting at R1, max 5 per ADR,
+
+| Layer | Leverage point (Meadows) | Tier |
+|-------|--------------------------|------|
+| 1 | The power to transcend paradigms | S |
+| 2 | The mindset or paradigm out of which the system arises | S |
+| 3 | The goals of the system | S |
+| 4 | The power to add, change, evolve, or self-organize system structure | A |
+| 5 | The rules of the system (incentives, punishments, constraints) | B |
+| 6 | The structure of information flows (who does and does not have access) | B |
+| 7 | The gain around driving positive feedback loops | C |
+| 8 | The strength of negative feedback loops | C |
+| 9 | The lengths of delays, relative to the rate of system change | D |
+| 10 | The structure of material stocks and flows | D |
+| 11 | The sizes of buffers and other stabilizing stocks, relative to their flows | D |
+| 12 | Constants, parameters, numbers | D |
+- Constraints: sequential IDs starting at R1, max 10 per ADR,
   7–60 words per rule, layer 1–12
 - All statuses require tagged rules (no Draft/Proposed exemption)
 
-**Why max 5 rules per ADR:** Research shows P(all rules followed)
-= P(individual)^N. At 90% per-rule compliance, 5 rules yield 59%
-all-correct; 10 rules yield 35%. Fewer rules with higher
+**Why max 10 rules per ADR:** Research shows P(all rules followed)
+= P(individual)^N. At 90% per-rule compliance, 10 rules yield 35%
+all-correct; 15 rules yield 21%. Fewer rules with higher
 individual compliance beats more rules.
 
 #### Writing Agent-Optimal Rules
@@ -573,7 +583,7 @@ Existing ADRs using old format (`- **R1**: text`) must migrate to
 the layer-annotated format (`R1 [N]: text`). To migrate:
 
 1. Identify the core enforceable statements in the existing
-   Decision prose — maximum 5 per ADR
+   Decision prose — maximum 10 per ADR
 2. Assign a Meadows leverage layer [1–12] to each rule based on
    the type of intervention it describes
 3. Reframe any prohibitions as positive commissions
@@ -604,5 +614,5 @@ Before submitting a tagged rule, verify:
 - [ ] **One statement?** Does the rule make exactly one enforceable
       claim, not two joined by "and"?
 - [ ] **7–60 words?** Within the T016 bounds?
-- [ ] **≤5 rules per ADR?** If you need more, split the ADR or
+- [ ] **≤10 rules per ADR?** If you need more, split the ADR or
       merge related constraints.

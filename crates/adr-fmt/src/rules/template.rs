@@ -34,7 +34,7 @@ const DEFAULT_MIN_WORDS: u64 = 7;
 const DEFAULT_MAX_WORDS: u64 = 50;
 
 /// Default maximum number of tagged rules per ADR.
-const DEFAULT_MAX_RULES: u64 = 5;
+const DEFAULT_MAX_RULES: u64 = 10;
 
 /// Default minimum words per tagged rule.
 const DEFAULT_MIN_RULE_WORDS: u64 = 7;
@@ -565,7 +565,7 @@ params = { min_words = 7, max_words = 50 }
 
 [[rules]]
 id = "T016"
-params = { max_rules = 5, min_rule_words = 7, max_rule_words = 60 }
+params = { max_rules = 10, min_rule_words = 7, max_rule_words = 60 }
 "#,
         )
         .unwrap()
@@ -1008,7 +1008,7 @@ params = { max_rules = 5, min_rule_words = 7, max_rule_words = 60 }
     fn too_many_rules_produces_t016() {
         use crate::model::TaggedRule;
         let mut record = make_record();
-        record.decision_rules = (1..=6)
+        record.decision_rules = (1..=11)
             .map(|i| TaggedRule {
                 id: format!("R{i}"),
                 text: "This rule has enough words to pass the minimum check here".into(),
@@ -1024,15 +1024,15 @@ params = { max_rules = 5, min_rule_words = 7, max_rule_words = 60 }
             .find(|d| d.rule == "T016" && d.message.contains("maximum"));
         assert!(
             t016_max.is_some(),
-            "6 rules should trigger T016 max (limit 5), got: {diags:?}"
+            "11 rules should trigger T016 max (limit 10), got: {diags:?}"
         );
     }
 
     #[test]
-    fn five_rules_within_limit() {
+    fn ten_rules_within_limit() {
         use crate::model::TaggedRule;
         let mut record = make_record();
-        record.decision_rules = (1..=5)
+        record.decision_rules = (1..=10)
             .map(|i| TaggedRule {
                 id: format!("R{i}"),
                 text: "This rule has enough words to pass the minimum check here".into(),
@@ -1048,7 +1048,7 @@ params = { max_rules = 5, min_rule_words = 7, max_rule_words = 60 }
             .find(|d| d.rule == "T016" && d.message.contains("maximum"));
         assert!(
             t016_max.is_none(),
-            "5 rules should not trigger T016 max, got: {diags:?}"
+            "10 rules should not trigger T016 max, got: {diags:?}"
         );
     }
 

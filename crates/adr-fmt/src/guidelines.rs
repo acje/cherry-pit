@@ -218,7 +218,7 @@ fn print_template() {
     println!("    T011  Code block size limit (max 20 lines)");
     println!("    T014  Section order (Related → Context → Decision → Consequences)");
     println!("    T015  Prose section word count (default 7–50, override via adr-fmt.toml: Context, Consequences, Retirement)");
-    println!("    T016  Tagged rules in Decision (≥1 rule, sequential IDs, max 5, 7–60 words, layer 1–12)");
+    println!("    T016  Tagged rules in Decision (≥1 rule, sequential IDs, max 10, 7–60 words, layer 1–12)");
     println!();
 }
 
@@ -243,7 +243,7 @@ fn print_tagged_rules() {
     println!();
     println!("  Constraints:");
     println!("    • At least 1 tagged rule per Decision section (all statuses)");
-    println!("    • Maximum 5 rules per ADR");
+    println!("    • Maximum 10 rules per ADR");
     println!("    • IDs must be sequential (R1, R2, R3 — no gaps)");
     println!("    • Each rule: 7–60 words");
     println!("    • Layer must be 1–12 (Meadows leverage points)");

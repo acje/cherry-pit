@@ -108,14 +108,24 @@ Format: `RN [L]: text` where N is sequential starting at R1 and L
 is the Meadows leverage layer (1–12).
 
 Layer mapping:
-- 1–3 → S-tier (paradigm/goals/mindset)
-- 4 → A-tier (self-organization)
-- 5–6 → B-tier (rules/information flows)
-- 7–8 → C-tier (feedback loops/delays)
-- 9–12 → D-tier (parameters/buffers)
+
+| Layer | Leverage point (Meadows) | Tier |
+|-------|--------------------------|------|
+| 1 | The power to transcend paradigms | S |
+| 2 | The mindset or paradigm out of which the system arises | S |
+| 3 | The goals of the system | S |
+| 4 | The power to add, change, evolve, or self-organize system structure | A |
+| 5 | The rules of the system (incentives, punishments, constraints) | B |
+| 6 | The structure of information flows (who does and does not have access) | B |
+| 7 | The gain around driving positive feedback loops | C |
+| 8 | The strength of negative feedback loops | C |
+| 9 | The lengths of delays, relative to the rate of system change | D |
+| 10 | The structure of material stocks and flows | D |
+| 11 | The sizes of buffers and other stabilizing stocks, relative to their flows | D |
+| 12 | Constants, parameters, numbers | D |
 
 Constraints:
-- Maximum 5 rules per ADR
+- Maximum 10 rules per ADR
 - 7-60 words per rule
 - Layer must be 1-12
 - Multi-line: indent continuation lines 2+ spaces
