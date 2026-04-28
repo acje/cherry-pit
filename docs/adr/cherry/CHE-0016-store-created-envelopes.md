@@ -11,26 +11,7 @@ References: CHE-0001, CHE-0004, COM-0003
 
 ## Context
 
-When persisting domain events, metadata must be attached: event ID,
-aggregate ID, sequence number, timestamp. Two approaches:
-
-1. **Caller-constructed envelopes** — callers build `EventEnvelope`
-   with all metadata before passing to the store. Risk: mismatched
-   IDs, wrong sequences, inconsistent timestamps.
-2. **Store-constructed envelopes** — callers pass raw `Vec<Event>`,
-   the store stamps all metadata. Risk: none — correct by
-   construction.
-
-Additionally, distributed event-sourced systems need tracing metadata
-to follow causal chains across aggregates and bounded contexts:
-
-- **Correlation ID** groups all events produced by a single logical
-  operation (a command and all downstream policy-triggered commands).
-- **Causation ID** identifies the specific event that caused this
-  event to be produced (via a policy or saga).
-
-Adding these fields after data exists in production requires schema
-migration of all persisted envelopes.
+When persisting domain events, metadata must be attached: event ID, aggregate ID, sequence number, timestamp. Caller-constructed envelopes risk mismatched IDs and wrong sequences. Store-constructed envelopes are correct by construction. Additionally, distributed tracing needs correlation ID (groups all events from one logical operation) and causation ID (the specific event that caused this event). Adding these fields after production data exists requires schema migration of all persisted envelopes.
 
 ## Decision
 

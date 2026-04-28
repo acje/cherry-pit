@@ -11,20 +11,7 @@ References: CHE-0001, CHE-0004
 
 ## Context
 
-Commands are intent objects dispatched to aggregates. They may stay
-within a single process (in-memory dispatch) or cross process
-boundaries (via NATS/pardosa transport).
-
-Options for the `Command` trait bounds:
-1. **Full bounds** — `Serialize + DeserializeOwned + Debug + Clone +
-   Send + Sync + 'static`. Every command pays for serialization
-   overhead whether it needs it or not.
-2. **Minimal marker** — `Send + Sync + 'static`. Users add serde,
-   Debug, Clone derives only when needed.
-
-Events must be serializable (they cross process boundaries via
-persistence and transport). Commands do not share this requirement —
-many commands are dispatched in-process and never serialized.
+Commands are intent objects dispatched to aggregates. They may stay in-process or cross process boundaries. Events must be serializable (they cross boundaries via persistence and transport). Commands do not share this requirement — many are dispatched in-process and never serialized. Full bounds (`Serialize + DeserializeOwned + Debug + Clone`) make every command pay for serialization whether needed or not. Minimal marker bounds (`Send + Sync + 'static`) let users add derives only when needed.
 
 ## Decision
 

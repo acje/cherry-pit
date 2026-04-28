@@ -11,21 +11,7 @@ References: CHE-0001, CHE-0008, CHE-0009, CHE-0013, CHE-0037
 
 ## Context
 
-Every aggregate must have an initial state before any events are
-applied. The framework needs to construct this initial state during
-command handling (for `create`) and during replay (for `dispatch`).
-
-Three approaches:
-
-1. **`Default` trait bound** — `Aggregate: Default`. The aggregate
-   provides a `default()` method returning a blank-slate instance.
-   State is built entirely by replaying events through `apply`.
-2. **Constructor method** — `Aggregate::initial_state() -> Self` or
-   `Aggregate::new() -> Self`. Custom name, same semantics. Adds a
-   method to the trait.
-3. **Builder pattern** — aggregate constructed from configuration or
-   initial parameters. Adds complexity; parameters would need to be
-   part of the first command.
+Every aggregate must have an initial state before any events are applied. The framework constructs this during command handling (`create`) and replay (`dispatch`). Three approaches: `Default` trait bound (blank-slate via standard trait), custom constructor method (adds a trait method), or builder pattern (adds complexity). `Default` is idiomatic Rust, infallible, and `#[derive(Default)]` covers most cases.
 
 ## Decision
 
@@ -64,27 +50,7 @@ For `dispatch`, the flow adds replay:
 
 ## Consequences
 
-- **No constructor arguments** — aggregates cannot take configuration
-  or initial parameters in their constructor. Any initial data must
-  arrive via the first command and first event.
-- **Default is not a valid domain state** — `A::default()` may have
-  fields set to `None`, empty strings, or zero values that violate
-  domain invariants. This is acceptable because no command is ever
-  dispatched against a default-only aggregate: `create` always
-  produces at least one event (CHE-0013), and `dispatch` loads
-  history first.
-- **Idiomatic Rust** — `Default` is a standard trait. Users can
-  `#[derive(Default)]` in most cases. No custom trait method to
-  learn.
-- **Testability** — creating an aggregate in a specific state for
-  testing is done by constructing `default()` then applying setup
-  events. This is the standard event-sourcing test pattern and
-  requires no mocks.
-- **Infallible construction** — `Default::default()` cannot fail.
-  Combined with infallible `apply` (CHE-0009), aggregate
-  reconstruction is guaranteed to succeed for any valid event
-  history.
-- **Related to CHE-0009** — infallible `apply` assumes a total
-  function from any state. `Default` provides the guaranteed
-  starting point. Together, they ensure that `default() + replay`
-  always produces a valid aggregate.
+- **No constructor arguments** — initial data must arrive via the first command and event.
+- **Default is not a valid domain state** — fields may be `None` or zero, but no command is dispatched against a default-only aggregate: `create` always produces ≥1 event (CHE-0013), and `dispatch` loads history first.
+- **Testability** — creating specific state for testing: `default()` then apply setup events. Standard event-sourcing test pattern.
+- **Infallible construction** — `Default::default()` cannot fail. Combined with infallible `apply` (CHE-0009), reconstruction is guaranteed for any valid event history.

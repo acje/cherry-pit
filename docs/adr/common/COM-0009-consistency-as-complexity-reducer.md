@@ -11,9 +11,9 @@ References: COM-0001
 
 ## Context
 
-Ousterhout (Ch. 17, "Consistency") identifies consistency as one of the most powerful tools for reducing cognitive complexity. When similar things are done in similar ways, developers leverage knowledge across contexts without re-reading code. Inconsistency forces each instance to be treated as novel. Consistency spans naming (same concept, same name everywhere), coding patterns (if `apply` always takes `&mut self, event: &E`, one aggregate teaches all), design patterns (COM-0005 applied uniformly, not mixed strategies), and invariants ("apply() is always infallible" per CHE-0009 eliminates per-aggregate checking). The cost of inconsistency is invisible but cumulative — eventually every module must be read from scratch.
+Ousterhout (Ch. 17) identifies consistency as one of the most powerful tools for reducing cognitive complexity. When similar things are done similarly, developers leverage knowledge across contexts without re-reading code. Consistency spans naming, coding patterns, design patterns, and invariants. The cost of inconsistency is invisible but cumulative.
 
-Cherry-pit applies consistency through uniform vocabulary (`create`, `load`, `append`, `apply`, `handle`), infallible `apply()` returning `()` on every aggregate (CHE-0009), error-per-command with dedicated types (CHE-0015), and store-owned envelope construction (CHE-0016).
+Cherry-pit applies consistency through uniform vocabulary (`create`, `load`, `append`, `apply`, `handle`), infallible `apply()` on every aggregate (CHE-0009), error-per-command types (CHE-0015), and store-owned envelope construction (CHE-0016).
 
 ## Decision
 
@@ -35,18 +35,4 @@ R5 [5]: When a pattern changes, update all instances; partial
 
 ## Consequences
 
-- Trait method naming follows a consistent vocabulary: `create`,
-  `load`, `append`, `apply`, `handle`. New traits are expected to
-  follow this vocabulary or justify a different one.
-- The infallibility invariant (CHE-0009) eliminates an entire class
-  of "which aggregates can fail during apply?" questions. Developers
-  learn the pattern once.
-- Error-per-command (CHE-0015) is applied uniformly. No aggregate
-  uses a shared error enum while others use per-command errors.
-- The ADR system itself is a consistency tool: every ADR follows
-  the same template, uses the same vocabulary (References,
-  Supersedes, Root), and is validated by the same linter.
-- Consistency creates inertia. Changing a well-established pattern
-  requires updating all instances, which raises the bar for change.
-  This is intentional for high-tier patterns (S, A) and may be
-  relaxed for lower tiers (D) where local variation is acceptable.
+Trait method naming follows a consistent vocabulary; new traits must follow it or justify deviation. The infallibility invariant (CHE-0009) eliminates "which aggregates can fail during apply?" questions — learn once, apply everywhere. Error-per-command (CHE-0015) is applied uniformly. The ADR system itself is a consistency tool: same template, same vocabulary, same linter. Consistency creates intentional inertia — changing established patterns requires updating all instances, raising the bar for high-tier changes while allowing local variation at lower tiers.

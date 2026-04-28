@@ -11,25 +11,7 @@ References: CHE-0001
 
 ## Context
 
-Cherry-pit's design priorities place correctness first and security
-second. Rust's type system and borrow checker provide memory safety
-without garbage collection — but only when `unsafe` blocks are absent.
-A single `unsafe` block can violate every guarantee the compiler
-provides.
-
-Options:
-
-1. **Allow unsafe where justified** — developers use `unsafe` for FFI,
-   performance-critical hot paths, or platform-specific operations.
-   Requires auditing every `unsafe` block.
-2. **`#![forbid(unsafe_code)]`** — the compiler rejects all `unsafe`
-   blocks in the crate. Memory safety is structurally guaranteed, not
-   audit-dependent.
-
-Cherry-pit is a framework providing "undifferentiated heavy lifting."
-There are no FFI requirements, no SIMD hot paths, and no platform
-abstractions that require `unsafe`. Dependencies (tokio, serde, scc)
-handle low-level operations.
+Cherry-pit's P1 correctness and P2 security priorities (CHE-0001) demand memory safety. Rust's borrow checker provides this — but only when `unsafe` is absent. A single `unsafe` block can violate every compiler guarantee. Two options: allow unsafe where justified (requires auditing every block) or `#![forbid(unsafe_code)]` (structurally guaranteed, not audit-dependent). Cherry-pit has no FFI, SIMD, or platform abstractions requiring `unsafe`. Dependencies (tokio, serde, scc) handle low-level operations.
 
 ## Decision
 

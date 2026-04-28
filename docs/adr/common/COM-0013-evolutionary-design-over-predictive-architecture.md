@@ -11,11 +11,9 @@ References: COM-0001, COM-0002
 
 ## Context
 
-Ford, Parsons, and Kua (Building Evolutionary Architectures, 2nd ed., Ch. 1) define evolutionary architecture as supporting "guided, incremental change across multiple dimensions." Erder, Pureur, and Woods (Continuous Architecture in Practice, Principle 3) add: "Delay design decisions until they are absolutely necessary." The cost of a wrong prediction compounds — an abstraction built for a future that never arrives is permanently maintained complexity.
+Ford, Parsons, and Kua (Building Evolutionary Architectures) define evolutionary architecture as supporting "guided, incremental change across multiple dimensions." Erder, Pureur, and Woods add: "Delay design decisions until absolutely necessary." The cost of wrong predictions compounds — abstractions built for futures that never arrive become permanent maintenance burden. Predictive anti-patterns: premature generalization, speculative infrastructure, over-abstraction.
 
-Predictive anti-patterns include premature generalization (generic interfaces for hypothetical consumers), speculative infrastructure (building for unneeded scale), and over-abstraction (indirection layers "in case" — COM-0004: layers must justify their existence).
-
-Cherry-pit practices evolutionary design through deliberate deferrals with documented trigger conditions: CHE-0037 (no snapshots — replay is fast enough), CHE-0040 (no sagas — single-aggregate model suffices), GEN-0031 (Rust-only — no non-Rust consumer exists), and GEN-0010 (std-only — no embedded target planned). Each deferral makes the evolution guided rather than ad hoc.
+Cherry-pit practices this through deliberate deferrals with trigger conditions: CHE-0037 (no snapshots), CHE-0040 (no sagas), GEN-0031 (Rust-only), GEN-0010 (std-only). Each makes evolution guided rather than ad hoc.
 
 ## Decision
 
@@ -37,19 +35,4 @@ R5 [6]: Deliberate-deferral ADRs are reviewed periodically against
 
 ## Consequences
 
-- Deliberate-deferral ADRs (status: Accepted, title includes
-  "Deliberate Deferral" or "Planned") are a recognized ADR
-  category, not a workaround. They are first-class architecture
-  decisions that say "not yet."
-- The complexity budget (COM-0001) is preserved: speculative
-  infrastructure is not built, so the budget is available for
-  concrete needs.
-- New feature proposals that require speculative infrastructure
-  can be challenged with COM-0013: "What concrete requirement
-  justifies this complexity today?"
-- The trigger-condition pattern prevents deferrals from becoming
-  forgotten decisions. Each deferral is actionable: when condition
-  X is met, revisit decision Y.
-- Risk of under-investment. Evolutionary design is not an excuse
-  for tactical programming (COM-0001). The strategic investment
-  is in making the current design evolvable, not in building less.
+Deliberate-deferral ADRs are a recognized category — first-class architecture decisions that say "not yet." The complexity budget (COM-0001) is preserved since speculative infrastructure is not built. New proposals requiring speculative infrastructure can be challenged with COM-0013. The trigger-condition pattern prevents deferrals from becoming forgotten decisions — each is actionable when its condition is met. Evolutionary design is not tactical programming (COM-0001); the strategic investment is in making the current design evolvable.

@@ -42,15 +42,7 @@ R2 [2]: Use optimistic concurrency as defense-in-depth within the
 
 - Eliminates distributed consensus complexity entirely.
 - Sequential `NonZeroU64` IDs are simple, fast, and Copy.
-- Horizontal scaling per aggregate is impossible — a hotspot aggregate
-  cannot be sharded across processes.
-- No fencing mechanism exists at the storage level. If two processes
-  accidentally share a store directory, data corruption is possible.
-  **Mitigated**: CHE-0043 adds process-level advisory file locking
-  (`flock`) that detects and rejects a second writer on the same
-  directory.
-- Multi-node deployment requires an external mechanism (NATS subject
-  partitioning, process registry) to route commands to the owning
-  process — this is currently undesigned.
-- The single-writer assumption is load-bearing. Changing it later
-  requires significant rearchitecture.
+- Horizontal scaling per aggregate is impossible.
+- No fencing existed at the storage level. **Mitigated**: CHE-0043 adds advisory file locking (`flock`) that detects a second writer on the same directory.
+- Multi-node deployment requires external routing (NATS subject partitioning, process registry) — currently undesigned.
+- The single-writer assumption is load-bearing. Changing it requires significant rearchitecture.

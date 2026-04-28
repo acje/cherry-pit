@@ -65,21 +65,9 @@ know the new ID.
 
 ## Consequences
 
-- Different aggregates can be read and written concurrently without
-  contention.
-- Same-aggregate writes are serialized, preventing the read-check-
-  write race in optimistic concurrency.
-- Reads never block. A read during a concurrent write sees the
-  pre-write state (atomic rename has not yet occurred).
-- The `scc::HashMap` grows monotonically — locks for aggregate IDs are
-  never removed. For long-running processes with many aggregates, this
-  is a minor memory leak. Acceptable for the target use case.
-- `scan_max_id` is one-shot: it runs once on the first `create` call.
-  Files added externally after initialization are invisible to the
-  counter. This is consistent with the single-writer assumption
-  (CHE-0006) — external modification is undefined behavior.
-- The coupling between `create` (no per-aggregate lock) and
-  `write_atomic` (temp file naming) means `write_atomic` must not be
-  called concurrently for the same target path without external
-  serialization. This invariant is maintained by the current design
-  but would break if `create` were parallelized.
+- Different aggregates can be read and written concurrently without contention.
+- Same-aggregate writes are serialized, preventing read-check-write races.
+- Reads never block — a concurrent read sees the pre-write state.
+- The `scc::HashMap` grows monotonically — locks are never removed. Minor memory leak, acceptable for the target use case.
+- `scan_max_id` runs once on first `create`. Files added externally after initialization are invisible, consistent with single-writer (CHE-0006).
+- `create` without per-aggregate lock and `write_atomic` temp file naming are coupled — `write_atomic` must not be called concurrently for the same path without external serialization.

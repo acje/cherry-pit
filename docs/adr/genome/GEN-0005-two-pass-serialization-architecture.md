@@ -11,31 +11,7 @@ References: GEN-0001
 
 ## Context
 
-Fixed-layout formats need to write inline scalar data and variable-length
-heap data (strings, vecs, maps, option payloads) into a single contiguous
-buffer. Three serialization strategies were evaluated:
-
-1. **Intermediate AST.** Build a tree of nodes representing the
-   serialized structure, then flatten to bytes. Memory cost: O(n)
-   proportional to the data. Used by JSON serializers. Simple
-   implementation but high peak memory.
-
-2. **Back-patching (FlatBuffers approach).** Write data in-order,
-   patching offsets retroactively as later data resolves positions.
-   Single pass, but complex cursor management and mutable offset
-   fixups. Requires mutable offsets — incompatible with streaming
-   writes.
-
-3. **Two-pass (sizing then writing).** First pass computes exact
-   buffer size. Second pass writes with zero reallocation. Memory
-   cost: O(1) beyond the output buffer. Requires the input to be
-   traversed twice — safe for immutable serde `Serialize` impls.
-
-| Strategy | Passes | Peak memory | Complexity | Streaming |
-|----------|--------|-------------|------------|-----------|
-| AST | 1 | O(n) | Low | No |
-| Back-patching | 1 | O(1) | High | No |
-| Two-pass | 2 | O(1) | Medium | No |
+Fixed-layout formats must write inline scalar data and variable-length heap data into a single contiguous buffer. Three strategies were evaluated: an intermediate AST (O(n) memory, simple), back-patching à la FlatBuffers (single pass but complex mutable offset fixups, incompatible with streaming), and two-pass sizing-then-writing (O(1) memory beyond the output buffer, requires traversing input twice). The two-pass approach trades a second traversal for zero reallocation and no intermediate allocations.
 
 ## Decision
 

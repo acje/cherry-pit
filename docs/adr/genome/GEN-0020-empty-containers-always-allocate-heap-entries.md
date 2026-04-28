@@ -11,20 +11,7 @@ References: GEN-0001, GEN-0017, GEN-0014
 
 ## Context
 
-Binary formats that use offsets to reference variable-length data must define the
-semantics of offset 0. Two approaches exist:
-
-1. **Offset 0 as sentinel:** Offset 0 means "empty" or "null." Eliminates heap
-   allocation for empty containers but creates ambiguity: does offset 0 mean
-   "empty string" or "data at position 0"?
-
-2. **Offset 0 as data:** Offset 0 means "data at position 0 in the heap." Empty
-   containers are allocated as normal heap entries with `len = 0` or `count = 0`.
-   No ambiguity.
-
-pardosa-genome already uses `0xFFFFFFFF` as the `Option::None` sentinel
-(GEN-0017). Adding a second sentinel (0 for "empty") doubles the special-case
-logic in the deserializer.
+Binary formats using offsets for variable-length data must define offset 0 semantics. Treating offset 0 as a sentinel ("empty") creates ambiguity with data at position 0. Treating offset 0 as data eliminates ambiguity — empty containers get normal heap entries with `len = 0`. pardosa-genome already uses `0xFFFFFFFF` as the `Option::None` sentinel (GEN-0017); adding a second sentinel doubles special-case logic in the deserializer.
 
 ## Decision
 
@@ -60,15 +47,6 @@ R3 [5]: Empty containers always allocate a heap entry with len or
 
 ## Consequences
 
-- **Positive:** Eliminates offset-0 ambiguity. Hex dumps and debugging tools
-  can treat every non-`0xFFFFFFFF` offset as a real data pointer.
-- **Positive:** Simplifies the deserializer — no special case for empty
-  containers. All containers follow the same `read-offset → read-count →
-  iterate` pattern.
-- **Positive:** Single sentinel value (`0xFFFFFFFF`) for the entire format.
-  Easy to document, easy to audit.
-- **Negative:** Empty containers cost 4 bytes of heap space (the length/count
-  prefix). Negligible: 4 bytes per empty container in a format that already
-  uses 4-byte offset stubs.
-- **Negative:** Slightly larger output for messages with many empty containers.
-  Compression (GEN-0014) eliminates this overhead in practice.
+- **Positive:** Eliminates offset-0 ambiguity. Every non-`0xFFFFFFFF` offset is a real data pointer. Single sentinel for the entire format.
+- **Positive:** Simplifies the deserializer — no special case for empty containers. All containers follow `read-offset → read-count → iterate`.
+- **Negative:** Empty containers cost 4 bytes of heap (the length prefix). Negligible overhead; compression (GEN-0014) eliminates it in practice.

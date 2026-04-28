@@ -41,19 +41,9 @@ R2 [6]: Use TryFrom<u64> for fallible conversion from raw values
 
 ## Consequences
 
-- Zero is no longer a valid aggregate ID at the type level — no
-  runtime guard needed.
-- `Option<AggregateId>` benefits from niche optimization (same size
-  as `AggregateId`).
+- Zero is no longer a valid aggregate ID at the type level.
+- `Option<AggregateId>` benefits from niche optimization (same size as `AggregateId`).
 - Copy semantics preserved — `NonZeroU64` is `Copy`.
-- Serde deserializes as `u64` but rejects zero automatically via
-  `NonZeroU64`'s `Deserialize` impl.
-- `AggregateId::get()` returns plain `u64` for ergonomic use in
-  format strings, file paths, etc.
-- `TryFrom<u64>` replaces `From<u64>` — callers converting from raw
-  `u64` must handle the error case. This is the correct tradeoff:
-  the error surfaces at the point of construction, not deep inside
-  the store.
-- IDs are not globally unique across aggregate types — two different
-  aggregates will both have `AggregateId(1)`. Cross-context references
-  require domain-level external IDs.
+- Serde deserializes as `u64` but rejects zero automatically.
+- `TryFrom<u64>` replaces `From<u64>` — callers must handle the error case at the point of construction.
+- IDs are not globally unique across aggregate types — cross-context references require domain-level external IDs.

@@ -64,24 +64,10 @@ and `File::lock()` in `std::fs`.
 
 ## Consequences
 
-- **Two processes, same directory** → second process fails fast with
-  `StoreError::StoreLocked` instead of silently corrupting data.
-- **Single process, multiple store instances** → each `File::create()`
-  opens a new file description; `flock` is per-description on both
-  macOS and Linux, so two `MsgpackFileStore` instances in the same
-  process contending for the same directory will also conflict
-  (desirable — only one store should own a directory).
-- **Read-only access unaffected** — `load` does not call
-  `ensure_fenced`. Multiple readers can coexist with a single writer.
-- **Zero new dependencies** — uses `std::fs::File::try_lock()`,
-  available since Rust 1.95.
-- **Advisory, not mandatory** — a process that ignores the `.lock`
-  file can still write. This is defense-in-depth, not a security
-  boundary.
-- **NFS caveat** — `flock` is not reliable on NFS. The store
-  directory must be on a local filesystem. This is consistent with
-  the single-process deployment model (CHE-0006).
-- **`.lock` file left on disk** — the sentinel file remains after
-  the process exits. This is harmless — the lock is on the open
-  file descriptor, not the file's existence. The file is covered
-  by `.gitignore` (`store/` directory).
+- Two processes on same directory → second fails fast with `StoreError::StoreLocked` instead of silent corruption.
+- Two `MsgpackFileStore` instances in the same process contending for the same directory also conflict (desirable).
+- Read-only access unaffected — `load` does not call `ensure_fenced`.
+- Zero new dependencies — uses `std::fs::File::try_lock()` (Rust 1.95+).
+- Advisory, not mandatory — defense-in-depth, not a security boundary.
+- `flock` is unreliable on NFS; store directory must be local filesystem (consistent with CHE-0006).
+- `.lock` file remains after exit — harmless; the lock is on the file descriptor, not the file's existence.

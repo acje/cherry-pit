@@ -11,35 +11,7 @@ References: CHE-0001, CHE-0008, CHE-0017, CHE-0039, COM-0005
 
 ## Context
 
-Cherry-pit has two idempotency requirements today, both enforced by
-convention only:
-
-1. **Command handling** (CHE-0008) — `HandleCommand::handle`
-   returning `Ok(vec![])` means the command was accepted but no
-   state change occurred. This is the idempotent acceptance pattern:
-   the aggregate detects from its state that the command is a
-   duplicate and produces zero events.
-2. **Policy reactions** (CHE-0017) — `Policy::react` must be
-   idempotent: "reacting to the same event twice must produce the
-   same outputs." Event delivery may be at-least-once (especially
-   over NATS), so policies must tolerate replays.
-
-Neither requirement has framework-level enforcement. CHE-0002 says
-"make illegal states unrepresentable," but idempotency is a
-behavioral invariant — "same input produces same output" — which the
-type system cannot structurally enforce for arbitrary functions.
-
-Three layers where idempotency matters:
-
-| Layer | Duplicate source | Current mitigation |
-|-------|-----------------|-------------------|
-| Command dispatch | User retries, webhook replays | `Ok(vec![])` convention in `handle` |
-| Policy reactions | At-least-once event delivery | `react` purity convention |
-| Event persistence | Concurrent appends | Optimistic concurrency (`expected_sequence`) |
-
-Additionally, `event_id` (UUID v7, CHE-0033) provides a natural
-deduplication key at the event level — every event has a globally
-unique identifier.
+Cherry-pit has two idempotency requirements enforced by convention only: command handling (`Ok(vec![])` for duplicate detection per CHE-0008) and policy reactions (same event twice must produce same outputs per CHE-0017). Neither has framework-level enforcement. CHE-0002 says "make illegal states unrepresentable," but idempotency is a behavioral invariant the type system cannot structurally enforce. Three layers matter: command dispatch (user retries), policy reactions (at-least-once delivery), and event persistence (optimistic concurrency via `expected_sequence`). UUID v7 `event_id` (CHE-0033) provides a natural deduplication key.
 
 ## Decision
 
@@ -128,22 +100,8 @@ command ingestion pattern is concrete.
 
 ## Consequences
 
-- **Type-system boundary acknowledged.** Idempotency is a
-  behavioral invariant. The compiler cannot verify "same input →
-  same output" for arbitrary `handle` or `react` implementations.
-  Convention + documentation is the pragmatic answer.
-- **Aggregate is the idempotency authority.** No external
-  deduplication table needed for in-process command dispatch. The
-  aggregate's state IS the deduplication state.
-- **Policy purity is the key invariant.** If `react` is pure AND
-  downstream handling is idempotent, at-least-once delivery is safe
-  without policy-level deduplication. Testing should verify purity:
-  call `react` twice with the same envelope, assert identical
-  outputs (CHE-0038).
-- **`event_id` (UUID v7) is a natural deduplication key** for
-  event-level operations. External systems receiving events can use
-  `event_id` for exactly-once processing.
-- **No automatic retry in the framework.** `Command` has no `Clone`
-  bound (CHE-0014), so the framework cannot clone and retry a
-  command. Retry is the caller's responsibility — the caller
-  reconstructs the command and re-dispatches.
+- **Type-system boundary acknowledged.** Idempotency is behavioral; the compiler cannot verify it. Convention + documentation is the pragmatic answer.
+- **Aggregate is the idempotency authority.** No external deduplication table needed — the aggregate's state IS the deduplication state.
+- **Policy purity is the key invariant.** If `react` is pure AND downstream handling is idempotent, at-least-once delivery is safe without policy-level deduplication. Testing should verify purity (CHE-0038).
+- **`event_id` (UUID v7) is a natural deduplication key** for external systems receiving events.
+- **No automatic retry** — `Command` has no `Clone` (CHE-0014), so callers must reconstruct and re-dispatch.

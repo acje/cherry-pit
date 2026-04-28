@@ -11,11 +11,9 @@ References: COM-0001, COM-0008
 
 ## Context
 
-Richards and Ford (Fundamentals of Software Architecture, Ch. 2) state: "Everything in software architecture is a trade-off." This principle is distinct from COM-0001 (complexity budget), which addresses *how much* complexity is justified. Trade-off analysis addresses the prior question: *which qualities compete*, and *which side does this project choose*?
+Richards and Ford (Fundamentals of Software Architecture, Ch. 2): "Everything in software architecture is a trade-off." This is distinct from COM-0001 (how much complexity is justified) — trade-off analysis addresses which qualities compete and which side this project chooses.
 
-Cherry-pit's quality attribute trade-offs include correctness over performance (CHE-0028, CHE-0009, CHE-0032), simplicity over flexibility (CHE-0037, CHE-0040, GEN-0031), safety over ergonomics (`#[non_exhaustive]` per CHE-0021, `forbid(unsafe_code)` per CHE-0007), and consistency over local optimality (uniform error-per-command per CHE-0015, infallible apply per CHE-0009, with COM-0009 justifying the global benefit).
-
-The ADR system is inherently a trade-off documentation system: Context presents competing forces, Decision resolves them, Consequences makes costs explicit. What is missing is a citable principle making trade-off analysis mandatory and providing vocabulary for it.
+Cherry-pit's trade-offs: correctness over performance (CHE-0028, CHE-0009, CHE-0032), simplicity over flexibility (CHE-0037, CHE-0040, GEN-0031), safety over ergonomics (CHE-0021, CHE-0007), consistency over local optimality (CHE-0015, CHE-0009, COM-0009). The ADR system documents trade-offs structurally; this ADR makes the practice mandatory.
 
 ## Decision
 
@@ -37,21 +35,4 @@ R5 [6]: When project scale or requirements shift, review affected
 
 ## Consequences
 
-- The ADR template's Context and Consequences sections are the
-  structural enforcement mechanisms. An ADR that presents only
-  benefits without costs is incomplete under this principle.
-- CHE-0001 (design priority ordering) becomes the project's
-  standing trade-off resolution, reducing per-decision cognitive
-  load for common quality attribute conflicts.
-- Deliberate deferrals (CHE-0037, CHE-0040, GEN-0031) are
-  validated as explicit trade-offs: flexibility deferred in
-  exchange for simplicity now, with documented conditions under
-  which the trade-off should be revisited.
-- This principle makes COM-0008 (Design It Twice) more productive:
-  comparing two designs is only useful if the comparison axes
-  (quality attributes) are explicit. Trade-off analysis provides
-  the vocabulary.
-- Risk of over-analysis. The mitigation is COM-0008's time-box:
-  trade-off analysis should be proportional to the decision's
-  tier and reversibility. Tier-D decisions need a sentence;
-  tier-S decisions need a section.
+ADR Context and Consequences sections are the enforcement — an ADR presenting only benefits without costs is incomplete. CHE-0001 (design priority ordering) becomes the standing trade-off resolution for common quality attribute conflicts. Deliberate deferrals (CHE-0037, CHE-0040, GEN-0031) are validated as explicit trade-offs with documented revisit conditions. COM-0008 (Design It Twice) becomes more productive when comparison axes are explicit. Risk of over-analysis is mitigated by COM-0008's time-box: proportional to tier and reversibility.

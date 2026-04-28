@@ -48,16 +48,4 @@ R3 [6]: Preserve event_id values across migrations so the new stream
 
 ## Consequences
 
-- **Positive:** Old stream is immutable — crash-safe, idempotent retry.
-- **Positive:** Write-lock duration reduced from O(n) to O(1) for the
-  lock-held phases (steps 1 and 4).
-- **Positive:** Rollback within the grace period is trivial — re-point the
-  KV registry to the old stream name.
-- **Positive:** Reads continue during migration against a self-consistent
-  snapshot.
-- **Negative:** Doubles storage during the grace period (old + new stream).
-- **Negative:** Consumers must handle stream cutover (see PAR-0013 and
-  [pardosa-next.md](../../plans/pardosa-next.md) §Phase 6).
-- **Negative:** `Index` values are generation-scoped — code that caches
-  indices must invalidate on generation change. `event_id` is the
-  cross-generation stable identifier.
+Old stream is immutable — crash-safe with idempotent retry. Write-lock duration reduced from O(n) to O(1) for lock-held phases. Rollback within the grace period is trivial — re-point the KV registry to the old stream name. Reads continue during migration against a self-consistent snapshot. Trade-offs: doubles storage during the grace period, consumers must handle stream cutover (see PAR-0013 and [pardosa-next.md](../../plans/pardosa-next.md) §Phase 6), and `Index` values are generation-scoped — code caching indices must invalidate on generation change. `event_id` is the cross-generation stable identifier.

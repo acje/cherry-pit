@@ -43,16 +43,7 @@ etc.) is an implementation detail.
 
 ## Consequences
 
-- Module reorganization, splitting, or merging is a non-breaking
-  change. The public API is the set of re-exported items, not the
-  module tree.
-- Users see a flat, discoverable API. `cherry_pit_core::` autocomplete
-  shows all public types without navigating submodules.
-- Re-exports must be maintained manually in `lib.rs`. Adding a new
-  public type requires both the definition and the re-export.
-- If two modules define conflicting names, the re-export layer must
-  resolve the ambiguity (via renaming or scoped re-exports). This
-  has not occurred in practice.
-- All workspace crates follow this pattern. `cherry-pit-core` uses private
-  modules throughout. `cherry-pit-gateway` follows the same pattern with
-  `mod event_store` (private) and `pub use event_store::MsgpackFileStore`.
+- Module reorganization is a non-breaking change. The public API is the set of re-exported items.
+- Users see a flat, discoverable API — `cherry_pit_core::` autocomplete shows all public types.
+- Re-exports must be maintained manually in `lib.rs`. Adding a new public type requires both definition and re-export.
+- All workspace crates follow this pattern.

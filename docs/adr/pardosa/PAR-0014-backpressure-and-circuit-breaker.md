@@ -54,18 +54,4 @@ R3 [8]: Reset the circuit breaker failure counter on the next
 
 ## Consequences
 
-- **Positive:** Write latency bounded at `publish_timeout`. A NATS
-  partition triggers circuit breaker within `threshold × timeout`
-  (default: 15s), after which writes fail immediately (no blocking).
-- **Positive:** Degraded mode preserves read availability during NATS
-  outages. Consumers querying in-memory state are unaffected.
-- **Positive:** Automatic recovery — no operator intervention required
-  once NATS reconnects.
-- **Negative:** Circuit breaker adds state to `Server<T>`: failure
-  counter and degraded flag. Minor complexity.
-- **Negative:** Threshold of 3 may trip on transient NATS leader election
-  (~1s). Configurable to mitigate. A time-window-based approach (e.g.,
-  3 failures within 10s) is a future refinement.
-- **Negative:** Degraded mode means writes are silently dropped from the
-  caller's perspective — the caller must handle `NatsUnavailable` and
-  decide whether to retry or queue.
+Write latency bounded at `publish_timeout`. Circuit breaker trips within `threshold × timeout` (default 15s), after which writes fail immediately with no blocking. Degraded mode preserves read availability during NATS outages. Automatic recovery once NATS reconnects — no operator intervention. Trade-offs: circuit breaker adds failure counter and degraded flag state to `Server<T>`. Threshold of 3 may trip on transient NATS leader election (~1s); configurable, with a time-window approach as a future refinement. Callers must handle `NatsUnavailable` during degraded mode and decide whether to retry or queue.

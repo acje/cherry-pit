@@ -11,9 +11,9 @@ References: COM-0001, COM-0009
 
 ## Context
 
-COM-0009 rule 3 frames mechanical enforcement as a fallback from convention. In practice, cherry-pit inverts this: mechanical enforcement is the *primary* strategy, and convention is the fallback for rules that cannot yet be mechanized. Human-enforced rules degrade over time — reviewers are inconsistent and fatigued. Machine-enforced rules are deterministic, catching every violation on every commit. Ousterhout (Ch. 17), Martin (Clean Code, Ch. 5), and Ford et al. (The Hard Parts, Ch. 6) all advocate automated enforcement through "fitness functions."
+COM-0009 rule 3 frames mechanical enforcement as a fallback from convention. In practice, cherry-pit inverts this: mechanical enforcement is the *primary* strategy. Human-enforced rules degrade — reviewers are inconsistent and fatigued. Machine-enforced rules are deterministic, catching every violation on every commit.
 
-Cherry-pit's enforcement hierarchy proceeds from strongest to weakest: the type system (`AggregateId(NonZeroU64)` prevents zero IDs at compile time), compiler lints (`#[non_exhaustive]` per CHE-0021), static analysis (`clippy::pedantic` per CHE-0026), compile-fail tests (`trybuild` per CHE-0028), custom tooling (`adr-fmt` for ADR conformance), and code review as the fallback for invariants not yet mechanized. This principle elevates the pattern to a citable design principle: when a rule can be mechanized, it should be.
+Cherry-pit's enforcement hierarchy: type system (`AggregateId(NonZeroU64)`), compiler lints (`#[non_exhaustive]` per CHE-0021), static analysis (`clippy::pedantic` per CHE-0026), compile-fail tests (`trybuild` per CHE-0028), custom tooling (`adr-fmt`), and code review as fallback for invariants not yet mechanized.
 
 ## Decision
 
@@ -40,24 +40,4 @@ R5 [6]: Enforcement escalation ladder from strongest to weakest:
 
 ## Consequences
 
-- The ADR template gains an implicit review question: "How is
-  this invariant enforced?" ADRs that establish rules without
-  enforcement mechanisms are incomplete under COM-0017.
-- Compile-fail tests (CHE-0028) are validated as a first-class
-  enforcement mechanism, not a testing novelty. They sit between
-  "compiler lint" and "CI gate" on the escalation ladder.
-- `adr-fmt` is validated as an architectural enforcement tool,
-  not just a formatter. It mechanizes invariants (template
-  conformance, link integrity, naming conventions) that would
-  otherwise require manual review.
-- Clippy pedantic (CHE-0026) is validated as an enforcement
-  strategy, not just a code quality preference.
-- New invariants proposed in ADRs will be challenged to identify
-  their enforcement mechanism. "We'll catch it in review" is
-  the weakest acceptable answer and signals a mechanization
-  opportunity.
-- Risk of over-mechanization: not every guideline benefits from
-  rigid enforcement. Taste, naming quality, and architectural
-  judgment resist mechanization. The escalation ladder
-  acknowledges this — code review remains a valid mechanism for
-  subjective invariants.
+ADRs establishing rules without enforcement mechanisms are incomplete under COM-0017. Compile-fail tests (CHE-0028) are a first-class enforcement mechanism between "compiler lint" and "CI gate" on the escalation ladder. `adr-fmt` is an architectural enforcement tool mechanizing template conformance, link integrity, and naming conventions. Clippy pedantic (CHE-0026) is an enforcement strategy. New invariants must identify their enforcement mechanism — "we'll catch it in review" signals a mechanization opportunity. Not every guideline benefits from rigid enforcement; taste and judgment resist mechanization, so code review remains valid for subjective invariants.

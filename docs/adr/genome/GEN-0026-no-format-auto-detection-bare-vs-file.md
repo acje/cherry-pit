@@ -11,20 +11,7 @@ References: GEN-0001, GEN-0008
 
 ## Context
 
-pardosa-genome defines two wire formats:
-
-- **Bare messages:** Start with `format_version: u16 LE` at bytes 0–1.
-- **Files:** Start with `"PGNO"` magic (4 ASCII bytes) at bytes 0–3, followed
-  by `format_version: u16 LE` at bytes 4–5.
-
-Auto-detection between these formats is trivially possible: check whether the
-first 4 bytes are `"PGNO"`. If yes, file format; otherwise, bare message. This
-would allow a single `parse(buf)` entry point.
-
-A separate concern is compression auto-detection: bare messages include an
-`algo` byte at offset 10 that enables transparent compression detection within
-the bare message format. This IS implemented — `decode` auto-detects the
-compression algorithm from the `algo` byte.
+pardosa-genome defines two wire formats: bare messages (starting with `format_version: u16 LE`) and files (starting with `"PGNO"` magic). Auto-detection is trivially possible by checking the first 4 bytes, but introduces ambiguity (bare messages whose bytes happen to match `"PG"`), forces a combined error type, and merges stateless (`decode`) and stateful (`Reader`) APIs. Compression auto-detection within bare messages via the `algo` byte IS implemented and is unaffected by this decision.
 
 ## Decision
 

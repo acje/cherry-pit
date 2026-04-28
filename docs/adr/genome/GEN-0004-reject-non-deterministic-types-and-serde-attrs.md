@@ -51,19 +51,6 @@ R3 [6]: Type rejection recurses into all syn::Type variants including
 
 ## Consequences
 
-Compile-time errors cite the specific field and rejected
-type/attribute — no runtime surprises. Structured attribute parsing
-eliminates false positives on field names containing rejected
-keywords. Extended type recursion catches `&HashMap<K,V>`,
-`[usize; N]`, `(usize, u32)`. Users must use `BTreeMap`/`BTreeSet`
-instead of `HashMap`/`HashSet` and fixed-width integers instead of
-`usize`/`isize`. Manual `Serialize` impls can bypass compile-time
-checks; runtime `verify_roundtrip` in CI is defense-in-depth.
+Compile-time errors cite the specific field and rejected type/attribute. Structured attribute parsing eliminates false positives on field names containing rejected keywords. Extended type recursion catches `&HashMap<K,V>`, `[usize; N]`, `(usize, u32)`. Users must use `BTreeMap`/`BTreeSet` and fixed-width integers instead. Manual `Serialize` impls can bypass checks; runtime `verify_roundtrip` in CI is defense-in-depth.
 
-`#[serde(with = "...")]` is **not rejected** because it cannot be
-distinguished from benign uses without analyzing the referenced
-module. Unlike the structurally incompatible attributes (`flatten`,
-`tag`, `untagged`, `skip_serializing_if`), `serde(with)` may be
-compatible if the custom module respects the genome wire format.
-Treat it as an auditable escape hatch verified by
-`verify_roundtrip`.
+`#[serde(with = "...")]` is **not rejected** because it cannot be distinguished from benign uses without analyzing the referenced module. Treat it as an auditable escape hatch verified by `verify_roundtrip`.

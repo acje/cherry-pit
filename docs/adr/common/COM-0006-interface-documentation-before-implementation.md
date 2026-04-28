@@ -11,11 +11,7 @@ References: COM-0001, COM-0002
 
 ## Context
 
-Ousterhout (Ch. 13, "Comments Should Describe Things That Aren't Obvious from the Code"; Ch. 15, "Write The Comments First") argues that documentation is a design tool, not a post-hoc annotation. Writing interface comments before implementation forces the author to think about the abstraction — what and why — before getting lost in how. If you cannot describe the abstraction clearly, the abstraction itself is likely unclear. Comments written after implementation tend to restate function names and describe code rather than purpose. Reviewers can evaluate interface design from comments alone.
-
-Cherry-pit's 685-line `cherry-pit-core.md` trait design document was written before implementations existed, describing what each trait does, why it exists, and how traits relate — information not inferable from method signatures.
-
-Red flags include comments restating function names (`/// Returns the aggregate ID` on `fn aggregate_id()`), comments describing implementation details rather than abstractions, and absent comments on public APIs where the explanation of why the interface exists is missing.
+Ousterhout (Ch. 13, 15) argues documentation is a design tool. Writing interface comments before implementation forces thinking about abstraction — what and why — before getting lost in how. If you cannot describe the abstraction clearly, it is likely unclear. Comments written after implementation tend to restate function names. Cherry-pit's 685-line `cherry-pit-core.md` design document was written before implementations existed. Red flags: comments restating function names, describing implementation rather than abstraction, or absent on public APIs.
 
 ## Decision
 
@@ -33,19 +29,4 @@ R4 [5]: For complex subsystems, a design document describing
 
 ## Consequences
 
-- Public APIs without doc comments are flagged in review. The
-  missing comment indicates either a missing design step or an
-  interface that has not been thought through.
-- Design documents like `cherry-pit-core.md` are first-class artifacts, not
-  optional supplements. They capture design intent that source code
-  cannot express.
-- Comments that restate function names are refactored during review
-  with a COM-0006 citation.
-- This principle supports Rust's `#![warn(missing_docs)]` lint. The
-  lint catches missing comments; COM-0006 ensures the comments that
-  exist are meaningful.
-- Over-documentation is a risk: comments that describe every
-  implementation detail create maintenance burden without
-  proportional value. The "abstraction, not code" rule mitigates
-  this — implementation comments are inline and co-located, not part
-  of the public interface.
+Public APIs without doc comments are flagged in review, indicating a missing design step. Design documents like `cherry-pit-core.md` are first-class artifacts capturing intent source code cannot express. Comments restating function names are refactored with a COM-0006 citation. This supports Rust's `#![warn(missing_docs)]` lint — the lint catches missing comments; COM-0006 ensures existing comments are meaningful. Over-documentation is mitigated by the "abstraction, not code" rule — implementation comments are inline, not part of the public interface.

@@ -11,22 +11,7 @@ References: GEN-0001, GEN-0014
 
 ## Context
 
-pardosa-genome's file format and bare messages support optional compression
-via the `compression_algo` field (3 bits in the file header flags, 1-byte
-`algo` field in bare messages). GEN-0014 documents the decompression bomb
-mitigation strategy. This ADR documents the algorithm selection decision.
-
-Two compression algorithms were evaluated for v1:
-
-| Property | Zstd | Brotli |
-|----------|:----:|:------:|
-| Decompression speed | ~1500 MB/s | ~400 MB/s |
-| Compression speed (level 3) | ~400 MB/s | ~15 MB/s |
-| Compression ratio | 50–60% | 55–65% |
-| Dictionary support | Yes (built-in) | Yes (less common) |
-| Rust crate maturity | `zstd` 0.13 (stable, well-maintained) | `brotli` 6.0 (stable) |
-| `no_std` decompression | `ruzstd` (pure Rust, experimental) | `brotli-decompressor` |
-| Window size attack surface | Up to 3.75 TiB (CVE risk) | Up to 16 MiB |
+pardosa-genome supports optional compression via the `compression_algo` field. GEN-0014 documents decompression bomb mitigation. Zstd dominates brotli for real-time workloads: ~4× faster decompression (~1500 vs ~400 MB/s), ~25× faster compression at comparable ratios. Brotli's marginally better compression ratio does not justify the speed penalty. The file header reserves 3 bits (7 values) for the algorithm, ensuring brotli can be added later without a format version bump.
 
 ## Decision
 

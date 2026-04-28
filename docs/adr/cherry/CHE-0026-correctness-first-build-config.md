@@ -61,16 +61,6 @@ R3 [9]: Use lto = true and codegen-units = 1 for whole-program
 
 ## Consequences
 
-- Integer overflow is always caught, in both debug and release. The
-  framework's ID generation and sequence arithmetic rely on
-  `checked_add` explicitly, but `overflow-checks = true` provides a
-  safety net for any unchecked arithmetic that slips through.
-- Clippy pedantic generates many warnings. Individual crates can
-  suppress specific pedantic lints via `#[allow(clippy::...)]` where
-  justified (e.g., `#[allow(clippy::type_complexity)]` on complex
-  return types).
-- Release build times are longer due to LTO + single codegen unit.
-  Acceptable for a framework — release builds are infrequent.
-- Tests run in debug mode where overflow already panics. The release
-  profile's `overflow-checks = true` is not directly tested by CI
-  but provides production-time safety.
+- Integer overflow is always caught in both debug and release. The framework's ID generation uses `checked_add` explicitly, but `overflow-checks = true` catches any unchecked arithmetic that slips through.
+- Clippy pedantic generates many warnings. Individual crates suppress specific lints via `#[allow(clippy::...)]` where justified.
+- Release build times are longer due to LTO + single codegen unit. Acceptable — release builds are infrequent.

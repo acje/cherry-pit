@@ -11,34 +11,7 @@ References: CHE-0001, CHE-0031, CHE-0032
 
 ## Context
 
-`MsgpackFileStore<E>` needs a storage topology (how events map to
-files on disk) and a persistence strategy (how new events are written).
-
-CHE-0031 covers the serialization format (MessagePack named encoding).
-CHE-0032 covers the write mechanism (temp-file + rename for
-atomicity). Neither addresses the structural decisions: how many files
-per aggregate, what each file contains, and how appends work.
-
-Three topology options:
-
-1. **Single file for all aggregates** — one append-only log file.
-   Simple append, but loading one aggregate requires scanning the
-   entire log. Index needed for random access.
-2. **File per aggregate instance** — one `.msgpack` file per aggregate
-   ID. Loading is a single file read. No index needed.
-3. **Directory per aggregate with segment files** — segment rotation
-   for large aggregates. Complex, premature for current scale.
-
-Three persistence strategies:
-
-1. **Append-only** — new events appended to end of file. Efficient
-   writes. Requires a format that supports incremental appending
-   (MessagePack as `Vec<Envelope>` does not — the outer array length
-   is fixed at write time).
-2. **Full rewrite** — load entire history, extend, write all back.
-   Simple. O(n) write cost where n = total events for the aggregate.
-3. **WAL + compaction** — write-ahead log with periodic compaction.
-   Complex, premature.
+`MsgpackFileStore<E>` needs a storage topology and persistence strategy. CHE-0031 covers serialization format; CHE-0032 covers write atomicity. Neither addresses structural decisions. Three topology options: single file for all aggregates (requires index for random access), file per aggregate instance (single file read, no index), or directory with segments (premature). Three persistence strategies: append-only (impossible with MessagePack's fixed array length), full rewrite (simple, O(n) cost), or WAL with compaction (premature).
 
 ## Decision
 
@@ -87,22 +60,10 @@ load(id):
 
 ## Consequences
 
-- **O(n) write cost per append** — every append rewrites the entire
-  history. Acceptable for development and small deployments;
-  production systems with long-lived aggregates should use a
-  database-backed store.
-- **O(1) file reads per load** — loading any aggregate is a single
-  file read and deserialization. No index, no seeking, no scanning.
-- **File count equals aggregate count** — file systems handle this
-  well up to ~1M files per directory; beyond that, sharding or
-  switching backends is needed.
-- **No partial reads** — the entire history must be loaded, consistent
-  with CHE-0037 (no snapshot support).
-- **MessagePack's `Vec` encoding** writes the array length first
-  (CHE-0031), making incremental append structurally impossible.
-  Full rewrite is the only correct strategy for this format.
-- **Atomic rename (CHE-0032)** ensures readers never see a partially
-  written file.
-- This is a concrete implementation choice in `cherry-pit-gateway`,
-  not a framework-level constraint. Other `EventStore`
-  implementations will have different strategies.
+- **O(n) write cost per append** — every append rewrites entire history. Acceptable for development; production with long-lived aggregates should use a database-backed store.
+- **O(1) file reads per load** — single file read, no index, no scanning.
+- **File count equals aggregate count** — file systems handle this up to ~1M files; beyond that, sharding or switching backends is needed.
+- **No partial reads** — consistent with CHE-0037 (no snapshots).
+- **MessagePack's `Vec` encoding** writes array length first (CHE-0031), making incremental append structurally impossible.
+- **Atomic rename (CHE-0032)** ensures readers never see partial writes.
+- This is a `cherry-pit-gateway` implementation choice, not a framework constraint.

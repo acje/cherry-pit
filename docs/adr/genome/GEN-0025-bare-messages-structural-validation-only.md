@@ -56,17 +56,7 @@ R3 [6]: Bare messages are designed for transport-protected channels
 
 ## Consequences
 
-- **Positive:** Minimal bare message overhead. No checksum computation on
-  encode or verification on decode.
-- **Positive:** Transport-agnostic — the format does not duplicate integrity
-  mechanisms provided by the transport layer.
-- **Negative:** Applications using bare messages on transports without
-  integrity (raw TCP without TLS, UDP, shared memory IPC) get zero bit-flip
-  detection for scalar values. A single bit flip in a numeric field is
-  undetectable.
-- **Negative:** Bare messages over untrusted channels without TLS/QUIC are
-  vulnerable to silent data corruption from network errors.
-- **Mitigation:** Use transport-level integrity (TLS, QUIC) for bare messages.
-  Use the file format (with xxHash64 checksums) for persistent storage.
-- **Future:** [genome.md](../../plans/genome.md) §Future Scope defines an optional
-  bare message checksum trailer behind a `checksum` feature flag for v2.
+- **Positive:** Minimal bare message overhead — no checksum computation on encode or verification on decode. Transport-agnostic.
+- **Negative:** Bare messages on transports without integrity (raw TCP, UDP, shared memory) get zero bit-flip detection for scalar values.
+- **Mitigation:** Use TLS/QUIC for bare messages. Use the file format (with xxHash64 checksums) for persistent storage.
+- **Future:** [genome.md](../../plans/genome.md) §Future Scope defines an optional bare message checksum trailer behind a `checksum` feature flag for v2.

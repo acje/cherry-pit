@@ -11,11 +11,9 @@ References: COM-0001, COM-0002
 
 ## Context
 
-Ousterhout (Ch. 5, "Information Hiding (and Leakage)") refines the deep-module principle (COM-0002) from *how much* to hide to *what specifically* to hide. A deep module is necessary but not sufficient — if the wrong details leak, the module is deep in implementation but shallow in abstraction. Information hiding means each module encapsulates its design decisions so other modules cannot depend on them. Information leakage — when a decision is reflected in multiple modules — creates hidden coupling requiring coordinated changes.
+Ousterhout (Ch. 5) refines COM-0002 from *how much* to hide to *what specifically* to hide. Information hiding means each module encapsulates its design decisions so other modules cannot depend on them. Leakage — when a decision is reflected in multiple modules — creates hidden coupling requiring coordinated changes. Leakage forms include interface leakage through signatures, temporal decomposition sharing intermediate state, and back-channel leakage through documentation.
 
-Leakage takes several forms: interface leakage through method signatures or public fields; temporal decomposition where sequential phases share knowledge of formats and intermediate state; and back-channel leakage through documentation or implicit contracts that create practical coupling despite formal decoupling.
-
-Cherry-pit demonstrates information hiding at several boundaries. `EventEnvelope` fields are `pub(crate)`, with consumers accessing data through methods so internal layout can change freely. The MsgPack format is invisible to trait users — `EventStore` consumes and produces domain types. File layout (one file per stream, atomic rename) is hidden behind the `EventStore` trait; callers never construct file paths or manage handles.
+Cherry-pit demonstrates this: `EventEnvelope` fields are `pub(crate)` with method-based access, MsgPack format is invisible to trait users, and file layout is hidden behind `EventStore`.
 
 ## Decision
 
@@ -38,21 +36,4 @@ R4 [5]: Default to private visibility; promote to pub(crate) only
 
 ## Consequences
 
-- `EventEnvelope` accessors are the primary example: field layout
-  is a hidden decision. Adding `correlation_id` and `causation_id`
-  (CHE-0016, CHE-0039) did not change the consumer API because
-  fields were already hidden behind methods.
-- Serialization format changes (CHE-0031: MessagePack, CHE-0045:
-  serialization scope) are isolated to implementation modules. No
-  trait user knows about `rmp_serde`.
-- New infrastructure ports (CHE-0044: object store) can change the
-  storage mechanism without leaking storage concepts through the
-  `EventStore` trait.
-- Temporal decomposition is prevented by the store's atomic
-  create/load/append design — envelope construction, sequencing,
-  and persistence are consolidated, not split into sequential
-  phases.
-- Overuse of information hiding can make debugging harder. The
-  mitigation is the same as COM-0003: expose internal state through
-  error messages and structured logging during failures, not
-  through the interface during normal operation.
+`EventEnvelope` accessors are the primary example: adding `correlation_id` and `causation_id` (CHE-0016, CHE-0039) did not change the consumer API because fields were hidden behind methods. Serialization format changes (CHE-0031, CHE-0045) are isolated to implementation modules. New infrastructure ports (CHE-0044) can change storage mechanisms without leaking concepts through `EventStore`. Temporal decomposition is prevented by consolidating envelope construction, sequencing, and persistence into atomic operations. Debugging difficulty is mitigated by exposing internal state through error messages and structured logging during failures (per COM-0003).

@@ -11,23 +11,7 @@ References: GEN-0001, GEN-0004, GEN-0007, GEN-0018
 
 ## Context
 
-Enum encoding is one of the most consequential wire format decisions. It
-determines inline size (affects struct padding), heap layout, and which serde
-enum representations are supported. GEN-0004 documents the compile-time
-rejection of incompatible serde attributes (`tag`, `untagged`, `content`).
-GEN-0007 lists the enum layout as `[discriminant:u32][offset:u32]`. Neither
-documents the rationale for choosing this specific encoding over alternatives.
-
-Four encoding strategies were evaluated:
-
-1. **Varint discriminant + variable payload** (protobuf-style): Compact for
-   small enums but variable inline size breaks the fixed-layout contract.
-2. **Tag byte + length-prefixed payload** (CBOR-style): Self-describing but
-   adds per-variant overhead and complicates random access.
-3. **Union table with vtable** (FlatBuffers-style): Supports schema evolution
-   but adds vtable complexity, rejected by GEN-0002.
-4. **Fixed `[discriminant:u32][offset:u32]`**: Constant 8-byte inline cost.
-   Deterministic layout. Simple implementation. Data in heap via offset.
+Enum encoding determines inline size, heap layout, and supported serde representations. GEN-0004 rejects incompatible serde attributes; GEN-0007 lists the layout as `[discriminant:u32][offset:u32]` without documenting the rationale. Four strategies were evaluated: varint discriminant (breaks fixed-layout), tag+length (complicates random access), union table with vtable (rejected by GEN-0002), and fixed `[discriminant:u32][offset:u32]` (constant 8-byte inline, deterministic, simple).
 
 ## Decision
 
@@ -63,18 +47,8 @@ R4 [5]: Only serde externally tagged representation is supported —
 
 ## Consequences
 
-- **Positive:** Fixed 8-byte inline size per enum. Struct layout is fully
-  determined at compile time. No branching on variant during inline offset
-  computation.
-- **Positive:** u32 discriminant supports ~4 billion variants — effectively
-  unlimited.
-- **Positive:** Simple read path: read discriminant, check bounds, read
-  offset, jump to heap. No vtable lookup.
-- **Negative:** Unit variants waste 4 bytes (offset field is padding). For
-  enums with many unit variants (e.g., 100-variant error codes), this adds
-  400 bytes per message vs. a 1-byte discriminant approach.
-- **Negative:** Only externally tagged enums supported. Users of `#[serde(tag)]`
-  must restructure their types.
-- **Negative:** Adding enum variants at positions other than the end changes
-  discriminant values, breaking existing data. Append-only variant addition
-  preserves compatibility (new discriminant > existing max).
+- **Positive:** Fixed 8-byte inline size per enum — struct layout fully determined at compile time.
+- **Positive:** Simple read path: read discriminant, check bounds, read offset, jump to heap.
+- **Negative:** Unit variants waste 4 bytes (offset is padding). Many-variant enums pay proportionally.
+- **Negative:** Only externally tagged enums supported; users of `#[serde(tag)]` must restructure.
+- **Negative:** Inserting enum variants mid-declaration changes discriminants, breaking existing data. Append-only addition preserves compatibility.

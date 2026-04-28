@@ -11,9 +11,9 @@ References: COM-0001
 
 ## Context
 
-Ousterhout (Ch. 11, "Design It Twice") observes that the first design that comes to mind is unlikely to be the best. For any significant decision, sketching at least two fundamentally different approaches exposes trade-offs a single-pass design misses. The cost of exploring a second design is minutes; the cost of discovering the first was wrong is days of refactoring. This applies to module interfaces, data representations, and API boundaries — not every function body. The investment scales with the decision's reversibility (COM-0001: tier assignment heuristic).
+Ousterhout (Ch. 11) observes that the first design is unlikely to be the best. Sketching at least two fundamentally different approaches exposes trade-offs a single-pass design misses. The cost of exploring a second design is minutes; discovering the first was wrong costs days. This applies to module interfaces, data representations, and API boundaries — not every function body.
 
-Cherry-pit's ADR system institutionalizes this: the Context section requires describing alternatives considered, making multi-design thinking a structural requirement. CHE-0011 (AggregateId) evaluated `u64`, `Uuid`, and `NonZeroU64`. CHE-0031 (MessagePack) compared JSON, bincode, CBOR, and MessagePack. GEN-0007 (FlatBuffers-style layout) evaluated Cap'n Proto, FlatBuffers, and a custom offset-based design.
+Cherry-pit's ADR system institutionalizes this: CHE-0011 evaluated `u64`, `Uuid`, and `NonZeroU64`; CHE-0031 compared JSON, bincode, CBOR, and MessagePack; GEN-0007 evaluated Cap'n Proto, FlatBuffers, and a custom design.
 
 ## Decision
 
@@ -34,16 +34,4 @@ R4 [5]: The ADR Context section captures alternatives considered;
 
 ## Consequences
 
-- The ADR template's Context section is the structural enforcement
-  mechanism. An ADR that presents only one approach with no
-  alternatives considered is incomplete.
-- Code review for new traits and infrastructure ports can cite
-  COM-0008 to request alternative designs before acceptance.
-- The 10–20% strategic investment budget (COM-0001) explicitly
-  covers time spent on multi-design exploration. It is not
-  additional overhead — it is part of the investment.
-- Deliberate deferrals (CHE-0037: no snapshots, CHE-0040: no sagas)
-  are a specific application: the second design was "implement now,"
-  evaluated and rejected in favor of "defer until needed."
-- Risk of analysis paralysis. The time-box rule (rule 3) is the
-  mitigation: the practice is exploratory, not exhaustive.
+The ADR Context section structurally enforces this — an ADR presenting only one approach is incomplete. Code review for new traits and infrastructure ports can cite COM-0008 to request alternatives. The 10–20% strategic investment (COM-0001) explicitly covers multi-design exploration. Deliberate deferrals (CHE-0037, CHE-0040) are a specific application: "implement now" was the second design, evaluated and rejected. Risk of analysis paralysis is mitigated by rule 3's time-box.

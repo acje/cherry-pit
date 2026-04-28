@@ -11,22 +11,7 @@ References: GEN-0001, GEN-0006, GEN-0007, GEN-0024
 
 ## Context
 
-Binary formats must choose an endianness convention and a byte-reading strategy.
-The choice affects every scalar read/write operation across every platform.
-
-Two approaches exist for reading multi-byte values from buffers:
-
-1. **Pointer casting** (`*(buf.as_ptr() as *const u32)`): requires aligned buffers,
-   produces UB on misaligned access (some architectures), requires `unsafe`.
-2. **Byte copying** (`u32::from_le_bytes([buf[0], buf[1], buf[2], buf[3]])`): works
-   on any buffer alignment, no `unsafe`, compiler optimizes to single load on LE
-   targets.
-
-FlatBuffers uses pointer casting with alignment requirements. rkyv uses pointer
-casting with `unsafe`. pardosa-genome uses `#![forbid(unsafe_code)]` (GEN-0006).
-
-GEN-0007 defines the offset-based binary layout. This ADR defines the wire encoding
-contract: how multi-byte values are read and written.
+Binary formats must choose an endianness and byte-reading strategy. Pointer casting (`*(buf.as_ptr() as *const u32)`) requires aligned buffers and `unsafe`, producing UB on misaligned access. Byte copying (`u32::from_le_bytes(...)`) works on any alignment, needs no `unsafe`, and compiles to a single load on LE targets. FlatBuffers and rkyv use pointer casting with `unsafe`; pardosa-genome uses `#![forbid(unsafe_code)]` (GEN-0006). GEN-0007 defines the offset-based layout; this ADR defines the wire encoding contract.
 
 ## Decision
 

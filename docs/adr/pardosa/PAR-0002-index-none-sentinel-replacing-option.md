@@ -46,18 +46,4 @@ R3 [9]: Index::checked_next() caps at u64::MAX minus 1 so valid
 
 ## Consequences
 
-- **Positive:** Saves 4 bytes inline + heap indirection per event in genome
-  encoding. For a line with 1M events, this is ~4 MiB saved.
-- **Positive:** `Index` is `Copy` — no heap allocation, no option branching
-  on the read path.
-- **Positive:** Sentinel semantics are explicit in the type's API (`is_none()`,
-  `NONE` constant).
-- **Negative:** Sentinel-based APIs are less type-safe than `Option`. A caller
-  could forget to check `is_none()` before using the value.
-- **Negative:** `u64::MAX` is permanently consumed from the value space. No
-  runtime impact given physical constraints.
-- **Cross-crate:** Genome's wire format must not assign structural meaning to
-  `u64::MAX` for `Index`-typed fields. See
-  [GEN-0002](../genome/GEN-0002-no-schema-evolution-fixed-layout.md)
-  and
-  [GEN-0007](../genome/GEN-0007-flatbuffers-style-offset-based-binary-layout.md).
+Saves 4 bytes inline plus heap indirection per event in genome encoding (~4 MiB for 1M events). `Index` is `Copy` with no heap allocation or option branching on reads. Sentinel semantics are explicit via `is_none()` and `NONE` constant. Trade-off: less type-safe than `Option` — callers could forget `is_none()` checks. `u64::MAX` is permanently consumed from the value space (no runtime impact given physical constraints). Genome's wire format must not assign structural meaning to `u64::MAX` for `Index`-typed fields; see [GEN-0002](../genome/GEN-0002-no-schema-evolution-fixed-layout.md) and [GEN-0007](../genome/GEN-0007-flatbuffers-style-offset-based-binary-layout.md).

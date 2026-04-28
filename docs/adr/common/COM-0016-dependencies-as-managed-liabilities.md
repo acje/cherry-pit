@@ -11,11 +11,9 @@ References: COM-0001
 
 ## Context
 
-Every external dependency is complexity imported wholesale with a unique risk profile: external maintainers control release cadence and breaking changes; transitive dependencies inherit security and maintenance risks without explicit selection; each dependency expands the supply chain attack surface; compile times and CI costs scale with dependency count; and license obligations may conflict with the project's distribution model.
+Every external dependency imports complexity with a unique risk profile: external maintainers control breaking changes, transitive dependencies inherit security risks without explicit selection, each dependency expands the attack surface, and compile times scale with count. COM-0001 establishes that complexity requires justification; dependencies are a category where costs are invisible at adoption but compound over time. This is distinct from COM-0012 (knowledge flow direction) — COM-0016 governs whether to take a dependency at all.
 
-COM-0001 (complexity budget) establishes that complexity requires justification. Dependencies are a category where costs are invisible at adoption but compound over the project's lifetime. Endler frames this as "every dependency should be seen as a liability." This is distinct from COM-0012 (dependency rule), which governs knowledge flow *direction* — COM-0016 governs whether to take a dependency at all.
-
-Cherry-pit already practices dependency minimization: `default-features = false` on `axum` and `reqwest`, workspace-level dependency declarations for version consistency, and `Cargo.lock` committed for reproducibility. What is missing is a citable principle making dependency justification mandatory.
+Cherry-pit already practices dependency minimization: `default-features = false`, workspace-level declarations, and committed `Cargo.lock`.
 
 ## Decision
 
@@ -40,20 +38,4 @@ R5 [6]: Audit and prune dependencies periodically as the standard
 
 ## Consequences
 
-- New dependencies require explicit justification in the PR
-  description. Reviewers can cite COM-0016 to challenge
-  unjustified additions.
-- The `default-features = false` pattern already used for `axum`
-  and `reqwest` is validated as the standard posture, not an
-  exception.
-- Workspace-level dependency declarations (`[workspace.dependencies]`)
-  are validated as a complexity management tool — they provide
-  a single inventory of external liabilities.
-- This principle creates tension with development velocity.
-  Implementing functionality in-house costs time now; taking a
-  dependency costs time later. The resolution aligns with
-  COM-0001: strategic investment (10–20% more time now) for
-  reduced long-term maintenance cost.
-- Transitive dependency awareness is a new review dimension.
-  `cargo tree` and dependency auditing tools become part of the
-  evaluation process, not just post-hoc checks.
+New dependencies require explicit PR justification; reviewers cite COM-0016 to challenge additions. The `default-features = false` pattern is validated as standard posture. Workspace-level declarations (`[workspace.dependencies]`) provide a single inventory of external liabilities. Tension with velocity is resolved per COM-0001: strategic investment now reduces long-term maintenance cost. Transitive dependency awareness via `cargo tree` and auditing tools becomes part of the evaluation process.

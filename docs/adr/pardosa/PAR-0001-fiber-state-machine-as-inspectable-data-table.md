@@ -11,22 +11,7 @@ Root: PAR-0001
 
 ## Context
 
-Pardosa models each aggregate instance's lifecycle as a **fiber** — a
-named entity with an event history anchored to a specific position in
-the line (pardosa's append-only event log). Fibers transition through
-five states: Undefined → Defined → Active → Locked → Detached. Seven
-actions drive these transitions (Create, Advance, Lock, Rescue, Detach,
-Reattach, Drop). The lifecycle must be enforced at runtime: invalid
-transitions (e.g., advancing a locked fiber) must be rejected with
-specific error messages. The design question is how to encode the
-transition function.
-
-Pardosa's fiber lifecycle defines a partial function over S × A → S
-where |S| = 5, |A| = 7, yielding 35 possible pairs. Only 10
-transitions are valid; the remaining 25 are rejected. The Rust
-ecosystem offers several state machine crates (`statig`, `rust-fsm`,
-`sm`), but they encode transitions in macros or trait impls that are
-opaque to tooling and visualization.
+Pardosa's fiber lifecycle defines a partial function over S × A → S where |S| = 5 states (Undefined → Defined → Active → Locked → Detached), |A| = 7 actions, yielding 35 pairs of which only 10 are valid. Invalid transitions must be rejected with specific errors. Rust state machine crates (`statig`, `rust-fsm`, `sm`) encode transitions in macros or trait impls opaque to tooling and visualization. The design question is how to encode the transition function so it remains inspectable and diagram-ready.
 
 ## Decision
 
@@ -54,15 +39,4 @@ R3 [6]: Validate all 35 state-action pairs in the exhaustive_35_pairs
 
 ## Consequences
 
-- **Positive:** Single source of truth — runtime logic, DOT visualization, and
-  test exhaustiveness checks all derive from one table.
-- **Positive:** The 35-pair exhaustive test (`exhaustive_35_pairs`) validates
-  that exactly 10 transitions succeed and 25 are rejected.
-- **Positive:** No macro complexity. The table is plain Rust data, readable
-  without understanding a DSL.
-- **Negative:** Linear scan of 10 entries for lookup. O(1) with a `match`
-  statement, but the table approach was chosen for inspectability. Negligible
-  at N=10.
-- **Negative:** A `match` statement would give compile-time exhaustiveness
-  guarantees. The runtime table relies on the `no_duplicate_state_action_pairs`
-  test and the `exhaustive_35_pairs` test for equivalent coverage.
+Single source of truth — runtime logic, DOT visualization, and exhaustive tests all derive from one table. The `exhaustive_35_pairs` test validates exactly 10 succeed and 25 are rejected. No macro complexity; the table is plain Rust data. Trade-off: linear scan instead of O(1) `match`, negligible at N=10. A `match` would give compile-time exhaustiveness guarantees; the runtime table relies on `no_duplicate_state_action_pairs` and `exhaustive_35_pairs` tests for equivalent coverage.

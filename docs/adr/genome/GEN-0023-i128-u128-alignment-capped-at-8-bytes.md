@@ -11,23 +11,7 @@ References: GEN-0001, GEN-0007
 
 ## Context
 
-Every type in pardosa-genome's wire format has a fixed natural alignment that
-determines padding insertion before the type's inline data. For most types,
-alignment matches the type's byte width: u8 aligns to 1, u32 aligns to 4,
-u64 aligns to 8. The question is what alignment to use for 128-bit types
-(i128, u128), which occupy 16 bytes.
-
-Two options:
-
-- **16-byte alignment:** Matches the logical width. Maximizes SIMD friendliness
-  on platforms with 128-bit SIMD registers. Worst-case padding: 15 bytes per
-  field.
-- **8-byte alignment:** Reduces worst-case padding to 7 bytes. Matches Rust's
-  actual alignment for i128/u128 on most targets (8 bytes on x86-64, 4 bytes
-  on 32-bit). SIMD consumers must manually align.
-
-Rust itself aligns i128/u128 to 8 bytes on x86-64 and 4 bytes on 32-bit
-targets. A wire format must choose a single cross-platform alignment.
+Every type in pardosa-genome has a fixed natural alignment determining padding insertion. For most types alignment matches byte width (u32→4, u64→8). For 128-bit types, 16-byte alignment maximizes SIMD friendliness but causes up to 15 bytes worst-case padding. 8-byte alignment caps padding at 7 bytes and matches Rust's actual i128/u128 alignment on x86-64. A wire format must choose a single cross-platform alignment.
 
 ## Decision
 

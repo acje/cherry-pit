@@ -11,24 +11,7 @@ References: GEN-0001, GEN-0005, GEN-0011
 
 ## Context
 
-pardosa-genome uses a two-region binary layout: an inline region (struct fields,
-scalars, enum discriminants) followed by a heap region (variable-length data:
-strings, vecs, maps, option payloads, enum variant data). GEN-0005 establishes
-the two-pass serialization architecture and mentions breadth-first heap ordering
-as a consequence. However, the heap ordering is a frozen wire format property
-that determines binary equality — two conforming serializers must produce
-identical bytes for the same value.
-
-Three heap ordering strategies were considered:
-
-- **Depth-first:** Write each heap item immediately when encountered. Simple to
-  implement but produces interleaved inline/heap boundaries and backward
-  offset references.
-- **Breadth-first:** Write all items directly referenced by the inline region
-  first, then items referenced by those heap items, and so on. Forward-pointing
-  offsets guaranteed by construction.
-- **Arbitrary/unspecified:** Let implementations choose. Breaks binary equality
-  and content-addressable storage.
+pardosa-genome uses a two-region layout: inline (scalars, discriminants) then heap (strings, vecs, maps, option/enum payloads). GEN-0005 mentions breadth-first heap ordering, but the ordering is a frozen wire format property determining binary equality. Depth-first interleaves heap items and produces backward offsets. Breadth-first guarantees forward-pointing offsets by construction. Unspecified ordering breaks binary equality and content-addressable storage.
 
 ## Decision
 
@@ -56,16 +39,8 @@ R3 [6]: Golden test vectors pin the exact byte output for multi-level
 
 ## Consequences
 
-- **Positive:** All offsets are forward-pointing into the heap region by
-  construction. The backward offset check (GEN-0011, check #6) is trivially
-  satisfied for correctly serialized data.
-- **Positive:** Binary equality — identical values always produce identical
-  bytes, enabling content-addressable storage, checksumming, and deduplication.
-- **Positive:** Deterministic byte output enables `verify_roundtrip` to compare
-  serialized bytes directly, not just deserialized values.
-- **Negative:** Write path complexity. The `WritingSerializer` must track heap
-  items by level and write them after the inline pass. More complex than
-  depth-first (which writes heap items inline during traversal).
-- **Negative:** Frozen forever. Any future serializer must produce the same
-  ordering. Second implementations (other languages, `genome-dump` re-serializer)
-  must replicate this exactly.
+- **Positive:** All offsets forward-pointing by construction; backward offset check (GEN-0011, check #6) trivially satisfied.
+- **Positive:** Binary equality — identical values always produce identical bytes, enabling content-addressable storage and deduplication.
+- **Positive:** Deterministic output enables `verify_roundtrip` byte comparison.
+- **Negative:** `WritingSerializer` must track heap items by level, more complex than depth-first.
+- **Negative:** Frozen forever — any second implementation must replicate this ordering exactly.

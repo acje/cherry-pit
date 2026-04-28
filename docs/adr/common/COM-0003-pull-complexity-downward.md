@@ -11,11 +11,9 @@ References: COM-0001, COM-0002
 
 ## Context
 
-Ousterhout (Ch. 8, "Pull Complexity Downwards") addresses where complexity should live when it must exist somewhere. A module is implemented once but called many times, so complexity in the implementation is paid once while complexity in the interface is paid by every caller. The module should absorb complexity: "It is more important for a module to have a simple interface than a simple implementation."
+Ousterhout (Ch. 8) argues that since a module is implemented once but called many times, complexity in the implementation is paid once while complexity in the interface is paid by every caller. Configuration parameters are a specific case — each option pushes a decision to callers who must understand and choose correctly.
 
-Configuration parameters are a specific case — each option pushes complexity to the caller, who must understand, choose, and accept responsibility. Ousterhout argues parameters should only be exposed when the system cannot determine the right value automatically.
-
-Cherry-pit applies this extensively. The store creates envelopes (CHE-0016) — callers pass `Vec<Event>` while the store handles ID assignment, sequencing, and timestamping. Infrastructure owns identity (CHE-0020) — callers never create `AggregateId` values. Two-level concurrency (CHE-0035) hides global mutexes and per-aggregate locks behind `create`, `load`, `append`. Process-level file fencing (CHE-0043) acquires the fence lazily on first write without caller involvement.
+Cherry-pit applies this extensively: the store creates envelopes (CHE-0016) so callers pass only `Vec<Event>`; infrastructure owns identity (CHE-0020); two-level concurrency (CHE-0035) hides locks behind three methods; file fencing (CHE-0043) acquires lazily without caller involvement.
 
 ## Decision
 
@@ -33,19 +31,4 @@ R4 [6]: When a module can handle an error internally through retry,
 
 ## Consequences
 
-- Infrastructure implementations absorb operational complexity. The
-  `EventStore` trait has 3 methods; the `MsgpackFileStore`
-  implementation has 600+ lines handling concurrency, fencing, atomic
-  writes, and serialization.
-- New infrastructure ports are evaluated for interface simplicity.
-  A port proposal that requires callers to manage locks, configure
-  buffer sizes, or handle retry logic is challenged to pull that
-  complexity down.
-- The "many users, few developers" asymmetry justifies the investment:
-  implementation complexity is paid once by the module author; interface
-  simplicity benefits every caller, every time.
-- There is tension with transparency: pulling complexity down can
-  make it harder to debug when things go wrong. This is mitigated by
-  structured logging and error messages that expose internal state
-  when failures occur — the interface is simple during normal
-  operation, detailed during failure investigation.
+Infrastructure implementations absorb operational complexity: the `EventStore` trait has 3 methods while `MsgpackFileStore` has 600+ lines handling concurrency, fencing, atomic writes, and serialization. New infrastructure ports are evaluated for interface simplicity — proposals requiring callers to manage locks or retry logic are challenged to pull that complexity down. Tension with transparency is mitigated by structured logging and detailed error messages that expose internal state during failures, not during normal operation.

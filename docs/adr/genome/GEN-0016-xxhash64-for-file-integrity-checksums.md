@@ -75,17 +75,8 @@ R3 [9]: Both per-message and footer checksums are mandatory and always
 
 ## Consequences
 
-- **Positive:** Eliminates `crc` crate dependency — xxHash64 already present
-  for schema hashing.
-- **Positive:** xxHash64 is faster than CRC32 on modern CPUs (~30 GB/s vs
-  ~5 GB/s without hardware CRC acceleration).
-- **Positive:** Better error detection distribution than CRC32 for the same
-  bit width. Full 64-bit output: birthday bound ~4 billion messages before
-  accidental collision.
-- **Positive:** Single hash algorithm for the entire crate (schema + integrity).
-- **Negative:** Index entry size increases from 16 to 24 bytes (~50% increase).
-  Negligible in practice: 1,000 messages add 24 KiB of index vs 16 KiB.
-- **Negative:** xxHash64 is not hardware-accelerated on most platforms (unlike
-  CRC32 on x86 with SSE4.2). But xxHash64's software speed exceeds CRC32's
-  hardware speed on modern out-of-order CPUs.
-- **Negative:** Same tamper-detection limitation as CRC32 — non-cryptographic.
+- **Positive:** Eliminates `crc` crate dependency — xxHash64 already present for schema hashing. Single algorithm for the entire crate.
+- **Positive:** Faster than CRC32 on modern CPUs (~30 GB/s vs ~5 GB/s). Better error detection distribution at 64 bits; birthday bound ~4 billion messages.
+- **Negative:** Index entry grows from 16 to 24 bytes (~50%). Negligible: 1,000 messages add 8 KiB overhead.
+- **Negative:** Not hardware-accelerated like CRC32 on x86 SSE4.2, but xxHash64 software speed exceeds CRC32 hardware speed on modern CPUs.
+- **Negative:** Same non-cryptographic tamper-detection limitation as CRC32.

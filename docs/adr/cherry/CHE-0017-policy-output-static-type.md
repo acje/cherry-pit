@@ -58,23 +58,8 @@ R2 [5]: Define policy output as an enum so the compiler verifies
 
 ## Consequences
 
-- No runtime type errors. The output enum is exhaustively matched at
-  compile time. A new output variant causes compilation failures at
-  all dispatch sites until handled.
-- No heap allocation per output. The enum lives on the stack or
-  inline in the `Vec`.
-- A policy cannot accidentally produce an output type it was not
-  designed to produce. The type system makes the boundary explicit.
-- **`Output` is not bounded by `Command`.** This is intentional:
-  policy outputs may need to carry additional context beyond the
-  command itself (e.g., the target `AggregateId` for cross-aggregate
-  dispatch, routing metadata for cross-context dispatch). Requiring
-  `Command` on `Output` would force this context into the command
-  type, conflating routing with intent.
-- The infrastructure layer that dispatches policy outputs must know
-  the output enum type. This creates a coupling between the policy
-  and its dispatch wiring — resolved by `cherry-pit-agent` (the composition
-  layer).
-- Policies receive `EventEnvelope`, not raw events — they need
-  metadata (`aggregate_id`, `timestamp`, `event_id`) to construct
-  correctly targeted outputs.
+- No runtime type errors. The output enum is exhaustively matched at compile time — new variants cause compilation failures until handled.
+- No heap allocation per output.
+- **`Output` is not bounded by `Command`.** Policy outputs may carry routing context (target `AggregateId`, cross-context metadata) beyond the command itself. Requiring `Command` on `Output` would conflate routing with intent.
+- The infrastructure dispatch layer must know the output enum type, creating coupling resolved by `cherry-pit-agent`.
+- Policies receive `EventEnvelope`, not raw events — they need metadata to construct correctly targeted outputs.

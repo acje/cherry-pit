@@ -11,27 +11,7 @@ References: CHE-0001, CHE-0016
 
 ## Context
 
-`EventEnvelope` stores a `timestamp` field — the instant an event was
-created. This type appears in every persisted event, every projection
-apply, every policy reaction. The choice of temporal library and type
-is load-bearing: it affects serialization format, precision, timezone
-handling, and arithmetic correctness.
-
-Candidates:
-
-1. **`chrono::DateTime<Utc>`** — the historical Rust standard. Large
-   API surface. Requires `chrono-tz` for IANA timezone support. Some
-   arithmetic operations are fallible in surprising ways (DST
-   transitions).
-2. **`time::OffsetDateTime`** — lightweight alternative. Good serde
-   support. Less mature ecosystem for timezone arithmetic.
-3. **`std::time::SystemTime`** — no serde support. No human-readable
-   formatting. No timezone awareness.
-4. **`jiff::Timestamp`** — modern Rust datetime library by BurntSushi
-   (author of `regex`, `ripgrep`). `Timestamp` is a UTC instant.
-   Lossless RFC 9557/RFC 3339 serde roundtrips. DST-safe arithmetic
-   by default. Built-in IANA timezone support without a separate
-   crate.
+`EventEnvelope` stores a `timestamp` field appearing in every persisted event, projection, and policy reaction. `chrono` has surprising fallible arithmetic at DST transitions. `time` has a less mature timezone ecosystem. `std::time::SystemTime` lacks serde and formatting. `jiff::Timestamp` (by BurntSushi) provides UTC-instant semantics, lossless RFC 9557/RFC 3339 serde roundtrips, DST-safe arithmetic, and built-in IANA timezone support without a separate crate.
 
 ## Decision
 
@@ -59,21 +39,9 @@ jiff = { version = "0.2", features = ["serde"] }
 
 ## Consequences
 
-- **Lossless serde roundtrips** — serializes to RFC 9557/RFC 3339
-  with full precision. No information loss across JSON, MessagePack,
-  or any serde-compatible format.
-- **DST-safe arithmetic** — jiff accounts for daylight saving time
-  transitions by default, giving correct results for time-interval
-  computations without manual handling.
-- **UTC instants only** — `Timestamp` records absolute time. Timezone
-  conversion is a presentation concern, not a persistence concern.
-- **Single timestamp per batch** — `build_envelopes` calls
-  `Timestamp::now()` once; all events in an atomic batch share the
-  same timestamp (CHE-0036).
-- **Migration cost** — `jiff::Timestamp` is embedded in every
-  serialized `EventEnvelope`. Switching libraries would require
-  migrating all persisted events.
-- **Version coupling** — jiff 0.2 is pre-1.0. A golden-file
-  regression test (CHE-0038) compares a deterministic envelope
-  against a committed fixture, catching serde format changes before
-  incompatible data is written.
+- Lossless serde roundtrips via RFC 9557/RFC 3339 with full precision.
+- DST-safe arithmetic by default.
+- UTC instants only — timezone conversion is a presentation concern, not a persistence concern.
+- Single timestamp per batch — `build_envelopes` calls `Timestamp::now()` once (CHE-0036).
+- `jiff::Timestamp` is embedded in every serialized envelope. Switching libraries requires migrating all persisted events.
+- jiff 0.2 is pre-1.0. A golden-file regression test (CHE-0038) catches serde format changes before incompatible data is written.

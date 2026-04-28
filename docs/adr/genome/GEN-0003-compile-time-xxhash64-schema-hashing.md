@@ -63,14 +63,8 @@ R3 [5]: String and bytes types use equivalence classes for schema hash
 
 ## Consequences
 
-- **Positive:** Type confusion detected at deserialization time with zero runtime cost
-  for the hash itself (computed at compile time as a `const`).
-- **Positive:** Root type name in hash distinguishes newtypes (`Meters(f64)` vs
-  `Seconds(f64)`) despite identical inner layout.
-- **Positive:** Frozen inputs documented and tested — pinned hash value tests catch
-  accidental algorithm changes.
-- **Negative:** Hash stability contract is load-bearing. Any change to the algorithm,
-  seed, or input canonicalization is a breaking change affecting all persisted data.
-- **Negative:** `String` ≠ `&str` may surprise users expecting serde's transparent
-  string serialization to imply hash equivalence. Documented in
-  [genome.md](../../plans/genome.md) §String Type Identity.
+- **Positive:** Type confusion detected at deserialization time with zero runtime cost (compile-time `const`).
+- **Positive:** Root type name distinguishes newtypes (`Meters(f64)` vs `Seconds(f64)`) despite identical layout.
+- **Positive:** Pinned hash value tests catch accidental algorithm changes.
+- **Negative:** Hash stability contract is load-bearing — any change to algorithm, seed, or input canonicalization breaks all persisted data.
+- **Negative:** `String` ≠ `&str` may surprise users. Documented in [genome.md](../../plans/genome.md) §String Type Identity.

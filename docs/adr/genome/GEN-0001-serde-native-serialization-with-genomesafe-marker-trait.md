@@ -11,23 +11,7 @@ Root: GEN-0001
 
 ## Context
 
-pardosa-genome must integrate with an existing Rust codebase where
-every data type already derives `Serialize` and `Deserialize`. Two
-forces are in tension: zero-copy read performance (the event replay
-hot path deserializes millions of events — per-field allocating
-formats impose a throughput ceiling) and adoption friction
-(introducing a parallel derive ecosystem like rkyv or FlatBuffers
-doubles maintenance surface with mirror types throughout the
-codebase).
-
-rkyv achieves full struct-level zero-copy but requires an
-`ArchivedFoo` for every `Foo`. FlatBuffers requires external `.fbs`
-schema files and code generation. Both sever the serde ecosystem —
-types cannot be used with JSON, TOML, or any other serde format
-without dual serialization implementations. A serde-native custom
-binary format avoids mirror types entirely while achieving partial
-zero-copy (str, bytes). PAR-0006 contains the detailed per-library
-alternatives analysis.
+Two forces are in tension: zero-copy read performance (the event replay hot path deserializes millions of events) and adoption friction (mirror-type ecosystems like rkyv and FlatBuffers double maintenance surface and sever serde compatibility). A serde-native binary format avoids mirror types while achieving partial zero-copy (str, bytes). rkyv requires `ArchivedFoo` per `Foo`; FlatBuffers requires external `.fbs` schemas and codegen. PAR-0006 contains the detailed per-library alternatives analysis.
 
 ## Decision
 

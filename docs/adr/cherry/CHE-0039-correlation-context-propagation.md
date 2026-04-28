@@ -11,23 +11,7 @@ References: CHE-0016, CHE-0004, CHE-0017
 
 ## Context
 
-`EventEnvelope` carries `correlation_id` and `causation_id` fields
-(CHE-0016) for distributed tracing, but the current API cannot
-populate them. `EventStore::create`, `EventStore::append`,
-`CommandBus`, and `CommandGateway` signatures carry no correlation
-parameter, and `MsgpackFileStore::build_envelopes` hardcodes both
-to `None`. The schema is "tracing-ready" but the port traits are not.
-
-The `tracing` crate serves a different purpose: Spans are
-process-local diagnostic context, while `correlation_id` is
-cross-process persisted causal context.
-
-Three propagation styles were considered. Explicit parameter — a
-`CorrelationContext` struct on every envelope-producing method;
-transparent, consistent with CHE-0003 and CHE-0001. Task-local
-context via `tokio::task_local!` — ergonomic but invisible, violating
-the "no magic" philosophy. Middleware/interceptor — deferred to
-`cherry-pit-agent`, does not solve the `EventStore` API gap.
+`EventEnvelope` carries `correlation_id` and `causation_id` fields (CHE-0016), but the current API cannot populate them — all port signatures lack a correlation parameter, and `build_envelopes` hardcodes both to `None`. Three propagation styles were considered: explicit parameter (transparent, consistent with CHE-0003), task-local context (ergonomic but invisible, violating "no magic"), and middleware (deferred to `cherry-pit-agent`).
 
 ## Decision
 
@@ -93,22 +77,8 @@ field for bridging, but this is not required by this ADR.
 
 ## Consequences
 
-- **Breaking change** to `EventStore`, `CommandBus`, and
-  `CommandGateway` trait signatures. Acceptable pre-1.0. All
-  existing implementations and call sites must add the
-  `CorrelationContext` parameter.
-- `MsgpackFileStore::build_envelopes` gains a `&CorrelationContext`
-  parameter and stamps `correlation_id`/`causation_id` from it
-  instead of hardcoding `None`.
-- Existing tests that call `create`/`append` must add
-  `CorrelationContext::none()` at each call site. Mechanical
-  migration.
-- The `CorrelationContext::none()` call is visible in code — a
-  reviewer can immediately see that correlation was intentionally
-  omitted, not accidentally forgotten.
-- Policy implementations are responsible for constructing the
-  `CorrelationContext` for downstream commands. The framework
-  provides the types; the policy provides the values.
-- `EventBus::publish` does NOT gain a context parameter — it
-  receives already-stamped envelopes. Correlation is stamped at
-  persistence time, not at publication time.
+- **Breaking change** to `EventStore`, `CommandBus`, and `CommandGateway` trait signatures. All implementations and call sites must add `CorrelationContext`. Acceptable pre-1.0.
+- Existing tests add `CorrelationContext::none()` at each call site — mechanical migration.
+- `CorrelationContext::none()` is visible in code — a reviewer can see correlation was intentionally omitted.
+- Policy implementations construct `CorrelationContext` for downstream commands. The framework provides types; the policy provides values.
+- `EventBus::publish` does NOT gain a context parameter — it receives already-stamped envelopes.

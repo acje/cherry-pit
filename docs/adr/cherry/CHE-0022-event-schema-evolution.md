@@ -49,22 +49,8 @@ R5 [5]: Do not use #[non_exhaustive] on domain event enums; exhaustive
 
 ## Consequences
 
-- Adding a variant forces compile-time updates to every `apply` — no
-  silent ignoring of new events.
-- Field evolution on existing variants is constrained to optional
-  additions — required fields break deserialization.
-- No runtime migration mechanism exists until Pardosa is built.
-- Removing or renaming events requires a full Pardosa log migration.
-- **Roll-forward only** — schema rollback is not supported. If a
-  deployment introduces a new event variant and writes events with
-  that variant, rolling back to the previous code version will cause
-  `StoreError::Infrastructure` on `load` for any aggregate containing
-  the unrecognized variant. The aggregate becomes unloadable until
-  code rolls forward to a version that recognizes all persisted
-  variants. This is intentional: silent data loss from ignoring
-  unknown events is worse than a loud failure.
-- **Golden-file serde regression** — a golden-file test in cherry-pit-core
-  (CHE-0038) catches accidental serialization format changes from
-  dependency updates (e.g., jiff, rmp-serde, uuid). The test
-  serializes a deterministic `EventEnvelope` and compares against a
-  committed fixture file byte-for-byte.
+- Adding a variant forces compile-time updates to every `apply` — no silent ignoring.
+- Field evolution is constrained to optional additions — required fields break deserialization.
+- No runtime migration until Pardosa is built. Removing or renaming events requires a full Pardosa log migration.
+- **Roll-forward only** — rolling back code after writing new event variants makes affected aggregates unloadable until code rolls forward. Silent data loss from ignoring unknown events is worse than a loud failure.
+- **Golden-file serde regression** (CHE-0038) catches accidental format changes from dependency updates by comparing a deterministic envelope against a committed fixture byte-for-byte.

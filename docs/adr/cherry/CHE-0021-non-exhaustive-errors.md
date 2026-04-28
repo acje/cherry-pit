@@ -41,16 +41,7 @@ R2 [5]: New error variants may be added in minor versions without
 
 ## Consequences
 
-- Downstream callers must use wildcard arms in `match` statements on
-  `DispatchError` and `StoreError`. This is slightly less ergonomic
-  but enables safe API evolution.
-- Within the `cherry-pit-core` crate, exhaustive matching is still allowed —
-  `#[non_exhaustive]` only affects external callers.
-- `BusError` is a newtype struct with a private field, so external
-  construction was already impossible. `#[non_exhaustive]` adds the
-  additional constraint that external code cannot destructure it in
-  patterns, maintaining consistency with the enum error types.
-- `#[derive(Debug)]` is the only derive on error types. `Clone` and
-  `PartialEq` are not derived because `Box<dyn Error>` prevents them.
-  Manual `Display` and `Error` impls are used instead of `thiserror`
-  to avoid a dependency in the foundational crate.
+- Downstream callers must use wildcard arms in `match` on `DispatchError` and `StoreError`. Slightly less ergonomic but enables safe API evolution.
+- Within `cherry-pit-core`, exhaustive matching is still allowed.
+- `BusError` is a newtype with a private field; `#[non_exhaustive]` adds the constraint that external code cannot destructure it in patterns.
+- `#[derive(Debug)]` is the only derive on error types. Manual `Display` and `Error` impls are used instead of `thiserror` (CHE-0027).

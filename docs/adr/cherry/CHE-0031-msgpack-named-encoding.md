@@ -11,25 +11,7 @@ References: CHE-0001, CHE-0045
 
 ## Context
 
-`MsgpackFileStore` persists aggregate event streams to disk. The
-serialization format must balance compactness, performance, and
-forward compatibility (adding new fields to `EventEnvelope` without
-breaking existing data).
-
-Formats considered:
-
-1. **JSON** — human-readable, widely supported. Verbose (string keys
-   repeated per object, whitespace). Slower to parse than binary
-   formats. Good schema evolution via `#[serde(default)]`.
-2. **Bincode** — compact binary, fastest serialization. Positional
-   encoding — adding or reordering fields breaks deserialization of
-   existing data. No schema evolution without versioning.
-3. **MessagePack (positional/array)** — compact binary. Same problem
-   as bincode: field order matters.
-4. **MessagePack (named/map)** — binary format with string keys.
-   Slightly larger than positional msgpack. Supports
-   `#[serde(default)]` for new fields — existing data deserializes
-   with defaults for absent keys.
+`MsgpackFileStore` persists aggregate event streams to disk. The format must balance compactness, performance, and forward compatibility. JSON is verbose and slow. Bincode and positional MessagePack break deserialization when fields are added or reordered. MessagePack with named/map encoding supports `#[serde(default)]` for new fields — existing data deserializes with defaults for absent keys, enabling forward-compatible evolution.
 
 ## Decision
 
@@ -49,18 +31,8 @@ these fields deserializes with `None` values. A dedicated test
 
 ## Consequences
 
-- New `Option` fields on `EventEnvelope` with `#[serde(default)]` can
-  be added without migrating existing data files. This is the primary
-  reason for choosing named encoding over positional.
-- Wire size is larger than positional msgpack (field names are stored
-  as strings). For a development/small-deployment store, this tradeoff
-  is acceptable.
-- The format is implementation-specific to `MsgpackFileStore`, not a
-  trait-level requirement. Other `EventStore` implementations (e.g.,
-  PostgreSQL-backed) can use different formats.
-- Switching away from msgpack requires a migration tool that reads old
-  format and writes new format — the store cannot hot-swap formats.
-- The entire aggregate history is stored as a single msgpack value
-  (`Vec<EventEnvelope<E>>`), not as a stream of individual records.
-  This simplifies atomic writes but means large aggregates load the
-  full history into memory.
+- New `Option` fields with `#[serde(default)]` can be added without migrating existing data — the primary reason for named encoding.
+- Wire size is larger than positional msgpack. Acceptable for a development/small-deployment store.
+- The format is implementation-specific to `MsgpackFileStore`, not a trait-level requirement.
+- Switching formats requires a migration tool — the store cannot hot-swap.
+- The entire aggregate history is stored as a single `Vec<EventEnvelope<E>>`, simplifying atomic writes but loading full history into memory.

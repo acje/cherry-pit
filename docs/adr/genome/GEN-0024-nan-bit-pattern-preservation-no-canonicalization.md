@@ -11,31 +11,7 @@ References: GEN-0001, GEN-0012
 
 ## Context
 
-IEEE 754 floating-point defines NaN (Not a Number) as any value with all
-exponent bits set and a non-zero significand. For f64 this allows ~2^52
-distinct NaN bit patterns; for f32, ~2^23. NaN payloads are used by some
-runtimes for NaN-boxing (encoding type tags in the significand bits) and
-diagnostic tagging.
-
-Different CPU architectures may produce different NaN payloads for the same
-arithmetic operation. For example, ARM64 `fmul` of `NaN * 1.0` may modify
-payload bits differently than x86-64. This means identical computations on
-different platforms can produce different NaN bit patterns.
-
-GEN-0012 establishes little-endian encoding via `from_le_bytes` and states in
-one line that "exact NaN bit patterns [are] preserved (no canonicalization)."
-This ADR documents the rationale, tradeoffs, and cross-platform implications
-as a standalone decision.
-
-Two approaches were evaluated:
-
-- **Canonicalization** (Cap'n Proto approach): Replace all NaN values with a
-  single canonical NaN (e.g., `0x7FF8000000000000` for f64). Guarantees
-  cross-platform byte equality for NaN-producing arithmetic. Destroys NaN
-  payload information.
-- **Bit-pattern preservation** (pardosa-genome approach): Serialize exact
-  `to_le_bytes()` output. Round-trips `f64::NAN.to_bits()` exactly. Does not
-  guarantee cross-platform byte equality for NaN-producing arithmetic.
+IEEE 754 NaN allows ~2^52 distinct bit patterns for f64. NaN payloads are used for NaN-boxing and diagnostic tagging. Different architectures produce different NaN payloads for the same arithmetic, so identical computations on different platforms yield different NaN bits. GEN-0012 states NaN bit patterns are preserved but does not document the rationale. Two approaches: canonicalization (Cap'n Proto — replaces all NaN with a single canonical value, destroying payloads) or bit-pattern preservation (round-trips exact `to_bits()`, no cross-platform byte equality for NaN-producing arithmetic).
 
 ## Decision
 
@@ -57,21 +33,8 @@ R3 [9]: The deserializer reads raw bytes via from_le_bytes with no NaN
 
 ## Consequences
 
-- **Positive:** Bit-fidelity preserved. Applications using NaN-boxing or NaN
-  payload tagging can serialize and deserialize without information loss.
-- **Positive:** Simple implementation — no float inspection code. Zero overhead
-  on the serialization hot path.
-- **Positive:** Value-level determinism guaranteed: the same `to_bits()` value
-  always produces the same bytes, and vice versa.
-- **Negative:** Cross-platform determinism is NOT guaranteed for
-  NaN-producing arithmetic. The same floating-point computation on x86-64 vs
-  ARM64 may produce different NaN payloads, which serialize to different bytes.
-  This affects content-addressable storage of floating-point computation results
-  across heterogeneous clusters.
-- **Negative:** `-0.0` and `+0.0` serialize to different bytes (`0x8000...` vs
-  `0x0000...`) despite comparing equal via `==`. Applications needing
-  `==`-equivalent byte representations must canonicalize at the application
-  level.
-- **Mitigation:** For cross-platform byte equality, canonicalize NaN values at
-  the application level before serialization. pardosa-genome does not impose
-  this cost on all users.
+- **Positive:** Bit-fidelity preserved — NaN-boxing and payload tagging round-trip without loss. Zero overhead on hot path.
+- **Positive:** Value-level determinism: same `to_bits()` always produces same bytes.
+- **Negative:** Cross-platform determinism NOT guaranteed for NaN-producing arithmetic. Different architectures may produce different NaN payloads, affecting content-addressable storage across heterogeneous clusters.
+- **Negative:** `-0.0` and `+0.0` serialize differently despite `==` equality. Applications needing byte-equivalent zeros must canonicalize at the application level.
+- **Mitigation:** Canonicalize NaN values at the application level before serialization if cross-platform byte equality is required.

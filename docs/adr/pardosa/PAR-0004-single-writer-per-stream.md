@@ -56,21 +56,4 @@ R3 [3]: The first publish uses Expected-Last-Subject-Sequence 0 to
 
 ## Consequences
 
-- **Positive:** Simplifies the entire system — no conflict resolution, no
-  merge logic, no vector clocks.
-- **Positive:** Wall-clock `timestamp: i64` is adequate for total ordering
-  (single writer eliminates clock skew).
-- **Positive:** Monotonic `event_id: u64` provides globally unique
-  identification without coordination.
-- **Positive:** Mandatory fencing means a second instance's first publish is
-  rejected immediately — fail-fast instead of silent divergence.
-- **Negative:** Single point of failure for writes. Reads can be served from
-  replicated consumers.
-- **Negative:** Horizontal write scaling requires partitioning across
-  multiple pardosa instances with separate streams.
-- **Negative:** Mandatory fencing means writes are rejected (not queued) when
-  the expected sequence is stale. Callers must handle
-  `NatsUnavailable` and retry.
-- **Risk:** If this constraint is ever lifted, most of the persistence layer
-  and migration model must be redesigned. This is accepted as a deliberate
-  simplicity trade-off.
+Simplifies the entire system — no conflict resolution, merge logic, or vector clocks. Wall-clock `timestamp: i64` suffices for total ordering (single writer eliminates clock skew). Monotonic `event_id: u64` provides globally unique identification without coordination. Mandatory fencing means a second instance's first publish is rejected immediately — fail-fast over silent divergence. Trade-offs: single point of failure for writes (reads can use replicated consumers), horizontal write scaling requires stream partitioning, and callers must handle `NatsUnavailable` on stale-sequence rejection. If this constraint is ever lifted, most of the persistence layer and migration model must be redesigned.

@@ -67,18 +67,7 @@ R3 [5]: Feature flags gate serialization dependencies so users opt in
 
 ## Consequences
 
-- **No conflict between CHE-0031 and PAR-0006.** They govern
-  different crates with different requirements. Users choosing
-  `cherry-pit-gateway` get MsgPack. Users choosing `pardosa` get genome.
-  Users can use both in the same application for different aggregates.
-- **Domain event portability.** Because `cherry-pit-core` is format-agnostic,
-  domain events can be serialised by any backend. Migrating from
-  `MsgpackFileStore` to a future `GenomeFileStore` requires no domain
-  code changes.
-- **Schema evolution strategies differ by crate.** `cherry-pit-gateway` uses
-  additive field evolution with `#[serde(default)]` (CHE-0022).
-  `pardosa` uses new-stream migration with log rewriting (PAR-0005).
-  Both are valid within their scope.
-- **Increased surface area.** Two serialization strategies means two
-  sets of golden-file tests, two sets of forward-compatibility
-  guarantees, and two encoding-specific bug surfaces.
+- No conflict between CHE-0031 and PAR-0006 — they govern different crates. Users choosing `cherry-pit-gateway` get MsgPack; users choosing `pardosa` get genome.
+- Domain event portability — `cherry-pit-core` is format-agnostic, so migrating from `MsgpackFileStore` to a future `GenomeFileStore` requires no domain code changes.
+- Schema evolution strategies differ by crate: additive field evolution with `#[serde(default)]` (CHE-0022) for gateway, new-stream migration (PAR-0005) for pardosa.
+- Two serialization strategies means two sets of golden-file tests and encoding-specific bug surfaces.

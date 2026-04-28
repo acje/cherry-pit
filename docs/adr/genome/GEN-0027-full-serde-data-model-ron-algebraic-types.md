@@ -11,20 +11,7 @@ References: GEN-0001, GEN-0004
 
 ## Context
 
-Serde's data model defines 29 types that any `Serializer`/`Deserializer` must
-handle. Binary serialization formats typically support a subset:
-
-| Format | Tuples | Non-string map keys | Char | Unit structs | All enum forms |
-|--------|:------:|:-------------------:|:----:|:------------:|:--------------:|
-| FlatBuffers | ✗ | ✗ | ✗ | ✗ | Partial (unions) |
-| Protobuf | ✗ | ✗ (string/int only) | ✗ | ✗ | ✗ (oneof) |
-| bincode | ✓ | ✓ | ✓ | ✓ | ✓ |
-| postcard | ✓ | ✓ | ✓ | ✓ | ✓ |
-| **pardosa-genome** | **✓** | **✓** | **✓** | **✓** | **✓** |
-
-Supporting a subset would reduce implementation complexity but limit which
-existing Rust types can be serialized with `#[derive(Serialize, Deserialize,
-GenomeSafe)]`.
+Serde's data model defines 29 types that any `Serializer`/`Deserializer` must handle. Binary formats typically support subsets — FlatBuffers and Protobuf lack tuples, non-string map keys, char, and unit structs. bincode and postcard support the full model. Supporting a subset would limit which existing Rust types can use `#[derive(Serialize, Deserialize, GenomeSafe)]`.
 
 ## Decision
 
@@ -54,18 +41,7 @@ R3 [6]: Fixed-size arrays use array length in the schema hash
 
 ## Consequences
 
-- **Positive:** Maximum compatibility with existing Rust serde types. Any
-  `#[derive(Serialize, Deserialize)]` struct can add `GenomeSafe` (modulo
-  the rejected types from GEN-0004).
-- **Positive:** No artificial limitations that force users to restructure
-  their data models. Non-string map keys (e.g., `BTreeMap<(u32, u32), Vec<u8>>`)
-  work naturally.
-- **Positive:** RON can serve as a human-readable debug format for the same
-  types — same serde derives, different serializer.
-- **Negative:** All 29 serde `Serializer`/`Deserializer` trait methods must
-  be implemented in both `SizingSerializer` and `WritingSerializer`. Significant
-  implementation surface (~1800 LOC estimated).
-- **Negative:** Non-string map keys require arbitrary key serialization with
-  alignment, increasing heap layout complexity.
-- **Negative:** Char validation (Unicode scalar check) adds a per-char
-  branch on deserialization. Negligible cost but nonzero.
+- **Positive:** Maximum compatibility with existing Rust serde types — any `#[derive(Serialize, Deserialize)]` struct can add `GenomeSafe` (modulo GEN-0004 rejections). Non-string map keys work naturally.
+- **Positive:** RON can serve as a human-readable debug format using the same derives.
+- **Negative:** All 29 serde trait methods must be implemented in both `SizingSerializer` and `WritingSerializer` (~1800 LOC).
+- **Negative:** Non-string map keys require arbitrary key serialization with alignment, increasing heap layout complexity.

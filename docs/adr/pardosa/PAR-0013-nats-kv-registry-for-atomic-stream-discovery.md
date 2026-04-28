@@ -58,22 +58,4 @@ R3 [6]: Consumers watch the KV key and reconnect to the new stream
 
 ## Consequences
 
-- **Positive:** Atomic pointer update — consumers see a consistent
-  `generation:stream_name` pair.
-- **Positive:** KV history provides an operational audit trail of
-  stream transitions.
-- **Positive:** Watch-based notification eliminates polling. Consumers
-  detect cutover in real-time.
-- **Positive:** Rollback is trivial — re-point the KV key to the old
-  stream name within the grace period.
-- **Positive:** CAS guard prevents unauthorized or stale overwrites.
-  Only the holder of the current revision can update the pointer.
-- **Negative:** Adds a NATS KV dependency. If the KV bucket is
-  unavailable, startup and migration fail (`RegistryUnavailable`).
-- **Negative:** Single-key format (`generation:stream_name`) requires
-  parsing. Minor complexity.
-- **Negative:** CAS failure during migration requires cleanup of the
-  orphan stream the losing process created. Cleanup is the migration
-  caller's responsibility.
-- **Negative:** Stale revision after another process updates the key
-  requires a re-read from KV before retry.
+Atomic pointer update — consumers see a consistent `generation:stream_name` pair. KV history provides an operational audit trail. Watch-based notification eliminates polling for real-time cutover detection. Rollback is trivial — re-point the KV key within the grace period. CAS guard prevents stale overwrites. Trade-offs: NATS KV dependency means startup and migration fail if the bucket is unavailable (`RegistryUnavailable`). CAS failure during migration requires cleanup of the orphan stream (caller's responsibility). Stale revision after another process updates the key requires a re-read before retry.

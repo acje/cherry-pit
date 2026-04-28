@@ -222,10 +222,22 @@ fn print_template() {
     println!("    T011  Code block size limit (max 20 lines)");
     println!("    T014  Section order (Related → Context → Decision → Consequences)");
     println!(
-        "    T015  Prose section word count (default 7–50, override via adr-fmt.toml: Context, Consequences, Retirement)"
+        "    T015  Section word count — signal, not gate. Exceeding the limit"
     );
     println!(
-        "    T016  Tagged rules in Decision (≥1 rule, sequential IDs, max 10, 7–60 words, layer 1–12)"
+        "          (default 7–100) flags the section for review: it may be"
+    );
+    println!(
+        "          overloaded or genuinely need the space. Override in adr-fmt.toml."
+    );
+    println!(
+        "    T016  Tagged rules — signal, not gate. Limits (max 10 rules,"
+    );
+    println!(
+        "          7–60 words, sequential IDs, layer 1–12) flag ADRs for review."
+    );
+    println!(
+        "          Exceeding max rules may indicate the ADR covers multiple decisions."
     );
     println!();
 }
@@ -249,9 +261,9 @@ fn print_tagged_rules() {
     println!();
     println!("  Global ID: PREFIX-NNNN:RN:LN  (e.g., CHE-0042:R1:L5)");
     println!();
-    println!("  Constraints:");
+    println!("  Constraints (signals — exceeding warrants review, not rejection):");
     println!("    • At least 1 tagged rule per Decision section (all statuses)");
-    println!("    • Maximum 10 rules per ADR");
+    println!("    • Maximum 10 rules per ADR — more may indicate overloaded scope");
     println!("    • IDs must be sequential (R1, R2, R3 — no gaps)");
     println!("    • Each rule: 7–60 words");
     println!("    • Layer must be 1–12 (Meadows leverage points)");

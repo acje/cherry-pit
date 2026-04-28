@@ -46,17 +46,4 @@ R3 [6]: Annotate genome-encoded types with a GENOME LAYOUT doc comment
 
 ## Consequences
 
-- **Positive:** Immutability enforced by the compiler — no runtime checks
-  needed.
-- **Positive:** `#[non_exhaustive]` allows adding fields in future versions
-  without breaking downstream compilation (though adding a field still changes
-  the genome schema hash — a migration is required).
-- **Positive:** `GENOME LAYOUT` doc comments create a grep-able audit trail
-  for field-order-sensitive types.
-- **Negative:** Accessor boilerplate for each field. Acceptable for a small
-  number of core types.
-- **Negative:** `#[non_exhaustive]` prevents pattern matching on `Event<T>` in
-  external crates. Acceptable — events should be accessed via methods, not
-  destructured.
-- **Cross-crate:** Field order is a shared invariant with pardosa-genome. See
-  [GEN-0001](../genome/GEN-0001-serde-native-serialization-with-genomesafe-marker-trait.md).
+Immutability enforced by the compiler — no runtime checks needed. `#[non_exhaustive]` allows adding fields without breaking downstream compilation (though adding a field changes the genome schema hash — a migration is required). `GENOME LAYOUT` doc comments create a grep-able audit trail for field-order-sensitive types. Trade-offs: accessor boilerplate per field (acceptable for few core types) and `#[non_exhaustive]` prevents pattern matching on `Event<T>` in external crates. Field order is a shared invariant with pardosa-genome; see [GEN-0001](../genome/GEN-0001-serde-native-serialization-with-genomesafe-marker-trait.md).

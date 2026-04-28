@@ -54,21 +54,8 @@ R3 [4]: handle returns Result<Vec<Event>, Error> as plain data with
 
 ## Consequences
 
-- Command handlers are trivially testable: construct an aggregate,
-  apply setup events, call `handle`, assert returned events or
-  error. No mocks, no I/O setup.
-- The `&self` + `apply` separation creates a two-phase state update:
-  `handle` decides, `apply` mutates. This is the canonical event-
-  sourcing pattern.
-- **Purity is convention, not compiler-enforced.** `&self` prevents
-  mutation of `self`, but nothing prevents I/O (network calls, file
-  reads, `println!`), accessing global mutable state (`static`,
-  `AtomicU64`), or calling non-deterministic functions (`rand`,
-  `Timestamp::now`). Enforcement relies on code review and
-  documentation.
-- No `Clone` requirement on commands (CHE-0014) means the framework
-  cannot retry by replaying the same command — the caller must
-  reconstruct it. This is consistent with one-time intent semantics.
-- Zero events returned (`Ok(vec![])`) means the command was accepted
-  but no state change occurred — idempotent acceptance. The
-  infrastructure persists nothing and publishes nothing.
+- Command handlers are trivially testable: construct aggregate, apply setup events, call `handle`, assert events or error. No mocks.
+- `&self` + `apply` creates two-phase update: `handle` decides, `apply` mutates — the canonical event-sourcing pattern.
+- **Purity is convention, not compiler-enforced.** `&self` prevents mutation but nothing prevents I/O, global state, or non-deterministic calls. Enforcement relies on code review.
+- No `Clone` on commands (CHE-0014) means the framework cannot retry — callers must reconstruct.
+- Zero events returned (`Ok(vec![])`) means idempotent acceptance: no persistence, no publication.

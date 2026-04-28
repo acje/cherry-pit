@@ -48,15 +48,7 @@ R3 [9]: Schema hash is the sole mechanism providing type identity for
 
 ## Consequences
 
-- **Positive:** Consistent with serde's data model. No special-case logic
-  needed in the serializer or deserializer.
-- **Positive:** Schema hash catches accidental type substitution in normal
-  operation (always-verify, GEN-0011).
-- **Positive:** Wire format simplicity — no additional type discriminator
-  beyond the schema hash in the header.
-- **Negative:** Types with identical serde structure but different names
-  (e.g., `Meters(f64)` vs `Seconds(f64)`) produce identical payload bytes.
-  Schema hash is the only defense. If a future `decode_unchecked` bypasses
-  the hash, silent type confusion is possible.
-- **Negative:** Users expecting structural typing (same layout = same type)
-  must understand that pardosa-genome uses nominal typing via schema hash.
+- **Positive:** Consistent with serde's data model — no special-case logic needed.
+- **Positive:** Schema hash catches accidental type substitution in normal operation (GEN-0011).
+- **Negative:** Structurally identical types (`Meters(f64)` vs `Seconds(f64)`) produce identical payload bytes. Schema hash is the only defense; a future `decode_unchecked` bypassing the hash would allow silent type confusion.
+- **Negative:** Users expecting structural typing must understand pardosa-genome uses nominal typing via schema hash.

@@ -63,19 +63,4 @@ R3 [3]: Wrap the NATS publish call inside the write lock with
 
 ## Consequences
 
-- **Positive:** No split-brain — the durable store is always authoritative.
-  In-memory state is a cache that can be rebuilt from replay.
-- **Positive:** Failure mode is clean — the caller sees `NatsUnavailable`
-  and can retry. No partial state.
-- **Positive:** Simplifies reasoning about consistency — no WAL, no
-  two-phase commit, no compensation logic.
-- **Negative:** Write latency includes network round-trip to NATS.
-  Under high write throughput, lock contention serializes all mutations
-  behind network latency.
-- **Negative:** `RwLock` held across async NATS publish. Bounded by
-  `publish_timeout` (default 5s). A NATS partition causes write rejection
-  within the timeout, not indefinite blocking. See PAR-0014 for circuit
-  breaker behavior under sustained failures.
-- **Negative:** No batching — each mutation is a separate publish.
-  A `transact()` pattern for atomic multi-mutation batches is a future
-  enhancement.
+No split-brain — the durable store is always authoritative; in-memory state is a rebuildable cache. Failure mode is clean: caller sees `NatsUnavailable` with no partial state. No WAL, two-phase commit, or compensation logic needed. Trade-offs: write latency includes the NATS round-trip, and lock contention serializes mutations behind network latency. `RwLock` held across async publish is bounded by `publish_timeout` (default 5s); a NATS partition triggers write rejection within that window. See PAR-0014 for circuit breaker behavior. No batching — each mutation is a separate publish; a `transact()` pattern is a future enhancement.

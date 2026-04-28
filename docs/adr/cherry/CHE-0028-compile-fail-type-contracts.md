@@ -11,32 +11,7 @@ References: CHE-0001, CHE-0002, CHE-0003, CHE-0005
 
 ## Context
 
-Cherry-pit's type system enforces several invariants at compile time
-(CHE-0005):
-
-- A `CommandGateway` rejects commands the bound aggregate does not
-  handle
-- An `EventStore` typed for one event cannot persist a different
-  event type
-- `HandleCommand<C>` cannot be implemented for a type that does not
-  implement `Command`
-
-These guarantees are architectural — they are the reason the framework
-uses associated types and trait bounds instead of runtime routing.
-But compile-time guarantees are invisible in tests unless explicitly
-verified. A refactoring could silently weaken a bound, and no test
-would catch it.
-
-Two approaches:
-
-1. **Trust the type system** — if the code compiles, the guarantees
-   hold. No explicit verification. Risk: accidental trait bound
-   relaxation goes undetected.
-2. **Compile-fail tests** — write code that should NOT compile, and
-   verify that the compiler rejects it. The `trybuild` crate runs
-   these as normal `#[test]` functions. If a refactoring weakens a
-   bound, the previously-failing code starts compiling and the test
-   fails.
+Cherry-pit's type system enforces several invariants at compile time (CHE-0005): a `CommandGateway` rejects unhandled commands, an `EventStore` typed for one event cannot persist a different type, `HandleCommand<C>` requires `Command`. These guarantees are architectural — the reason for associated types over runtime routing. But they are invisible in tests unless explicitly verified. A refactoring could silently weaken a bound with no test catching it.
 
 ## Decision
 
@@ -79,19 +54,8 @@ trybuild = { workspace = true }
 
 ## Consequences
 
-- **Invariant regression detection** — if a refactoring removes a
-  trait bound, the compile-fail test starts passing and the suite
-  fails, catching regressions no runtime test can detect.
-- **Living documentation** — each compile-fail test file documents
-  what the type system prevents. Contributors can read
-  `tests/compile_fail/` to understand safety guarantees.
-- **Compiler-version sensitivity** — compile-fail tests match on
-  error messages. Major Rust version bumps may require updating
-  expected `.stderr` files.
-- **One invariant per file** — failures are precise, identifying
-  exactly which contract was broken.
-- **New safety guarantees should add compile-fail tests** — the
-  suite grows with the type safety surface area.
-- **Architectural tests, not unit tests** — they verify the
-  framework's compile-time contract with users and belong in
-  `cherry-pit-core`'s test suite.
+- **Invariant regression detection** — if a refactoring removes a trait bound, the compile-fail test starts passing and the suite fails.
+- **Living documentation** — each file in `tests/compile_fail/` documents what the type system prevents.
+- **Compiler-version sensitivity** — major Rust version bumps may require updating expected `.stderr` files.
+- **One invariant per file** — failures precisely identify which contract was broken.
+- New safety guarantees should add compile-fail tests. They are architectural tests verifying the framework's compile-time contract with users.

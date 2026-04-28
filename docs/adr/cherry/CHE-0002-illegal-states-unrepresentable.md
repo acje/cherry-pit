@@ -11,26 +11,7 @@ References: CHE-0001
 
 ## Context
 
-P1 (CHE-0001) mandates correctness first. The most effective
-correctness technique is designing types where invalid values cannot
-be constructed — the compiler rejects illegal states rather than
-runtime guards catching them.
-
-Two enforcement strategies exist. Runtime guards (`assert!`,
-`if`-checks) run on every invocation, can be bypassed or forgotten,
-and scale O(call sites). Type-level encoding (e.g.,
-`AggregateId(NonZeroU64)`) enforces the invariant once at
-construction; every subsequent use inherits the guarantee at zero
-runtime cost, scaling O(1).
-
-As the codebase grows, runtime guards become increasingly likely to
-miss a path. Type-level invariants cannot be circumvented by code
-growth.
-
-This principle is applied throughout cherry-pit but never stated as
-its own decision. It informs: `AggregateId(NonZeroU64)` (CHE-0011),
-associated types preventing cross-aggregate confusion (CHE-0005),
-exhaustive event enums (CHE-0022), and infallible apply (CHE-0009).
+P1 (CHE-0001) mandates correctness first. Runtime guards (`assert!`, `if`-checks) run on every invocation, can be bypassed, and scale O(call sites). Type-level encoding (e.g., `AggregateId(NonZeroU64)`) enforces invariants once at construction; every subsequent use inherits the guarantee at zero cost, scaling O(1). As the codebase grows, runtime guards increasingly miss paths while type-level invariants cannot be circumvented. This principle informs `AggregateId(NonZeroU64)` (CHE-0011), associated types (CHE-0005), exhaustive event enums (CHE-0022), and infallible apply (CHE-0009).
 
 ## Decision
 

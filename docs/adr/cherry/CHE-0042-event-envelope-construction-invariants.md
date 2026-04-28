@@ -11,49 +11,7 @@ References: CHE-0001, CHE-0002, CHE-0010, CHE-0016, CHE-0033, CHE-0034, CHE-0039
 
 ## Context
 
-`EventEnvelope<E>` is the infrastructure wrapper around every domain
-event. It carries metadata (event_id, aggregate_id, sequence,
-timestamp, correlation_id, causation_id) stamped by the `EventStore`
-during `create` and `append`. CHE-0016 establishes: "Callers never
-construct envelopes directly."
-
-However, all seven fields are `pub`:
-
-```rust
-pub struct EventEnvelope<E: DomainEvent> {
-    pub event_id: uuid::Uuid,
-    pub aggregate_id: AggregateId,
-    pub sequence: u64,
-    pub timestamp: jiff::Timestamp,
-    pub correlation_id: Option<uuid::Uuid>,
-    pub causation_id: Option<uuid::Uuid>,
-    pub payload: E,
-}
-```
-
-Any code — including user code — can construct an envelope via
-struct literal with wrong `sequence`, wrong `aggregate_id`, stale
-`timestamp`, nil `event_id`, or arbitrary correlation metadata.
-The safety guarantee "only the store constructs envelopes" is
-convention, not enforcement.
-
-CHE-0002 says: "Every cherry-pit type must encode its invariants at
-the type level." `EventEnvelope` violates this — illegal envelopes
-are representable.
-
-Three options were evaluated:
-
-1. **Private fields + validated public constructor + accessor
-   methods** — external code cannot construct malformed envelopes.
-   The constructor validates invariants (non-nil event_id, non-zero
-   sequence). All field reads go through methods. Breaking change.
-2. **`#[non_exhaustive]` on struct** — prevents external struct
-   literal construction. Fields remain publicly readable. Same
-   cross-crate constructor problem as option 1 because
-   `EventEnvelope` is defined in `cherry-pit-core` but constructed in
-   `cherry-pit-gateway`.
-3. **Accept with documentation** — keep `pub` fields, document the
-   convention. Zero breaking changes. CHE-0002 violation persists.
+`EventEnvelope<E>` wraps every domain event with metadata stamped by the `EventStore`. CHE-0016 establishes "callers never construct envelopes directly," but all seven fields are `pub` — any code can construct an envelope with wrong sequence, stale timestamp, or nil event_id. CHE-0002 says "encode invariants at the type level," yet `EventEnvelope` violates this. Three options were evaluated: private fields with validated constructor and accessors (enforced), `#[non_exhaustive]` on struct (partial), or accept with documentation (CHE-0002 violation persists).
 
 ## Decision
 
@@ -171,21 +129,8 @@ storage is caught at load time.
 
 ## Consequences
 
-- **CHE-0002 compliance restored.** External code cannot construct
-  malformed envelopes via struct literal. The validated constructor
-  rejects nil event_id, `NonZeroU64` eliminates zero sequences, and
-  post-deserialization validation catches corrupt stored data.
-- **Breaking change.** 48 locations in `cherry-pit-gateway` change
-  (field accesses → accessors, struct literals → `new()` calls,
-  new `CorrelationContext` parameters from CHE-0039). All mechanical.
-- **Sequencing dependency on CHE-0039.** The constructor accepts
-  correlation/causation IDs extracted from `CorrelationContext`;
-  CHE-0039 must be implemented first.
-- **Serde bypass is defense-in-depth.** The `validate()` method in
-  `load()` catches corrupt data; the window of invalid in-memory
-  state is contained within the store implementation.
-- **`pub fn new()` visibility.** External code can call the
-  constructor, but violations produce valid envelopes with potentially
-  wrong metadata, not structurally invalid ones.
-- **Future compile-fail test** (CHE-0028) should verify that direct
-  struct literal construction fails.
+- **CHE-0002 compliance restored.** External code cannot construct malformed envelopes. Validated constructor rejects nil event_id, `NonZeroU64` eliminates zero sequences, and post-deserialization validation catches corrupt stored data.
+- **Breaking change.** 48 locations in `cherry-pit-gateway` change (field accesses → accessors, struct literals → `new()` calls). All mechanical.
+- **Sequencing dependency on CHE-0039** — constructor accepts correlation/causation IDs from `CorrelationContext`.
+- **Serde bypass is defense-in-depth.** `validate()` in `load()` catches corrupt data; the invalid-state window is contained within the store.
+- Future compile-fail test (CHE-0028) should verify struct literal construction fails.

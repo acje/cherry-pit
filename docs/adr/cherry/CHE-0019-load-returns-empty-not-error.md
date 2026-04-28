@@ -51,15 +51,7 @@ path, which assigns the aggregate ID and guarantees ≥1 event.
 
 ## Consequences
 
-- The store trait is simpler — `load` has only two outcomes: events or
-  infrastructure error. No ambiguity between "not found" and "exists
-  but empty" (which cannot occur since `create` requires ≥1 event).
-- The bus is responsible for the semantic decision. Different bus
-  implementations could interpret empty streams differently (e.g.,
-  a bus for eventually-consistent systems might allow commands to
-  empty aggregates).
-- HTTP adapters mapping errors to status codes handle `NotFound` at
-  the `DispatchError` level (→ 404), not at the store level.
-- `append` to a never-created aggregate returns
-  `StoreError::Infrastructure` with a descriptive message. This
-  enforces the `create`→`append` lifecycle at the store level.
+- The store trait is simpler — `load` has only two outcomes: events or infrastructure error.
+- The bus owns the semantic decision: empty stream before dispatch → `DispatchError::AggregateNotFound`.
+- HTTP adapters handle `NotFound` at the `DispatchError` level (→ 404), not the store level.
+- `append` to a never-created aggregate returns `StoreError::Infrastructure`, enforcing the `create`→`append` lifecycle.

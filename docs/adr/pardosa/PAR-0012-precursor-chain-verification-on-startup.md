@@ -46,15 +46,4 @@ R3 [6]: Reject any event whose precursor references an event with a
 
 ## Consequences
 
-- **Positive:** Detects corruption before the server serves reads — no
-  silent data integrity loss.
-- **Positive:** O(n) is acceptable for a one-time startup check. A line
-  with 1M events completes in milliseconds.
-- **Positive:** The check is structural, not semantic — it validates the
-  graph topology, not application-level correctness.
-- **Negative:** Does not detect all corruption. A precursor that points to
-  a valid earlier event of the same fiber but is the *wrong* event
-  (reordered within the fiber) would not be caught. This would require
-  walking each fiber's chain end-to-end, which is O(n × fibers).
-- **Negative:** Startup time scales linearly with line size. For very large
-  lines (>10M events), consider making the check opt-in or sampling-based.
+Detects corruption before the server serves reads — no silent data integrity loss. O(n) is acceptable for a one-time startup check (1M events completes in milliseconds). The check is structural, validating graph topology rather than application-level correctness. Trade-offs: does not detect within-fiber reordering where a precursor points to a valid earlier same-fiber event but the wrong one (that would require O(n × fibers) chain walks). Startup time scales linearly with line size; for very large lines (>10M events), consider making the check opt-in or sampling-based.

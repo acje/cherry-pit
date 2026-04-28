@@ -11,19 +11,7 @@ References: GEN-0001, GEN-0013
 
 ## Context
 
-Zstd decompression is a denial-of-service vector. A few kilobytes of crafted
-compressed data can expand to terabytes, exhausting memory. Real-world CVEs
-demonstrate this attack class:
-
-- **Movement Network** (2024): crafted zstd frame caused unbounded allocation.
-- **urllib3** (CVE-2024-37891): decompression bomb via Content-Encoding.
-- **OTel Collector** (2024): crafted zstd payload caused OOM in telemetry pipeline.
-
-The zstd specification allows window sizes up to 3.75 TiB — a single decompressor
-can consume terabytes of memory if window size is not capped.
-
-A single-layer defense (e.g., only checking output size) is insufficient because
-the attacker controls both the compressed payload and the size headers.
+Zstd decompression is a denial-of-service vector — crafted compressed data can expand to terabytes, exhausting memory (CVEs in Movement Network, urllib3, OTel Collector). The zstd spec allows window sizes up to 3.75 TiB. A single-layer defense is insufficient because the attacker controls both the compressed payload and the size headers.
 
 ## Decision
 
