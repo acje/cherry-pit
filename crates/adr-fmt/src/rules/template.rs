@@ -40,12 +40,25 @@ const DEFAULT_MIN_RULE_WORDS: u64 = 7;
 /// Default maximum words per tagged rule.
 const DEFAULT_MAX_RULE_WORDS: u64 = 60;
 
-/// Canonical H2 section order for active ADRs.
-const ACTIVE_SECTION_ORDER: &[&str] = &["Status", "Related", "Context", "Decision", "Consequences"];
+/// Canonical H2 section order for active ADRs (with legacy ## Status heading).
+const ACTIVE_SECTION_ORDER_WITH_STATUS: &[&str] =
+    &["Status", "Related", "Context", "Decision", "Consequences"];
 
-/// Canonical H2 section order for stale ADRs (Retirement at end).
-const STALE_SECTION_ORDER: &[&str] = &[
+/// Canonical H2 section order for active ADRs (new format — no ## Status heading).
+const ACTIVE_SECTION_ORDER: &[&str] = &["Related", "Context", "Decision", "Consequences"];
+
+/// Canonical H2 section order for stale ADRs (with legacy ## Status heading).
+const STALE_SECTION_ORDER_WITH_STATUS: &[&str] = &[
     "Status",
+    "Related",
+    "Context",
+    "Decision",
+    "Consequences",
+    "Retirement",
+];
+
+/// Canonical H2 section order for stale ADRs (new format — no ## Status heading).
+const STALE_SECTION_ORDER: &[&str] = &[
     "Related",
     "Context",
     "Decision",
@@ -101,7 +114,19 @@ pub fn check(record: &AdrRecord, config: &Config, diags: &mut Vec<Diagnostic>) {
             "T005",
             &record.file_path,
             0,
-            "missing `## Status` section or status line".into(),
+            "missing `## Status` section or `Status:` metadata field".into(),
+        ));
+    }
+
+    // T005b: Dual-status conflict (both metadata field and section present)
+    if record.has_dual_status {
+        diags.push(Diagnostic::warning(
+            "T005b",
+            &record.file_path,
+            record.status_line,
+            "both `Status:` metadata field and `## Status` section present — \
+             metadata field takes precedence; remove the `## Status` section"
+                .into(),
         ));
     }
 
@@ -146,7 +171,7 @@ pub fn check(record: &AdrRecord, config: &Config, diags: &mut Vec<Diagnostic>) {
             &record.file_path,
             0,
             "Related section has no relationships — every ADR must \
-             have at least one relation (use `- Root: ID` for tree roots)"
+             have at least one relation (use `Root: ID` for tree roots)"
                 .into(),
         ));
     }
@@ -275,11 +300,16 @@ pub fn check(record: &AdrRecord, config: &Config, diags: &mut Vec<Diagnostic>) {
 ///
 /// Only validates the relative ordering of known canonical sections.
 /// Extra subsections (e.g., `### Rules`) within a section are ignored.
+/// Dynamically selects expected order based on whether `## Status` is
+/// present (legacy format) or absent (new metadata-field format).
 fn check_section_order(record: &AdrRecord, diags: &mut Vec<Diagnostic>) {
-    let expected = if record.is_stale {
-        STALE_SECTION_ORDER
-    } else {
-        ACTIVE_SECTION_ORDER
+    let has_status_section = record.section_order.iter().any(|s| s == "Status");
+
+    let expected: &[&str] = match (record.is_stale, has_status_section) {
+        (true, true) => STALE_SECTION_ORDER_WITH_STATUS,
+        (true, false) => STALE_SECTION_ORDER,
+        (false, true) => ACTIVE_SECTION_ORDER_WITH_STATUS,
+        (false, false) => ACTIVE_SECTION_ORDER,
     };
 
     // Filter section_order to only canonical sections
@@ -548,7 +578,6 @@ params = { max_rules = 5, min_rule_words = 7, max_rule_words = 60 }
             has_decision: true,
             has_consequences: true,
             section_order: vec![
-                "Status".into(),
                 "Related".into(),
                 "Context".into(),
                 "Decision".into(),
@@ -702,7 +731,6 @@ params = { max_rules = 5, min_rule_words = 7, max_rule_words = 60 }
     fn section_out_of_order_produces_t014() {
         let mut record = make_record();
         record.section_order = vec![
-            "Status".into(),
             "Context".into(), // out of order — Related should come first
             "Related".into(),
             "Decision".into(),
@@ -726,6 +754,25 @@ params = { max_rules = 5, min_rule_words = 7, max_rule_words = 60 }
         assert!(
             !diags.iter().any(|d| d.rule == "T014"),
             "correct order should not trigger T014, got: {diags:?}"
+        );
+    }
+
+    #[test]
+    fn section_correct_order_with_legacy_status_no_t014() {
+        let mut record = make_record();
+        record.section_order = vec![
+            "Status".into(),
+            "Related".into(),
+            "Context".into(),
+            "Decision".into(),
+            "Consequences".into(),
+        ];
+        let config = make_config();
+        let mut diags = Vec::new();
+        check(&record, &config, &mut diags);
+        assert!(
+            !diags.iter().any(|d| d.rule == "T014"),
+            "correct legacy order should not trigger T014, got: {diags:?}"
         );
     }
 
@@ -788,7 +835,13 @@ params = { max_rules = 5, min_rule_words = 7, max_rule_words = 60 }
         record.is_stale = true;
         record.has_retirement = true;
         record.section_word_counts.insert("Retirement".into(), 15);
-        record.section_order.push("Retirement".into());
+        record.section_order = vec![
+            "Related".into(),
+            "Context".into(),
+            "Decision".into(),
+            "Consequences".into(),
+            "Retirement".into(),
+        ];
         let config = make_config();
         let mut diags = Vec::new();
         check(&record, &config, &mut diags);
@@ -1067,5 +1120,61 @@ params = { max_rules = 5, min_rule_words = 7, max_rule_words = 60 }
         check(&record, &config, &mut diags);
         let t016 = diags.iter().find(|d| d.rule == "T016" && d.message.contains("gap"));
         assert!(t016.is_some(), "gap in IDs should trigger T016");
+    }
+
+    #[test]
+    fn dual_status_produces_t005b_warning() {
+        use crate::model::{RelVerb, Relationship, TaggedRule};
+        let mut record = make_record();
+        record.has_dual_status = true;
+        record.relationships = vec![Relationship {
+            verb: RelVerb::Root,
+            target: record.id.clone(),
+            line: 10,
+        }];
+        record.is_self_referencing = true;
+        record.decision_rules = vec![TaggedRule {
+            id: "R1".into(),
+            text: "All events must be versioned with semantic version numbers".into(),
+            line: 10,
+        }];
+        let config = make_config();
+        let mut diags = Vec::new();
+        check(&record, &config, &mut diags);
+        let t005b = diags
+            .iter()
+            .find(|d| d.rule == "T005b" || d.message.contains("both"));
+        assert!(
+            t005b.is_some(),
+            "dual status should produce warning, got: {diags:?}"
+        );
+    }
+
+    #[test]
+    fn no_dual_status_no_t005b() {
+        use crate::model::{RelVerb, Relationship, TaggedRule};
+        let mut record = make_record();
+        record.has_dual_status = false;
+        record.relationships = vec![Relationship {
+            verb: RelVerb::Root,
+            target: record.id.clone(),
+            line: 10,
+        }];
+        record.is_self_referencing = true;
+        record.decision_rules = vec![TaggedRule {
+            id: "R1".into(),
+            text: "All events must be versioned with semantic version numbers".into(),
+            line: 10,
+        }];
+        let config = make_config();
+        let mut diags = Vec::new();
+        check(&record, &config, &mut diags);
+        let t005b = diags
+            .iter()
+            .find(|d| d.rule == "T005b" || d.message.contains("both"));
+        assert!(
+            t005b.is_none(),
+            "no dual status should not produce T005b, got: {diags:?}"
+        );
     }
 }

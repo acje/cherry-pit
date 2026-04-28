@@ -22,6 +22,7 @@ people, write tagged rules for machines.
 ````markdown
 # PREFIX-NNNN. Title
 
+Date: YYYY-MM-DD
 Last-reviewed: YYYY-MM-DD
 Tier: S|A|B|C|D
 Status: Draft | Proposed | Accepted | Rejected | Deprecated | Superseded by PREFIX-NNNN
@@ -145,12 +146,13 @@ its domain. Omit it when the decision is domain-wide.
 ### Status
 
 ```
-## Status
-
-Accepted
+Status: Accepted
 ```
 
-Lifecycle state on its own line below the `## Status` heading.
+Lifecycle state as a metadata field in the preamble (before any H2
+heading). Legacy format (`## Status` section with value on next line)
+is still recognized as a fallback. If both are present, the metadata
+field takes precedence and a T005b warning is emitted.
 
 | State | Meaning |
 |-------|---------|
@@ -168,7 +170,7 @@ the file to `stale/` and adding a `## Retirement` section.
 `Amended` is not a valid status. If a decision evolves, update the
 existing ADR (keeping its ID) or write a new ADR that supersedes it.
 
-**Enforced by:** T005, T006, S004–S006.
+**Enforced by:** T005, T005b, T006, S004–S006.
 
 ---
 
@@ -177,11 +179,12 @@ existing ADR (keeping its ID) or write a new ADR that supersedes it.
 ```
 ## Related
 
-- References: CHE-0002, CHE-0010
-- Supersedes: CHE-0015
+References: CHE-0002, CHE-0010 | Supersedes: CHE-0015
 ```
 
-Relationships to other ADRs using exactly three permitted verbs:
+Pipe-separated relationships on a single line. Each segment is
+`Verb: TARGET1, TARGET2`. Multiple segments separated by ` | `.
+Three permitted verbs:
 
 | Verb | Meaning | Use when |
 |------|---------|----------|
@@ -469,14 +472,11 @@ Date: 2026-04-25
 Last-reviewed: 2026-04-25
 Tier: B
 Crates: cherry-pit-core, cherry-pit-gateway
-
-## Status
-
-Accepted
+Status: Accepted
 
 ## Related
 
-- References: CHE-0002, CHE-0010, CHE-0016, CHE-0033, CHE-0034, CHE-0039
+References: CHE-0002, CHE-0010, CHE-0016, CHE-0033, CHE-0034, CHE-0039
 
 ## Context
 

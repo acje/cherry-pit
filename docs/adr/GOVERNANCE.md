@@ -163,6 +163,25 @@ Terminal states (Rejected, Deprecated, Superseded) require moving the
 ADR to the stale directory and adding a `## Retirement` section
 explaining why the ADR left active service.
 
+### Format Migration (2026-04-28)
+
+The template format has two changes:
+
+1. **Status as metadata field.** Status moves from a `## Status`
+   section to a preamble field (`Status: Accepted`) alongside Date,
+   Last-reviewed, and Tier. The legacy `## Status` section is still
+   recognized as a fallback — both formats parse correctly — but new
+   ADRs should use the metadata field. If both are present, the
+   metadata field takes precedence and a T005b warning is emitted.
+
+2. **Pipe-separated Related.** The `## Related` section uses
+   pipe-separated format: `Verb: targets | Verb: targets`.
+   The old bullet format (`- Verb: target`) is no longer parsed.
+   Existing ADRs will fire T007 until migrated.
+
+Migrate existing ADRs by tier (S first) when touching them for
+other reasons — no urgent batch conversion required.
+
 ---
 
 ## 4. Overlap Resolution

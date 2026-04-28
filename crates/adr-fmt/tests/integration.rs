@@ -61,14 +61,11 @@ const VALID_ADR: &str = "\
 Date: 2026-04-27
 Last-reviewed: 2026-04-27
 Tier: B
-
-## Status
-
-Accepted
+Status: Accepted
 
 ## Related
 
-- Root: TST-0001
+Root: TST-0001
 
 ## Context
 
@@ -90,14 +87,11 @@ const REFERENCING_ADR: &str = "\
 Date: 2026-04-27
 Last-reviewed: 2026-04-27
 Tier: B
-
-## Status
-
-Accepted
+Status: Accepted
 
 ## Related
 
-- References: TST-0001
+References: TST-0001
 
 ## Context
 
@@ -119,14 +113,11 @@ const DANGLING_LINK_ADR: &str = "\
 Date: 2026-04-27
 Last-reviewed: 2026-04-27
 Tier: B
-
-## Status
-
-Accepted
+Status: Accepted
 
 ## Related
 
-- References: TST-9999
+References: TST-9999
 
 ## Context
 
@@ -148,14 +139,11 @@ const NO_TAGGED_RULES_ADR: &str = "\
 Date: 2026-04-27
 Last-reviewed: 2026-04-27
 Tier: B
-
-## Status
-
-Accepted
+Status: Accepted
 
 ## Related
 
-- Root: TST-0004
+Root: TST-0004
 
 ## Context
 
@@ -176,14 +164,11 @@ const DRAFT_ADR: &str = "\
 
 Date: 2026-04-27
 Tier: B
-
-## Status
-
-Draft
+Status: Draft
 
 ## Related
 
-- Root: TST-0005
+Root: TST-0005
 
 ## Context
 
@@ -206,14 +191,11 @@ Date: 2026-04-27
 Last-reviewed: 2026-04-27
 Tier: B
 Crates: test-core, test-api
-
-## Status
-
-Accepted
+Status: Accepted
 
 ## Related
 
-- Root: TST-0006
+Root: TST-0006
 
 ## Context
 
@@ -235,14 +217,11 @@ const FOUNDATION_ADR: &str = "\
 Date: 2026-04-27
 Last-reviewed: 2026-04-27
 Tier: S
-
-## Status
-
-Accepted
+Status: Accepted
 
 ## Related
 
-- Root: COM-0001
+Root: COM-0001
 
 ## Context
 
@@ -264,14 +243,11 @@ const STALE_ADR: &str = "\
 Date: 2026-01-01
 Last-reviewed: 2026-01-01
 Tier: B
-
-## Status
-
-Superseded by TST-0001
+Status: Superseded by TST-0001
 
 ## Related
 
-- References: TST-0001
+References: TST-0001
 
 ## Context
 
@@ -297,14 +273,11 @@ const GAP_RULES_ADR: &str = "\
 Date: 2026-04-27
 Last-reviewed: 2026-04-27
 Tier: B
-
-## Status
-
-Accepted
+Status: Accepted
 
 ## Related
 
-- Root: TST-0007
+Root: TST-0007
 
 ## Context
 
@@ -688,14 +661,11 @@ const MULTILINE_RULES_ADR: &str = "\
 Date: 2026-04-27
 Last-reviewed: 2026-04-27
 Tier: B
-
-## Status
-
-Accepted
+Status: Accepted
 
 ## Related
 
-- Root: TST-0008
+Root: TST-0008
 
 ## Context
 
@@ -719,14 +689,11 @@ const DRAFT_WITH_RULES_ADR: &str = "\
 
 Date: 2026-04-27
 Tier: B
-
-## Status
-
-Draft
+Status: Draft
 
 ## Related
 
-- Root: TST-0009
+Root: TST-0009
 
 ## Context
 

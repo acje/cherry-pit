@@ -70,6 +70,9 @@ pub struct AdrRecord {
     /// True when the ADR has a `- Root: SELF` self-reference.
     #[allow(dead_code)] // Used by generate tree logic (retained for future)
     pub is_self_referencing: bool,
+    /// True when both `Status:` metadata field and `## Status` section
+    /// are present — the metadata field takes precedence.
+    pub has_dual_status: bool,
     pub max_code_block_lines: usize,
     /// 1-indexed line number of the opening fence of the largest code
     /// block. 0 if no code blocks exist.
@@ -124,6 +127,7 @@ impl Default for AdrRecord {
             has_rejection_rationale: false,
             is_stale: false,
             is_self_referencing: false,
+            has_dual_status: false,
             max_code_block_lines: 0,
             max_code_block_line: 0,
             code_block_count: 0,

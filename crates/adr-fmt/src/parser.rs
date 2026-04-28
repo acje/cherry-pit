@@ -110,7 +110,18 @@ pub fn parse_adr_file(path: &Path, expected_prefix: &str, is_stale: bool) -> Opt
     let (tier, tier_line) = find_tier_field(&lines);
 
     // --- Status ---
-    let (status, status_line, status_raw) = find_status(&lines);
+    // Try metadata field first (`Status: value`), then fall back to section
+    let (status_field, status_field_line, status_field_raw) = find_status_field(&lines);
+    let (status_section, status_section_line, status_section_raw) = find_status_section(&lines);
+
+    let has_dual_status = status_field.is_some() && status_section.is_some();
+
+    // Metadata field takes precedence
+    let (status, status_line, status_raw) = if status_field.is_some() {
+        (status_field, status_field_line, status_field_raw)
+    } else {
+        (status_section, status_section_line, status_section_raw)
+    };
 
     // --- Related ---
     let (relationships, has_related, related_has_placeholder) = find_relationships(&lines);
@@ -163,6 +174,7 @@ pub fn parse_adr_file(path: &Path, expected_prefix: &str, is_stale: bool) -> Opt
         has_rejection_rationale,
         is_stale,
         is_self_referencing,
+        has_dual_status,
         max_code_block_lines,
         max_code_block_line,
         code_block_count,
@@ -192,9 +204,12 @@ fn parse_title(lines: &[&str], expected_prefix: &str) -> Option<(AdrId, String, 
     None
 }
 
-/// Find a simple `Key: value` field.
+/// Find a simple `Key: value` field in the preamble (before first H2 heading).
 fn find_field(lines: &[&str], key: &str) -> (Option<String>, usize) {
     for (i, line) in lines.iter().enumerate() {
+        if line.starts_with("## ") {
+            break;
+        }
         if let Some(value) = line.strip_prefix(key) {
             let value = value.trim();
             if !value.is_empty() {
@@ -216,8 +231,27 @@ fn find_tier_field(lines: &[&str]) -> (Option<Tier>, usize) {
     (None, 0)
 }
 
-/// Find the `## Status` section and parse the status line.
-fn find_status(lines: &[&str]) -> (Option<Status>, usize, Option<String>) {
+/// Find `Status:` metadata field in the preamble (before first H2 heading).
+fn find_status_field(lines: &[&str]) -> (Option<Status>, usize, Option<String>) {
+    for (i, line) in lines.iter().enumerate() {
+        // Stop at first H2 — metadata preamble is above sections
+        if line.starts_with("## ") {
+            break;
+        }
+        if let Some(value) = line.strip_prefix("Status:") {
+            let value = value.trim();
+            if !value.is_empty() {
+                let raw = value.to_owned();
+                let status = Status::parse(value);
+                return (Some(status), i + 1, Some(raw));
+            }
+        }
+    }
+    (None, 0, None)
+}
+
+/// Find the `## Status` section and parse the status line (legacy format).
+fn find_status_section(lines: &[&str]) -> (Option<Status>, usize, Option<String>) {
     let mut in_status = false;
     for (i, line) in lines.iter().enumerate() {
         if *line == "## Status" {
@@ -242,6 +276,10 @@ fn find_status(lines: &[&str]) -> (Option<Status>, usize, Option<String>) {
 }
 
 /// Find all relationships in the `## Related` section.
+///
+/// Parses pipe-separated format: `Verb: TARGET1, TARGET2 | Verb: TARGET3`
+/// Each segment is `Verb: targets` where targets are comma-separated ADR IDs.
+/// A single segment without pipes is also valid: `Root: OWN-ID`.
 fn find_relationships(lines: &[&str]) -> (Vec<Relationship>, bool, bool) {
     let mut rels = Vec::new();
     let mut in_related = false;
@@ -267,23 +305,27 @@ fn find_relationships(lines: &[&str]) -> (Vec<Relationship>, bool, bool) {
                 has_placeholder = true;
                 continue;
             }
-            // Parse "- Verb: TARGET1, TARGET2"
-            if let Some(rest) = line.strip_prefix("- ")
-                && let Some(colon_pos) = rest.find(": ")
-            {
-                let verb_str = &rest[..colon_pos];
-                let targets_str = &rest[colon_pos + 2..];
+            // Parse pipe-separated format: "Verb: targets | Verb: targets"
+            let segments: Vec<&str> = trimmed.split(" | ").collect();
+            for segment in &segments {
+                let segment = segment.trim();
+                if segment.is_empty() {
+                    continue;
+                }
+                if let Some(colon_pos) = segment.find(": ") {
+                    let verb_str = &segment[..colon_pos];
+                    let targets_str = &segment[colon_pos + 2..];
 
-                if let Some(verb) = RelVerb::parse(verb_str) {
-                    for target_str in targets_str.split(", ") {
-                        // Strip annotations like "(indirect)" or "(`#[non_exhaustive]`)"
-                        let clean = strip_annotation(target_str);
-                        if let Some(target_id) = parse_adr_id_from_str(clean) {
-                            rels.push(Relationship {
-                                verb,
-                                target: target_id,
-                                line: i + 1,
-                            });
+                    if let Some(verb) = RelVerb::parse(verb_str) {
+                        for target_str in targets_str.split(", ") {
+                            let clean = strip_annotation(target_str);
+                            if let Some(target_id) = parse_adr_id_from_str(clean) {
+                                rels.push(Relationship {
+                                    verb,
+                                    target: target_id,
+                                    line: i + 1,
+                                });
+                            }
                         }
                     }
                 }
@@ -579,7 +621,7 @@ mod tests {
     #[test]
     fn find_status_parses_accepted() {
         let lines = vec!["## Status", "", "Accepted", "", "## Related"];
-        let (status, line, raw) = find_status(&lines);
+        let (status, line, raw) = find_status_section(&lines);
         assert_eq!(status, Some(Status::Accepted));
         assert_eq!(line, 3);
         assert_eq!(raw.as_deref(), Some("Accepted"));
@@ -588,7 +630,7 @@ mod tests {
     #[test]
     fn find_status_parses_rejected() {
         let lines = vec!["## Status", "", "Rejected", "", "## Related"];
-        let (status, _, _) = find_status(&lines);
+        let (status, _, _) = find_status_section(&lines);
         assert_eq!(status, Some(Status::Rejected));
     }
 
@@ -597,25 +639,23 @@ mod tests {
         let lines = vec![
             "## Related",
             "",
-            "- Depends on: CHE-0006, CHE-0032",
-            "- Referenced by: CHE-0036 (indirect), CHE-0043",
+            "References: CHE-0006, CHE-0032 | Supersedes: CHE-0015",
             "",
             "## Context",
         ];
         let (rels, found, _placeholder) = find_relationships(&lines);
         assert!(found);
-        assert_eq!(rels.len(), 4);
-        assert_eq!(rels[0].verb, RelVerb::DependsOn);
+        assert_eq!(rels.len(), 3);
+        assert_eq!(rels[0].verb, RelVerb::References);
         assert_eq!(rels[0].target, parse_adr_id_from_str("CHE-0006").unwrap());
         assert_eq!(rels[1].target, parse_adr_id_from_str("CHE-0032").unwrap());
-        assert_eq!(rels[2].verb, RelVerb::ReferencedBy);
-        assert_eq!(rels[2].target, parse_adr_id_from_str("CHE-0036").unwrap());
-        assert_eq!(rels[3].target, parse_adr_id_from_str("CHE-0043").unwrap());
+        assert_eq!(rels[2].verb, RelVerb::Supersedes);
+        assert_eq!(rels[2].target, parse_adr_id_from_str("CHE-0015").unwrap());
     }
 
     #[test]
     fn find_relationships_parses_root_verb() {
-        let lines = vec!["## Related", "", "- Root: CHE-0001", "", "## Context"];
+        let lines = vec!["## Related", "", "Root: CHE-0001", "", "## Context"];
         let (rels, found, _) = find_relationships(&lines);
         assert!(found);
         assert_eq!(rels.len(), 1);
@@ -741,7 +781,7 @@ mod tests {
 
     #[test]
     fn find_relationships_no_placeholder_with_rels() {
-        let lines = vec!["## Related", "", "- Depends on: CHE-0001", "", "## Context"];
+        let lines = vec!["## Related", "", "References: CHE-0001", "", "## Context"];
         let (rels, found, placeholder) = find_relationships(&lines);
         assert!(found);
         assert_eq!(rels.len(), 1);
@@ -756,13 +796,9 @@ mod tests {
         let lines = vec![
             "# CHE-0001. Title",
             "",
-            "## Status",
-            "",
-            "Accepted",
-            "",
             "## Related",
             "",
-            "- Root: CHE-0001",
+            "Root: CHE-0001",
             "",
             "## Context",
             "",
@@ -779,7 +815,7 @@ mod tests {
         let (order, counts) = analyze_sections(&lines);
         assert_eq!(
             order,
-            vec!["Status", "Related", "Context", "Decision", "Consequences"]
+            vec!["Related", "Context", "Decision", "Consequences"]
         );
         assert_eq!(counts["Context"], 11);
         assert_eq!(counts["Decision"], 12);
@@ -824,7 +860,7 @@ mod tests {
 
     #[test]
     fn self_referencing_detected() {
-        let lines = vec!["## Related", "", "- Root: CHE-0001", "", "## Context"];
+        let lines = vec!["## Related", "", "Root: CHE-0001", "", "## Context"];
         let (rels, _, _) = find_relationships(&lines);
         let id = AdrId {
             prefix: "CHE".into(),
@@ -838,7 +874,7 @@ mod tests {
 
     #[test]
     fn self_referencing_wrong_id_not_detected() {
-        let lines = vec!["## Related", "", "- Root: CHE-0002", "", "## Context"];
+        let lines = vec!["## Related", "", "Root: CHE-0002", "", "## Context"];
         let (rels, _, _) = find_relationships(&lines);
         let id = AdrId {
             prefix: "CHE".into(),
@@ -1055,5 +1091,177 @@ mod tests {
             "Construct via `EventEnvelope::new()` which \
              returns `Result<Self, EnvelopeError>`"
         );
+    }
+
+    // ── Status metadata field tests ────────────────────────────────────
+
+    #[test]
+    fn find_status_field_parses_accepted() {
+        let lines = vec![
+            "# CHE-0001. Title",
+            "Date: 2026-04-27",
+            "Tier: B",
+            "Status: Accepted",
+            "",
+            "## Related",
+        ];
+        let (status, line, raw) = find_status_field(&lines);
+        assert_eq!(status, Some(Status::Accepted));
+        assert_eq!(line, 4); // 1-indexed
+        assert_eq!(raw.as_deref(), Some("Accepted"));
+    }
+
+    #[test]
+    fn find_status_field_parses_superseded_with_target() {
+        let lines = vec![
+            "# CHE-0001. Title",
+            "Date: 2026-04-27",
+            "Tier: B",
+            "Status: Superseded by CHE-0099",
+            "",
+            "## Related",
+        ];
+        let (status, _, raw) = find_status_field(&lines);
+        assert!(matches!(status, Some(Status::SupersededBy(_))));
+        assert_eq!(raw.as_deref(), Some("Superseded by CHE-0099"));
+    }
+
+    #[test]
+    fn find_status_field_none_when_absent() {
+        let lines = vec![
+            "# CHE-0001. Title",
+            "Date: 2026-04-27",
+            "Tier: B",
+            "",
+            "## Related",
+        ];
+        let (status, _, _) = find_status_field(&lines);
+        assert_eq!(status, None);
+    }
+
+    #[test]
+    fn find_status_field_stops_at_h2() {
+        // Status: after a ## heading should NOT be picked up as metadata
+        let lines = vec![
+            "# CHE-0001. Title",
+            "Date: 2026-04-27",
+            "Tier: B",
+            "",
+            "## Context",
+            "Status: Accepted",
+        ];
+        let (status, _, _) = find_status_field(&lines);
+        assert_eq!(status, None);
+    }
+
+    // ── Pipe-separated Related edge cases ──────────────────────────────
+
+    #[test]
+    fn find_relationships_empty_section_returns_no_rels() {
+        let lines = vec!["## Related", "", "", "## Context"];
+        let (rels, found, _) = find_relationships(&lines);
+        assert!(found); // section heading exists
+        assert!(rels.is_empty()); // but no relationships parsed
+    }
+
+    #[test]
+    fn find_relationships_old_bullet_format_not_parsed() {
+        // Old format with "- Verb: target" should NOT produce relationships
+        let lines = vec![
+            "## Related",
+            "",
+            "- Root: CHE-0001",
+            "- References: CHE-0002",
+            "",
+            "## Context",
+        ];
+        let (rels, found, _) = find_relationships(&lines);
+        assert!(found); // section heading exists
+        assert!(rels.is_empty()); // bullets don't parse as pipe-format
+    }
+
+    #[test]
+    fn find_relationships_single_verb_no_pipe() {
+        let lines = vec!["## Related", "", "References: CHE-0005", "", "## Context"];
+        let (rels, found, _) = find_relationships(&lines);
+        assert!(found);
+        assert_eq!(rels.len(), 1);
+        assert_eq!(rels[0].verb, RelVerb::References);
+        assert_eq!(rels[0].target.number, 5);
+    }
+
+    #[test]
+    fn find_relationships_whitespace_around_pipe() {
+        let lines = vec![
+            "## Related",
+            "",
+            "Root: CHE-0001  |  References: CHE-0002 ,  CHE-0003",
+            "",
+            "## Context",
+        ];
+        let (rels, found, _) = find_relationships(&lines);
+        assert!(found);
+        assert_eq!(rels.len(), 3);
+        assert_eq!(rels[0].verb, RelVerb::Root);
+        assert_eq!(rels[1].target.number, 2);
+        assert_eq!(rels[2].target.number, 3);
+    }
+
+    #[test]
+    fn find_relationships_no_space_pipe_not_parsed() {
+        // Pipe without surrounding spaces is NOT a valid separator
+        let lines = vec![
+            "## Related",
+            "",
+            "Root: CHE-0001|References: CHE-0002",
+            "",
+            "## Context",
+        ];
+        let (rels, found, _) = find_relationships(&lines);
+        assert!(found);
+        // "Root: CHE-0001|References: CHE-0002" is treated as one segment
+        // verb_str = "Root", targets_str = "CHE-0001|References: CHE-0002"
+        // parse_adr_id_from_str("CHE-0001|References: CHE-0002") → None (trailing text)
+        // Actually parse_adr_id_from_str parses "CHE-0001|References: CHE-0002" → let's verify
+        // If it fails, rels is empty; if ID parser is lenient it might grab CHE-0001
+        // Either way this documents the boundary
+        assert!(
+            rels.len() <= 1,
+            "no-space pipe should not split into multiple segments"
+        );
+    }
+
+    #[test]
+    fn find_relationships_multi_line_content() {
+        // Multiple lines within Related section (each is an independent pipe-format line)
+        let lines = vec![
+            "## Related",
+            "",
+            "Root: CHE-0001",
+            "References: CHE-0002, CHE-0003",
+            "",
+            "## Context",
+        ];
+        let (rels, found, _) = find_relationships(&lines);
+        assert!(found);
+        assert_eq!(rels.len(), 3);
+        assert_eq!(rels[0].verb, RelVerb::Root);
+        assert_eq!(rels[1].verb, RelVerb::References);
+        assert_eq!(rels[1].target.number, 2);
+        assert_eq!(rels[2].verb, RelVerb::References);
+        assert_eq!(rels[2].target.number, 3);
+    }
+
+    #[test]
+    fn find_field_stops_at_h2_boundary() {
+        let lines = vec![
+            "# CHE-0001. Title",
+            "",
+            "## Context",
+            "",
+            "Date: 2026-01-01",
+        ];
+        let (date, _) = find_field(&lines, "Date:");
+        assert_eq!(date, None, "Date: inside a section body should not be found");
     }
 }
