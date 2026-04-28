@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-- References: CHE-0004
+References: CHE-0001, CHE-0004
 
 ## Context
 
@@ -30,6 +30,13 @@ Options:
 Cherry-pit is a Cargo workspace monorepo with 8 planned crates (2
 currently active). Dependencies are shared at workspace level via
 `[workspace.dependencies]`. The DAG is acyclic:
+
+R1 [5]: Organize cherry-pit as a Cargo workspace monorepo with an
+  acyclic crate dependency graph
+R2 [5]: Share dependency versions at workspace level via
+  [workspace.dependencies]
+R3 [5]: Commit Cargo.lock to version control for reproducible
+  dependency resolution across all environments
 
 ```
 cherry-pit-core (leaf — no cherry-pit dependencies)

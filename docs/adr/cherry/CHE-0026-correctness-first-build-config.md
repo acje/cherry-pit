@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-- References: CHE-0001, CHE-0007, RST-0003
+References: CHE-0001, CHE-0007, RST-0003
 
 ## Context
 
@@ -41,6 +41,12 @@ pedantic = { level = "warn", priority = -1 }
 ```
 
 Key points:
+
+R1 [9]: Set overflow-checks = true in the release profile so integer
+  overflow panics in production
+R2 [9]: Set clippy::pedantic at warn level across the entire workspace
+R3 [9]: Use lto = true and codegen-units = 1 for whole-program
+  optimization in release builds
 
 - **`overflow-checks = true`** — integer overflow panics in release
   builds, not just debug builds. Consistent with design priority P1

@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-- References: CHE-0004, CHE-0022, CHE-0029
+References: CHE-0001, CHE-0004, CHE-0022, CHE-0029
 
 ## Context
 
@@ -32,6 +32,13 @@ compatibility requirements.
 
 Each crate owns its serialization strategy. No crate's choice
 constrains another's.
+
+R1 [5]: Each crate owns its serialization strategy independently; no
+  crate may mandate a format for another crate
+R2 [5]: Domain events are format-agnostic; the choice of serialization
+  format is made at the infrastructure layer
+R3 [5]: Feature flags gate serialization dependencies so users opt in
+  explicitly
 
 | Crate | Serialization | Governing ADR |
 |-------|--------------|---------------|

@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-- References: CHE-0004
+References: CHE-0001, CHE-0004
 
 ## Context
 
@@ -35,6 +35,11 @@ Users add derives as needed:
 - In-process commands: no serde overhead.
 - Cross-process commands: add `#[derive(Serialize, Deserialize)]`.
 - Debugging: add `#[derive(Debug)]` (most users will do this anyway).
+
+R1 [5]: The Command trait requires only Send + Sync + 'static as
+  bounds
+R2 [5]: No Serialize, Deserialize, Debug, Clone, or PartialEq bounds
+  on the Command trait
 
 ## Consequences
 

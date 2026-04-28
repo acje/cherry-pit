@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-- References: CHE-0011, CHE-0012, CHE-0013, CHE-0018, CHE-0033, COM-0003
+References: CHE-0001, CHE-0011, CHE-0012, CHE-0013, CHE-0018, CHE-0033, COM-0003
 
 ## Context
 
@@ -35,6 +35,14 @@ The infrastructure layer owns aggregate identity assignment. The
 domain layer is identity-agnostic.
 
 Concrete rules:
+
+R1 [5]: Aggregate trait has no id() method; aggregate identity is
+  managed by the infrastructure layer
+R2 [5]: EventStore::create assigns the aggregate ID via auto-increment
+R3 [5]: Callers never invent aggregate IDs; the store is the sole
+  source of ID assignment
+R4 [5]: If domain logic needs its own identity, store it as a domain
+  field populated during the first event's apply
 
 1. **`Aggregate` has no `id()` method.** Aggregate identity is
    managed by the infrastructure layer (event store, command bus,
@@ -68,26 +76,17 @@ fn create(&self, events: Vec<Self::Event>)
 
 - **No identity conflicts** — the store guarantees uniqueness via
   sequential assignment. No coordination protocol, no UUID collision
-  risk for aggregate IDs (event IDs use UUID v7 per CHE-0033, but
-  aggregate IDs are sequential `u64`s).
+  risk for aggregate IDs (event IDs use UUID v7 per CHE-0033).
 - **Aggregate is a pure state machine** — it has no infrastructure
-  concerns. It does not know its ID, its store, or its bus. This
-  maximizes testability and keeps the domain layer runtime-agnostic
-  (CHE-0018).
-- **First-event pattern** — since the aggregate starts as `Default`
-  (CHE-0012) and does not receive its ID, any domain logic that
-  needs the aggregate's own ID must extract it from the first
-  event's envelope. The `EventEnvelope.aggregate_id` field is
-  available to policies and projections (which receive envelopes),
-  but the aggregate itself only receives `&Event` (not the
-  envelope). This is an intentional asymmetry: the aggregate
-  operates on domain facts, not infrastructure metadata.
+  concerns, maximizing testability and keeping the domain layer
+  runtime-agnostic (CHE-0018).
+- **First-event pattern** — domain logic needing the aggregate's own
+  ID must extract it from the first event's envelope.
+  `EventEnvelope.aggregate_id` is available to policies and
+  projections, but the aggregate itself receives only `&Event` — an
+  intentional asymmetry.
 - **No aggregate self-reference** — an aggregate cannot include its
-  own `AggregateId` in the events it produces during `handle`. If
-  a command handler needs to reference "this aggregate" in an event,
-  the ID must be passed in as part of the command or stored as a
-  domain field during a prior `apply`.
-- **Cross-reference between ADRs** — this principle is a consequence
-  of CHE-0011 (type), CHE-0013 (API split), and CHE-0018 (domain
-  purity). It completes the picture by stating the ownership rule
-  explicitly.
+  own `AggregateId` in events produced during `handle`; the ID must
+  arrive via the command or a domain field set during a prior `apply`.
+- This principle completes the picture established by CHE-0011
+  (type), CHE-0013 (API split), and CHE-0018 (domain purity).

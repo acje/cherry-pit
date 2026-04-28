@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-- Root: GEN-0013
+References: GEN-0001
 
 ## Context
 
@@ -61,6 +61,14 @@ bytes) but increment depth (preventing stack overflow from deep newtype chains).
 
 **Worst-case CPU bound:** `O(max_total_elements * max_depth)`. With Page0
 defaults: `256 * 128 = 32,768` operations.
+
+R1 [5]: All resource limits are enforced before allocation occurs
+R2 [5]: max_total_elements is checked against Vec and Map count prefix
+  before Vec::with_capacity is called
+R3 [6]: Element counting is global per message — each SeqAccess and
+  MapAccess call counts against a shared budget
+R4 [5]: PageClass defines per-message element budgets using the formula
+  256 times 16 to the power N
 
 ## Consequences
 

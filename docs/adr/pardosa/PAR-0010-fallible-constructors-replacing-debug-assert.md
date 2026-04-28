@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-- References: CHE-0002
+References: PAR-0001
 
 ## Context
 
@@ -41,6 +41,13 @@ Replace `debug_assert!` with fallible constructors:
 Deserialization is validated via `#[serde(try_from = "FiberRaw")]` — a raw
 struct deserializes first, then converts through `Fiber::new()`. This
 prevents invariant bypass through serde.
+
+R1 [5]: Fiber::new() returns Result and validates anchor, current,
+  and len invariants in all build profiles
+R2 [5]: Fiber::advance() returns Result and validates new_current is
+  strictly greater than current
+R3 [6]: Deserialize Fiber via serde try_from FiberRaw to reject
+  malformed input at the boundary
 
 ## Consequences
 

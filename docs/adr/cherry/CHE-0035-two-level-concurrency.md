@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-- References: CHE-0006, CHE-0032, COM-0003
+References: CHE-0001, CHE-0006, CHE-0032, COM-0003
 
 ## Context
 
@@ -30,6 +30,13 @@ Options for concurrent access:
 ## Decision
 
 `MsgpackFileStore` uses a two-level concurrency architecture:
+
+R1 [10]: Use a global mutex for aggregate ID assignment to guarantee
+  uniqueness
+R2 [10]: Use per-aggregate write locks via scc::HashMap for
+  fine-grained concurrency between different aggregates
+R3 [10]: Reads are lock-free because writes are atomic via temp file
+  plus rename
 
 1. **Global ID mutex** (`tokio::sync::Mutex<Option<u64>>`) — held only
    during aggregate ID assignment in `create`. Serializes ID

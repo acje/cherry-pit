@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-- References: CHE-0006
+References: CHE-0001, CHE-0006
 
 ## Context
 
@@ -29,6 +29,11 @@ Write strategies considered:
 ## Decision
 
 All writes in `MsgpackFileStore` go through `write_atomic`:
+
+R1 [10]: Write all data to a temporary file then rename to the target
+  path for atomic writes
+R2 [10]: On rename failure clean up the temp file on a best-effort
+  basis
 
 1. Serialize envelopes to bytes in memory.
 2. Write bytes to `{filename}.tmp` in the store directory.

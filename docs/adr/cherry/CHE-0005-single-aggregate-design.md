@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-- References: CHE-0001, CHE-0004, CHE-0011, CHE-0013, COM-0002
+References: CHE-0001, CHE-0004, CHE-0011, CHE-0013, COM-0002
 
 ## Context
 
@@ -60,6 +60,13 @@ happens through event subscriptions (e.g. NATS subjects), not shared
 stores.
 
 Compile-fail tests in cherry-pit-core prove the guarantees hold.
+
+R1 [2]: Bind every infrastructure port to a single aggregate type via
+  associated types
+R2 [2]: Require separate bounded contexts with typed infrastructure
+  stacks for multiple aggregates
+R3 [2]: Use event subscriptions for cross-context communication, not
+  shared stores
 
 ## Consequences
 

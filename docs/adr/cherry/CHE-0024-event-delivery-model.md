@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-- References: CHE-0004, CHE-0017
+References: CHE-0001, CHE-0004, CHE-0017
 
 ## Context
 
@@ -40,6 +40,13 @@ delivery guarantee.
 ## Decision
 
 Persist-then-publish with non-fatal delivery:
+
+R1 [7]: Persist events before publishing; publication failure is
+  non-fatal because events are safely stored
+R2 [7]: No subscribe method on the EventBus port trait; subscription
+  is implementation-specific
+R3 [7]: Consumers that miss a publication catch up by replaying from
+  the event store
 
 1. **CommandBus calls `EventBus::publish()`** after successful
    persistence. Events are the source of truth once stored — publish

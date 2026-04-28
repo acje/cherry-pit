@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-- References: GEN-0003, GEN-0011
+References: GEN-0001, GEN-0003, GEN-0011
 
 ## Context
 
@@ -38,6 +38,13 @@ data payload. They are distinguished **only by schema hash**.
 This is **intentional**. The format does not store type names in the binary
 payload — only the schema hash provides type identity. This matches serde's
 own data model equivalence between tuple structs and tuples.
+
+R1 [9]: Tuple structs and plain tuples produce identical wire bytes
+  for their data payload
+R2 [9]: They are distinguished only by schema hash — the format does
+  not store type names in the binary payload
+R3 [9]: Schema hash is the sole mechanism providing type identity for
+  structurally equivalent types
 
 ## Consequences
 

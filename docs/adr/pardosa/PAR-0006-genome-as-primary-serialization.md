@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-- References: CHE-0045, GEN-0001, GEN-0006, GEN-0008, GEN-0012, GEN-0031, PAR-0005, PAR-0007
+References: PAR-0005, PAR-0007
 
 ## Context
 
@@ -46,6 +46,13 @@ json = ["dep:serde_json"]
 ```
 
 Compression features (`brotli`, `zstd`) are passthrough to genome.
+
+R1 [5]: Use pardosa-genome as the primary serialization format for
+  NATS publish and genome file storage paths
+R2 [6]: Retain JSON behind an optional json feature flag for debugging
+  and human-readable output only
+R3 [5]: Gate the genome dependency and compression features via Cargo
+  feature flags in the pardosa crate manifest
 
 ## Alternatives Considered
 

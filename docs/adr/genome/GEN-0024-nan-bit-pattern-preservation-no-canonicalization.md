@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-- References: GEN-0012
+References: GEN-0001, GEN-0012
 
 ## Context
 
@@ -47,6 +47,13 @@ Floats are serialized as raw LE IEEE 754 bytes. The serializer performs no
 inspection or modification of the bit pattern. The deserializer reads the
 raw bytes and converts via `from_le_bytes` — no NaN detection, no payload
 masking, no quiet/signaling conversion.
+
+R1 [9]: Preserve exact NaN bit patterns with no canonicalization —
+  f64::NAN.to_bits() round-trips exactly
+R2 [9]: The serializer performs no inspection or modification of float
+  bit patterns
+R3 [9]: The deserializer reads raw bytes via from_le_bytes with no NaN
+  detection or payload masking
 
 ## Consequences
 

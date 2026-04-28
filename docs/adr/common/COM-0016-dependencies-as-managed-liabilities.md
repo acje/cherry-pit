@@ -7,60 +7,15 @@ Status: Accepted
 
 ## Related
 
-- References: COM-0001
+References: COM-0001
 
 ## Context
 
-Every external dependency is a complexity cost imported wholesale
-into the project. Unlike internal complexity — which the team
-controls, reviews, and can refactor — external complexity has a
-unique risk profile:
+Every external dependency is complexity imported wholesale with a unique risk profile: external maintainers control release cadence and breaking changes; transitive dependencies inherit security and maintenance risks without explicit selection; each dependency expands the supply chain attack surface; compile times and CI costs scale with dependency count; and license obligations may conflict with the project's distribution model.
 
-1. **External rate of change.** The dependency's maintainers set
-   the release cadence, API evolution strategy, and deprecation
-   timeline. The consuming project has no control over when
-   breaking changes arrive or how long security patches take.
+COM-0001 (complexity budget) establishes that complexity requires justification. Dependencies are a category where costs are invisible at adoption but compound over the project's lifetime. Endler frames this as "every dependency should be seen as a liability." This is distinct from COM-0012 (dependency rule), which governs knowledge flow *direction* — COM-0016 governs whether to take a dependency at all.
 
-2. **Transitive depth.** A single direct dependency may pull in
-   dozens of transitive dependencies. Each transitive dependency
-   inherits the same risks (security, maintenance, compatibility)
-   but receives less scrutiny because it was never explicitly
-   chosen.
-
-3. **Security attack surface.** Each dependency is a supply chain
-   entry point. Malicious code injection, abandoned crates with
-   known vulnerabilities, and typosquatting all scale with
-   dependency count. The attack surface is multiplicative, not
-   additive.
-
-4. **Build and CI cost.** Dependencies increase compile times,
-   CI duration, and the surface area of version resolution
-   conflicts. These costs are paid on every build, by every
-   contributor.
-
-5. **License entanglement.** Each dependency introduces license
-   obligations that may conflict with the project's own license
-   or distribution model.
-
-COM-0001 (complexity budget) establishes that complexity requires
-justification. Dependencies are a specific category where the
-justification must account for costs that are invisible at
-adoption time but compound over the project's lifetime. Endler
-(Corrode, "Long-term Rust Project Maintenance") frames this as
-"every dependency should be seen as a liability." The Prossimo
-project's sudo-rs case study demonstrated that deliberate
-dependency reduction improved auditability and security posture.
-
-This principle is distinct from COM-0012 (dependency rule), which
-governs the *direction* of knowledge flow between architectural
-layers. COM-0016 governs the *existence* of dependencies on
-external code — whether to take a dependency at all.
-
-Cherry-pit already practices dependency minimization:
-`default-features = false` on `axum` and `reqwest`, workspace-level
-dependency declarations for version consistency, and `Cargo.lock`
-committed for reproducibility. What is missing is a citable
-principle that makes dependency justification mandatory.
+Cherry-pit already practices dependency minimization: `default-features = false` on `axum` and `reqwest`, workspace-level dependency declarations for version consistency, and `Cargo.lock` committed for reproducibility. What is missing is a citable principle making dependency justification mandatory.
 
 ## Decision
 
@@ -69,35 +24,19 @@ against the complexity budget. Dependencies are not free — they
 trade development convenience for long-term maintenance cost,
 security exposure, and coupling to external change schedules.
 
-### Rules
-
-1. **Justify before adopting.** Before adding a new dependency,
-   demonstrate that the functionality cannot be reasonably
-   implemented in-house or sourced from the standard library.
-   "It saves a few lines" is not sufficient justification for a
-   dependency that brings transitive depth or maintenance risk.
-
-2. **Minimize what you import.** Disable default features. Enable
-   only the feature flags the project actually uses. Every unused
-   feature is dead code that still participates in compilation,
-   version resolution, and security scanning.
-
-3. **Prefer the standard library.** When the standard library
-   provides functionality that is adequate (even if not optimal),
-   prefer it over an external crate. Standard library APIs have
-   stronger stability guarantees and zero transitive cost.
-
-4. **Evaluate the full cost.** When assessing a dependency, consider:
-   transitive dependency count, maintenance activity, security
-   track record, license compatibility, and the dependency's own
-   MSRV and edition compatibility. A crate with 50 transitive
-   dependencies is a different cost than one with zero.
-
-5. **Audit and prune periodically.** Dependencies that were
-   justified at adoption time may become unjustified as the
-   standard library evolves, requirements change, or better
-   alternatives emerge. Periodic review prevents dependency
-   accumulation.
+R1 [5]: Before adding a dependency, demonstrate the functionality
+  cannot be reasonably implemented in-house or sourced from the
+  standard library
+R2 [5]: Disable default features and enable only the feature flags
+  the project actually uses
+R3 [5]: Prefer the standard library when it provides adequate
+  functionality, even if not optimal, due to stronger stability
+  guarantees and zero transitive cost
+R4 [6]: Evaluate the full cost of a dependency — transitive count,
+  maintenance activity, security record, license compatibility,
+  and MSRV compatibility
+R5 [6]: Audit and prune dependencies periodically as the standard
+  library evolves and requirements change
 
 ## Consequences
 

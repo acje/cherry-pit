@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-- Root: GEN-0007
+References: GEN-0001
 
 ## Context
 
@@ -33,6 +33,14 @@ Key layout rules:
 - Tuple: elements inline with alignment
 - Newtype: transparent (inner type's layout)
 - Unit: 0 bytes
+
+R1 [2]: Use a two-region layout with inline region for scalars and heap
+  region for variable-length data referenced by 4-byte LE offsets
+R2 [5]: Scalars are inline at natural alignment with LE encoding
+R3 [5]: Strings and bytes use 4-byte offset inline pointing to heap
+  len-prefixed data
+R4 [5]: Enums use discriminant-u32 plus offset-u32 inline pointing to
+  heap variant data
 
 ## Consequences
 

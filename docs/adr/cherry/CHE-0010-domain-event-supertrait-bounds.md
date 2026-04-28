@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-- References: CHE-0001, CHE-0004, CHE-0014
+References: CHE-0001, CHE-0004, CHE-0014
 
 ## Context
 
@@ -58,6 +58,13 @@ Every bound is load-bearing:
 `event_type() -> &'static str` is a stable string discriminator used
 for routing, schema registry, and deserialization dispatch. It must
 never change once events of this type exist in a log.
+
+R1 [4]: DomainEvent requires Serialize + DeserializeOwned + Clone +
+  Send + Sync + 'static as supertrait bounds
+R2 [4]: event_type() returns a &'static str that must never change
+  once events of that type exist in a log
+R3 [4]: Every supertrait bound must be load-bearing with a concrete
+  infrastructure consumer that requires it
 
 ## Consequences
 

@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-- References: GEN-0008
+References: GEN-0001, GEN-0008
 
 ## Context
 
@@ -52,6 +52,13 @@ byte — this is not affected by this decision.
 4. **Explicit is better than implicit.** Callers know whether they're reading
    a file or a network message. Forcing the correct API reflects this
    knowledge in the type system.
+
+R1 [9]: No auto-detection between bare and file formats — consumers
+  must use the correct API
+R2 [9]: Compression auto-detection within bare messages is supported
+  via the algo byte
+R3 [9]: Separate error types DeError and FileError are used for bare
+  and file formats respectively
 
 ## Consequences
 

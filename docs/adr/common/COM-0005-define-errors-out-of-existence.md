@@ -7,54 +7,15 @@ Status: Accepted
 
 ## Related
 
-- References: COM-0002
+References: COM-0001, COM-0002, COM-0003
 
 ## Context
 
-Ousterhout (Ch. 10, "Define Errors Out of Existence") identifies
-exception handling as a major source of software complexity.
-Exceptions are disproportionately expensive:
+Ousterhout (Ch. 10, "Define Errors Out of Existence") identifies exception handling as a major source of complexity. Every error variant adds interface complexity for callers, propagation decisions for each layer, dedicated test cases, and combinatorial state explosion. Before adding an error variant, the first question should be: "Can the operation be redefined so that this error does not exist?"
 
-1. **Interface complexity** — every error variant is part of the
-   module's interface. Callers must understand and handle each
-   variant.
-2. **Propagation complexity** — errors propagate through call stacks,
-   and each layer must decide: handle, translate, or propagate.
-3. **Testing complexity** — error paths require their own test cases,
-   often more than the happy path.
-4. **Combinatorial explosion** — N operations with M error variants
-   each produce N × M potential error states.
+Techniques include redefining operations to succeed — `load` for an unknown aggregate returns `Vec::new()` instead of `NotFound` (CHE-0019); making operations infallible — `Aggregate::apply` returns `()` as a pure state transition (CHE-0009); idempotent semantics — duplicate commands produce `Ok(vec![])` rather than errors (CHE-0041); exception masking when the module can take a reasonable default action; and exception aggregation into single composite operations.
 
-Before adding an error variant, the first question should be: "Can
-the operation be redefined so that this error does not exist?"
-
-**Techniques for eliminating errors:**
-
-- **Redefine the operation to succeed.** `load` for an unknown
-  aggregate returns `Vec::new()` instead of `NotFound` — the
-  operation succeeds by defining an empty stream as a valid result
-  (CHE-0019).
-
-- **Make the operation infallible.** `Aggregate::apply` returns `()`
-  — replay cannot fail because `apply` is a pure state transition,
-  not a validation step (CHE-0009).
-
-- **Idempotent semantics.** A duplicate command produces `Ok(vec![])`
-  — zero events, not an error. The operation "succeeded" by doing
-  nothing (CHE-0041).
-
-- **Exception masking.** Handle the error internally when the module
-  can take a reasonable default action. The caller never sees the
-  error.
-
-- **Exception aggregation.** Collect multiple potential errors into a
-  single operation that either fully succeeds or reports one
-  composite failure.
-
-Cherry-pit applies this principle aggressively: `apply()` is
-infallible, `load()` returns empty instead of not-found, and
-idempotent command handling produces empty event vectors instead of
-duplicate-command errors.
+Cherry-pit applies this aggressively: `apply()` is infallible, `load()` returns empty instead of not-found, and idempotent command handling produces empty event vectors instead of duplicate-command errors.
 
 ## Decision
 
@@ -62,30 +23,17 @@ Before adding an error variant to any `Result` type, demonstrate
 that the operation cannot be redefined to succeed. Error elimination
 is preferred over error handling.
 
-### Rules
-
-1. **Redefine before handling.** Before writing
-   `Err(SomeError::NewVariant)`, ask: "Can this operation be
-   redefined so that this condition is a success case?"
-
-2. **Infallible operations where possible.** If an operation's
-   failure would make the system unrecoverable (e.g., event replay
-   fails), the operation should be infallible. Truly unrecoverable
-   conditions use `panic`, not `Result`.
-
-3. **Idempotent semantics over duplicate errors.** When an operation
-   is repeated with the same input, returning `Ok` with no side
-   effects is preferred over returning a `DuplicateOperation` error.
-
-4. **Error variants require justification.** Each error variant is
-   interface complexity. The justification must explain:
-   - Why the caller cannot avoid this condition
-   - Why the module cannot handle it internally
-   - What the caller is expected to do with the error
-
-5. **Exception masking for internal recovery.** When a module can
-   handle an error with a reasonable default (retry, fallback, empty
-   result), it should mask the exception rather than propagating it.
+R1 [5]: Before writing a new error variant, ask whether the operation
+  can be redefined so the condition becomes a success case
+R2 [5]: Operations whose failure would be unrecoverable must be
+  infallible; truly unrecoverable conditions use panic, not Result
+R3 [5]: Repeated operations with the same input return Ok with no
+  side effects rather than a duplicate-operation error
+R4 [6]: Each error variant requires justification explaining why the
+  caller cannot avoid it, why the module cannot handle it, and what
+  the caller does with it
+R5 [5]: When a module can handle an error with retry, fallback, or
+  empty result, it masks the exception rather than propagating it
 
 ## Consequences
 

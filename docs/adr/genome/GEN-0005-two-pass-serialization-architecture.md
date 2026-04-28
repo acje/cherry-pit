@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-- References: GEN-0001
+References: GEN-0001
 
 ## Context
 
@@ -50,6 +50,13 @@ structural logic:
 
 A sizing mismatch between passes produces `SerError::InternalSizingMismatch` in all
 build profiles, with an additional `debug_assert!` in debug builds.
+
+R1 [5]: Serialization uses two passes — SizingSerializer computes exact
+  buffer size, WritingSerializer writes with zero reallocation
+R2 [6]: A sizing mismatch between passes produces
+  SerError::InternalSizingMismatch in all build profiles
+R3 [5]: WritingSerializer pre-allocates the exact buffer and writes
+  inline data from position 0 with heap items in breadth-first order
 
 ## Consequences
 

@@ -75,6 +75,19 @@ crates = []
 foundation = true
 
 [[domains]]
+prefix = "SEC"
+name = "Security Domain"
+directory = "security"
+description = """\
+    CISQ-aligned security qualities: integrity at trust boundaries, \
+    availability via resource bounding, control via capability \
+    restriction, authenticity via provenance binding. Composed \
+    qualities cover TOCTOU prevention, confidentiality, and \
+    non-repudiation. Foundation domain applying to all crates."""
+crates = []
+foundation = true
+
+[[domains]]
 prefix = "AFM"
 name = "adr-fmt Domain"
 directory = "adr-fmt"
@@ -94,7 +107,7 @@ crates = ["adr-fmt"]
 
 [[rules]]
 id = "T015"
-params = { min_words = 7, max_words = 100 }
+params = { min_words = 7, max_words = 200 }
 
 [[rules]]
 id = "T016"

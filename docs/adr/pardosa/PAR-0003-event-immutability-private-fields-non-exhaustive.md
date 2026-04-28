@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-- References: CHE-0022, GEN-0001
+References: PAR-0001
 
 ## Context
 
@@ -36,6 +36,13 @@ Types that participate in genome encoding carry a `GENOME LAYOUT` doc comment:
 
 This convention signals to future contributors that field reordering is a
 schema migration, not a refactor.
+
+R1 [5]: Make all fields on Event<T>, Fiber, Index, and DomainId
+  private with constructor and accessor methods
+R2 [5]: Mark Event<T> with non_exhaustive to prevent external
+  construction via struct literal syntax
+R3 [6]: Annotate genome-encoded types with a GENOME LAYOUT doc comment
+  stating that field reordering is a breaking change
 
 ## Consequences
 

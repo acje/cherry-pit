@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-- References: CHE-0008, CHE-0009, CHE-0013, CHE-0037
+References: CHE-0001, CHE-0008, CHE-0009, CHE-0013, CHE-0037
 
 ## Context
 
@@ -30,6 +30,12 @@ Three approaches:
 ## Decision
 
 `Aggregate` requires `Default`. Aggregates start as blank slates.
+
+R1 [4]: Aggregate trait requires Default for zero-state construction
+R2 [4]: The Default instance is a construction artifact, not a valid
+  domain state, that becomes valid after the first event is applied
+R3 [4]: No constructor arguments are permitted on aggregates; initial
+  data must arrive via the first command and event
 
 ```rust
 pub trait Aggregate: Default + Send + Sync + 'static {

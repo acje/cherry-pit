@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-- References: GEN-0008
+References: GEN-0001, GEN-0008
 
 ## Context
 
@@ -39,6 +39,11 @@ std = []
 derive = ["dep:pardosa-genome-derive"]
 zstd = ["std"]  # Phase 3: will add dep:zstd
 ```
+
+R1 [9]: Remove the non-functional alloc feature from Cargo.toml and
+  document the crate as std-only
+R2 [9]: Retain the std feature flag for forward compatibility
+R3 [9]: Defer no_std support until an actual consumer exists
 
 ## Consequences
 

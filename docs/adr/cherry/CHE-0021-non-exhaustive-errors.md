@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-- References: CHE-0015, CHE-0022
+References: CHE-0001, CHE-0015, CHE-0022
 
 ## Context
 
@@ -33,6 +33,11 @@ All public error types in `cherry-pit-core` are `#[non_exhaustive]`:
 
 New variants (e.g., `RateLimited`, `Timeout`, `SchemaVersionMismatch`)
 can be added in minor versions.
+
+R1 [5]: All public error types in cherry-pit-core are
+  #[non_exhaustive]
+R2 [5]: New error variants may be added in minor versions without
+  breaking downstream callers
 
 ## Consequences
 

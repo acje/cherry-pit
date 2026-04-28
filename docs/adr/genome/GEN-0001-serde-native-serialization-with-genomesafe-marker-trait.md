@@ -7,42 +7,27 @@ Status: Accepted
 
 ## Related
 
-- Root: GEN-0001
+Root: GEN-0001
 
 ## Context
 
 pardosa-genome must integrate with an existing Rust codebase where
 every data type already derives `Serialize` and `Deserialize`. Two
-forces are in tension:
+forces are in tension: zero-copy read performance (the event replay
+hot path deserializes millions of events — per-field allocating
+formats impose a throughput ceiling) and adoption friction
+(introducing a parallel derive ecosystem like rkyv or FlatBuffers
+doubles maintenance surface with mirror types throughout the
+codebase).
 
-1. **Zero-copy read performance.** The event storage hot path
-   deserializes millions of events during replay. Formats that
-   allocate per-field (JSON, bincode, postcard) impose a throughput
-   ceiling. Zero-copy formats (rkyv, FlatBuffers) avoid this but
-   require their own trait hierarchies.
-
-2. **Adoption friction.** Introducing a second derive ecosystem
-   (rkyv's `Archive + Serialize + Deserialize`, FlatBuffers' codegen)
-   doubles the maintenance surface. Every type change requires
-   updates to both the serde representation and the zero-copy
-   representation. Mirror types spread through the entire codebase.
-
-Three approaches were evaluated:
-
-| Approach | Zero-copy | Serde compat | Mirror types | Schema hash |
-|----------|-----------|-------------|--------------|-------------|
-| serde + custom binary format | Partial (str, bytes) | Full | None | Custom |
-| rkyv | Full (struct-level) | None | Required | None |
-| FlatBuffers + codegen | Full | None | Required | External |
-
-rkyv achieves full struct-level zero-copy but at the cost of a
-parallel type hierarchy (`ArchivedFoo` for every `Foo`) that spreads
-through the entire codebase. FlatBuffers requires external `.fbs`
-schema files and code generation. Both sever the serde ecosystem
-connection — types cannot be used with JSON, TOML, or any other serde
-format without maintaining two serialization implementations.
-PAR-0006 contains the detailed per-library alternatives analysis that
-informed this decision.
+rkyv achieves full struct-level zero-copy but requires an
+`ArchivedFoo` for every `Foo`. FlatBuffers requires external `.fbs`
+schema files and code generation. Both sever the serde ecosystem —
+types cannot be used with JSON, TOML, or any other serde format
+without dual serialization implementations. A serde-native custom
+binary format avoids mirror types entirely while achieving partial
+zero-copy (str, bytes). PAR-0006 contains the detailed per-library
+alternatives analysis.
 
 ## Decision
 
@@ -54,6 +39,13 @@ validation.
 
 Types only need `#[derive(Serialize, Deserialize, GenomeSafe)]`. No mirror types,
 no external schema files, no code generation beyond these three derives.
+
+R1 [2]: All serializable types use serde Serialize and Deserialize as
+  the sole serialization interface — no parallel trait hierarchies
+R2 [2]: GenomeSafe is a marker trait with no methods, carrying only
+  SCHEMA_HASH and SCHEMA_SOURCE associated constants
+R3 [2]: No mirror types, no external schema files, no code generation
+  beyond derive(Serialize, Deserialize, GenomeSafe)
 
 ## Consequences
 

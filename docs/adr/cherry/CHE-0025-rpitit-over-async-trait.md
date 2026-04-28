@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-- References: CHE-0001
+References: CHE-0001
 
 ## Context
 
@@ -31,6 +31,11 @@ dispatch is measurable overhead for a framework.
 All async port traits use RPITIT (`impl Future` in return position)
 instead of the `async_trait` proc macro. The minimum supported Rust
 version is 1.95 (edition 2024).
+
+R1 [9]: All async port traits use impl Future in return position
+  instead of the async_trait proc macro
+R2 [9]: No heap allocation per async trait method call via
+  Box<dyn Future>
 
 ## Consequences
 

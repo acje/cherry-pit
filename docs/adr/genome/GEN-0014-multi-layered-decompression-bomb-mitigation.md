@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-- References: GEN-0013
+References: GEN-0001, GEN-0013
 
 ## Context
 
@@ -61,6 +61,13 @@ pardosa-genome-produced messages.
 
 Total decompressor memory per message: ~4 MiB (capped window) + output buffer
 size.
+
+R1 [5]: Implement four independent defense layers each checked before
+  the allocation it guards
+R2 [5]: ZSTD_d_maxWindowLog is capped at 22 (4 MiB) to bound
+  decompressor working memory
+R3 [6]: Content size is always written into the zstd frame header
+  during compression ensuring layer 2 is always available
 
 ## Consequences
 

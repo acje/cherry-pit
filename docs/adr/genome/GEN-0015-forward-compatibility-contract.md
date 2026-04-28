@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-- Root: GEN-0015
+References: GEN-0001
 
 ## Context
 
@@ -49,6 +49,13 @@ files from other binary formats and enable fast rejection of non-genome input.
 The bare message format has no magic bytes (it starts directly with
 `format_version`) because bare messages are used in contexts where the transport
 layer already identifies the content type.
+
+R1 [5]: File bytes 0-3 (magic) and 4-5 (format_version) are frozen and
+  will never change across any future format version
+R2 [5]: Bare message bytes 0-1 (format_version) are frozen and will
+  never change across any future format version
+R3 [6]: Readers must reject unknown versions before interpreting any
+  subsequent fields
 
 ## Consequences
 

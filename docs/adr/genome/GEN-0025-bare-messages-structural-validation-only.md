@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-- References: GEN-0011, GEN-0016
+References: GEN-0001, GEN-0011, GEN-0016
 
 ## Context
 
@@ -46,6 +46,13 @@ channels (TLS, QUIC, JetStream, Unix domain sockets). These transports
 already provide data integrity. Adding a checksum to bare messages would
 increase message size by 8 bytes and add computation overhead for redundant
 protection.
+
+R1 [5]: Bare messages provide structural validation but no data
+  integrity checksums
+R2 [5]: A bit flip in a scalar field that does not violate structural
+  invariants produces silently wrong data in bare messages
+R3 [6]: Bare messages are designed for transport-protected channels
+  that already provide data integrity
 
 ## Consequences
 

@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-- References: CHE-0045
+References: CHE-0001, CHE-0045
 
 ## Context
 
@@ -36,6 +36,11 @@ Formats considered:
 `MsgpackFileStore` uses `rmp_serde::encode::to_vec_named` (map
 encoding with string keys) for all writes. Deserialization uses
 `rmp_serde::from_slice`.
+
+R1 [9]: Use rmp_serde::encode::to_vec_named (map encoding with
+  string keys) for all MsgpackFileStore writes
+R2 [9]: New Option fields with #[serde(default)] can be added to
+  EventEnvelope without migrating existing data files
 
 This was validated when `correlation_id` and `causation_id` were added
 to `EventEnvelope` with `#[serde(default)]` — existing data without

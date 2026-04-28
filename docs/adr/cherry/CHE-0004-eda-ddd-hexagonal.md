@@ -7,60 +7,32 @@ Status: Accepted
 
 ## Related
 
-- References: CHE-0001
+References: CHE-0001
 
 ## Context
 
 Cherry-pit is a composable systems-kernel for agent-first building.
-Three forces are in tension:
+Three forces are in tension: audit completeness (agents need full,
+replayable history of every state change), domain model fidelity
+(command intent must be preserved separately from state mutations),
+and infrastructure decoupling (domain code must not know about
+serialization, databases, or message brokers).
 
-1. **Audit completeness.** Agents require full, replayable history of
-   every state change. Audit is not a bolt-on; it is the primary data
-   model. Any architecture that does not store the complete causal
-   chain of state transitions fails this requirement.
+CRUD+CDC loses command intent. Bi-temporal databases preserve
+temporal state but do not decompose into aggregates and bounded
+contexts. State-based audit logs duplicate data with no consistency
+guarantee.
 
-2. **Domain model fidelity.** The system must preserve command intent
-   (what the user asked for) separately from state changes (what
-   happened). CRUD systems collapse intent into state mutations —
-   the "why" is lost, making replay non-deterministic and debugging
-   forensically impossible.
-
-3. **Infrastructure decoupling.** The kernel handles "undifferentiated
-   heavy lifting" — persistence, transport, and fan-out — so users
-   focus on domain logic. Domain code must not know about
-   serialization formats, database schemas, or message brokers.
-
-Four architectural approaches were evaluated:
-
-| Approach | Audit | Intent | Decoupling | Complexity |
-|----------|-------|--------|------------|------------|
-| EDA + Event Sourcing + DDD + Hex | Full | Preserved | Full | High |
-| CRUD + Change Data Capture | Partial | Lost | Partial | Medium |
-| Bi-temporal Database | Full | Partial | Low | High |
-| State-based + Audit Log | Partial | Partial | Partial | Low |
-
-CRUD+CDC loses command intent: a CDC record says "field X changed
-to Y" but not "user issued command Z that caused the change."
-Bi-temporal databases preserve temporal state but do not naturally
-decompose into aggregates and bounded contexts. State-based+audit-log
-duplicates data (state + log) with no guarantee of consistency
-between them.
-
-The chosen approach composes three mutually reinforcing patterns:
-
-- **Event-Driven Architecture (EDA)** structures the system around
-  events as the primary communication and coordination mechanism.
-  Event sourcing — persisting all state changes as an immutable
-  event log — is a core pattern within this approach, providing
-  full audit trails and state reconstruction by replay.
-- **Domain-Driven Design** provides aggregates as consistency
-  boundaries with clear command/event semantics.
-- **Hexagonal architecture (ports and adapters)** decouples domain
-  logic from infrastructure, enabling testability and composability.
-
-EDA supplies the communication and data model, DDD supplies the
-consistency model, and hexagonal architecture supplies the
-integration model.
+The chosen approach composes three mutually reinforcing patterns.
+Event-Driven Architecture (EDA) structures the system around events
+as the primary communication mechanism, with event sourcing
+providing full audit trails and state reconstruction by replay.
+Domain-Driven Design provides aggregates as consistency boundaries
+with clear command/event semantics. Hexagonal architecture (ports
+and adapters) decouples domain logic from infrastructure, enabling
+testability and composability. EDA supplies the data model, DDD
+the consistency model, and hexagonal architecture the integration
+model.
 
 ## Decision
 
@@ -68,6 +40,13 @@ Cherry-pit combines EDA, DDD, and hexagonal architecture as
 its foundational pattern. All domain logic lives behind trait-based
 ports. All infrastructure lives in adapter crates. Events are the
 source of truth; aggregates are the consistency boundary.
+
+R1 [1]: Use events as the source of truth for all state, persisted as
+  an immutable append-only log
+R2 [1]: Place all domain logic behind trait-based ports and all
+  infrastructure in adapter crates
+R3 [1]: Use aggregates as the consistency boundary for all write
+  operations
 
 ## Consequences
 

@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-- References: CHE-0006, CHE-0043
+Root: PAR-0004
 
 ## Context
 
@@ -46,6 +46,13 @@ Enforced by:
 
 Multi-instance deployment requires leader election or partitioning — a
 fundamentally different architecture that is explicitly out of scope.
+
+R1 [1]: Single-writer per stream is a hard architectural constraint
+  with correctness taking priority over availability
+R2 [3]: Every publish sets Nats-Expected-Last-Subject-Sequence to the
+  previous successful publish sequence number for mandatory fencing
+R3 [3]: The first publish uses Expected-Last-Subject-Sequence 0 to
+  eliminate the TOCTOU race on empty streams
 
 ## Consequences
 

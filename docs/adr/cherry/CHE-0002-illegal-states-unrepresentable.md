@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-- References: CHE-0001
+References: CHE-0001
 
 ## Context
 
@@ -16,25 +16,16 @@ correctness technique is designing types where invalid values cannot
 be constructed — the compiler rejects illegal states rather than
 runtime guards catching them.
 
-Two enforcement strategies exist for invariants:
+Two enforcement strategies exist. Runtime guards (`assert!`,
+`if`-checks) run on every invocation, can be bypassed or forgotten,
+and scale O(call sites). Type-level encoding (e.g.,
+`AggregateId(NonZeroU64)`) enforces the invariant once at
+construction; every subsequent use inherits the guarantee at zero
+runtime cost, scaling O(1).
 
-1. **Runtime guards** — `assert!(id != 0)`, `if seq == 0 { return
-   Err(...) }`. Guards run on every invocation. They can be bypassed
-   by bugs, disabled in release builds (`debug_assert!`), or
-   forgotten in new code paths. The invariant holds only as long as
-   every code path checks it. Maintenance cost scales with call
-   sites.
-
-2. **Type-level encoding** — `AggregateId(NonZeroU64)`. The invariant
-   is enforced once, at construction time. Every subsequent use of the
-   value benefits without any runtime cost. New code paths inherit the
-   guarantee automatically — the type system carries it. Maintenance
-   cost is O(1).
-
-The asymmetry is fundamental: runtime guards are O(call sites),
-type-level invariants are O(1). As the codebase grows, runtime guards
-become increasingly likely to miss a path. Type-level invariants
-cannot be circumvented by any amount of code growth.
+As the codebase grows, runtime guards become increasingly likely to
+miss a path. Type-level invariants cannot be circumvented by code
+growth.
 
 This principle is applied throughout cherry-pit but never stated as
 its own decision. It informs: `AggregateId(NonZeroU64)` (CHE-0011),
@@ -54,6 +45,15 @@ Every cherry-pit type must encode its invariants at the type level.
 
 Runtime guards (e.g., `expected_sequence` on `append`) are
 defense-in-depth, not primary enforcement.
+
+R1 [2]: Encode every type invariant at the type level so the compiler
+  rejects invalid values at construction time
+R2 [2]: Use newtypes to prevent primitive type confusion across
+  domain boundaries
+R3 [2]: Use validated constructors returning Result to prevent
+  invalid instances from existing
+R4 [2]: Reserve runtime guards for defense-in-depth only, never as
+  primary enforcement
 
 ## Consequences
 

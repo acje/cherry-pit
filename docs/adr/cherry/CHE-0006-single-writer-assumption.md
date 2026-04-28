@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-- References: CHE-0004, PAR-0004
+References: CHE-0001, CHE-0004, PAR-0004
 
 ## Context
 
@@ -32,6 +32,11 @@ distributed coordination protocol is used. Sequential auto-increment
 IDs (NonZeroU64) are safe without distributed ID generation. Optimistic
 concurrency (`expected_sequence` on `append`) serves as defense-in-depth
 within the single writer, not as a distributed coordination mechanism.
+
+R1 [2]: Each aggregate instance is owned by exactly one OS process
+  with no distributed coordination
+R2 [2]: Use optimistic concurrency as defense-in-depth within the
+  single writer, not as distributed coordination
 
 ## Consequences
 

@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-- References: CHE-0007
+References: GEN-0001, CHE-0007
 
 ## Context
 
@@ -26,6 +26,13 @@ Every deserialization performs the full verification suite: bounds checks on all
 UTF-8 validation, char/bool value validation, padding zero checks, backward-offset
 rejection. There is no unverified `decode` path — verification adds modest overhead
 (not yet benchmarked) and is branch-predicted away on well-formed input.
+
+R1 [4]: The crate uses forbid(unsafe_code) — all reads use
+  from_le_bytes on byte slices with no pointer casts
+R2 [4]: Every deserialization performs the full verification suite with
+  no unverified decode path
+R3 [4]: Zero-copy deserialization applies to strings and byte slices
+  via serde's visit_borrowed_str mechanism
 
 ## Consequences
 

@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-- Root: PAR-0001
+Root: PAR-0001
 
 ## Context
 
@@ -44,6 +44,13 @@ DOT/Graphviz output directly from the same `TRANSITIONS` data, guaranteeing the
 diagram always matches runtime behavior.
 
 No external state machine crate is used.
+
+R1 [5]: Encode the fiber transition function as a single const array
+  of (FiberState, FiberAction, FiberState) triples
+R2 [5]: Generate DOT/Graphviz output directly from the TRANSITIONS
+  array so the diagram always matches runtime behavior
+R3 [6]: Validate all 35 state-action pairs in the exhaustive_35_pairs
+  test to confirm exactly 10 succeed and 25 are rejected
 
 ## Consequences
 

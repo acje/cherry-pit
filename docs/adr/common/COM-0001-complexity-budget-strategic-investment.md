@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-- Root: COM-0001
+Root: COM-0001
 
 ## Context
 
@@ -42,32 +42,16 @@ Every design decision must justify its complexity cost against a
 fixed budget. Zero tolerance for incremental complexity — no change
 is too small to evaluate.
 
-### Rules
-
-1. **Strategic over tactical.** Invest 10–20% additional time per task
-   in design quality. This is not optional overhead; it is the primary
-   output.
-
-2. **Complexity requires justification.** Before adding a new
-   abstraction, type parameter, trait bound, error variant, or
-   configuration option, demonstrate that the complexity is
-   unavoidable. "It might be useful later" is not justification.
-
-3. **Complexity budget is finite.** Each module, trait, and API surface
-   has a complexity budget. Additions that exceed the budget require
-   refactoring to make room — not expanding the budget.
-
-4. **Red flags trigger review:**
-   - "I'll clean it up later" — tactical shortcut
-   - Interface mirrors implementation — shallow module (COM-0002)
-   - Caller passes information the callee could compute — complexity
-     pushed upward (COM-0003)
-   - New error variant for a recoverable condition — error not
-     defined out of existence (COM-0005)
-   - Configuration parameter without a sensible default — complexity
-     pushed to the user (COM-0003)
-
-### Measurement
+R1 [2]: Invest 10–20% additional time per task in design quality;
+  this is the primary output, not optional overhead
+R2 [2]: Before adding any abstraction, type parameter, or error
+  variant, demonstrate the complexity is unavoidable — "it might
+  be useful later" is not justification
+R3 [2]: Each module and API surface has a finite complexity budget;
+  additions that exceed it require refactoring to make room
+R4 [3]: Red flags — "I'll clean it up later," interface mirrors
+  implementation, caller passes computable information, error
+  variant for a recoverable condition — trigger mandatory review
 
 Complexity is assessed qualitatively through code review, not
 quantitatively through metrics. The relevant question is: "Does a

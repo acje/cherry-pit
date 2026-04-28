@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-- References: CHE-0031, CHE-0032
+References: CHE-0001, CHE-0031, CHE-0032
 
 ## Context
 
@@ -43,6 +43,11 @@ Three persistence strategies:
 ## Decision
 
 One file per aggregate instance. Full rewrite on every append.
+
+R1 [10]: Store one .msgpack file per aggregate instance containing the
+  complete event history as Vec<EventEnvelope<E>>
+R2 [10]: Rewrite the entire aggregate history on every append
+  operation
 
 ### File layout
 
@@ -83,31 +88,21 @@ load(id):
 ## Consequences
 
 - **O(n) write cost per append** — every append rewrites the entire
-  history. For an aggregate with 1,000 events, appending one event
-  serializes and writes all 1,001. This is acceptable for development
-  and small deployments; production systems with long-lived
-  aggregates should use a database-backed store.
+  history. Acceptable for development and small deployments;
+  production systems with long-lived aggregates should use a
+  database-backed store.
 - **O(1) file reads per load** — loading any aggregate is a single
-  file read and a single deserialization. No index, no seeking, no
-  scanning.
-- **File count equals aggregate count** — a system with 100,000
-  aggregates has 100,000 files. File systems handle this well up to
-  ~1M files per directory; beyond that, sharding directories or
-  switching storage backends is needed.
-- **Filename is the aggregate ID** — `u64` IDs cannot cause path
-  traversal. No validation or escaping needed.
-- **No partial reads** — snapshots or partial loading are impossible
-  with this model. The entire history must be loaded. This is
-  consistent with CHE-0037 (no snapshot support).
-- **MessagePack's `Vec` encoding** does not support append-in-place.
-  The named-map format (CHE-0031) writes the array length first,
-  making incremental appending structurally impossible without
-  re-encoding. Full rewrite is the only correct strategy given the
-  chosen serialization format.
+  file read and deserialization. No index, no seeking, no scanning.
+- **File count equals aggregate count** — file systems handle this
+  well up to ~1M files per directory; beyond that, sharding or
+  switching backends is needed.
+- **No partial reads** — the entire history must be loaded, consistent
+  with CHE-0037 (no snapshot support).
+- **MessagePack's `Vec` encoding** writes the array length first
+  (CHE-0031), making incremental append structurally impossible.
+  Full rewrite is the only correct strategy for this format.
 - **Atomic rename (CHE-0032)** ensures readers never see a partially
-  written file. The temp-file pattern is necessary because the full
-  rewrite is not an atomic operation at the filesystem level.
-- The storage model is a concrete implementation choice in
-  `cherry-pit-gateway`, not a framework-level constraint. Other `EventStore`
-  implementations (database-backed, Pardosa-backed) will have
-  different topologies and persistence strategies.
+  written file.
+- This is a concrete implementation choice in `cherry-pit-gateway`,
+  not a framework-level constraint. Other `EventStore`
+  implementations will have different strategies.

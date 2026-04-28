@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-- References: CHE-0008, CHE-0017, CHE-0039, COM-0005
+References: CHE-0001, CHE-0008, CHE-0017, CHE-0039, COM-0005
 
 ## Context
 
@@ -45,6 +45,13 @@ unique identifier.
 
 Convention-based idempotency with infrastructure-level support
 planned for the `CommandBus`.
+
+R1 [5]: Aggregates are the authority on duplicate detection using
+  state rebuilt from events
+R2 [5]: Policy::react must be a pure function where same
+  EventEnvelope input produces the same Vec<Output>
+R3 [5]: Optimistic concurrency via expected_sequence prevents
+  duplicate appends at the store level
 
 ### Command-level idempotency
 

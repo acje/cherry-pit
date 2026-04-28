@@ -7,47 +7,34 @@ Status: Accepted
 
 ## Related
 
-- References: CHE-0017, CHE-0024, CHE-0037, CHE-0039
+References: CHE-0001, CHE-0017, CHE-0024, CHE-0037, CHE-0039
 
 ## Context
 
 `Policy` (CHE-0017) reacts to a single event by producing zero or
-more commands. This is the choreography pattern: each policy reacts
-independently, with no coordinator tracking multi-step progress.
+more commands — the choreography pattern. Event-sourced systems often
+need multi-step processes where step N depends on step N-1 succeeding.
+Choreography handles this via independent policy reactions and
+compensation events; orchestration uses a saga coordinator tracking
+step completion and issuing compensation commands on failure.
 
-Event-sourced systems often need multi-step processes where step N
-depends on step N-1 succeeding. Two coordination patterns exist:
-
-1. **Choreography** — policies react independently to events.
-   Compensation is modeled as domain events (e.g., `PaymentFailed`
-   → policy → `CancelOrder`). No central coordinator. Each
-   participant knows only its own role.
-2. **Orchestration** — a saga coordinator (process manager) tracks
-   step completion and issues compensation commands on failure.
-   Central state machine. Each participant is directed by the
-   coordinator.
-
-Cherry-pit's `Policy` trait is a choreography primitive. No saga
-coordinator, no step tracking, no automatic compensation exists in
-the framework. The question is whether to add orchestration support
-now.
-
-Three considerations argue for deferral:
-
-1. **`CommandBus` is unbuilt.** Sagas require dispatching commands
-   and observing their outcomes. Without a `CommandBus`
-   implementation, saga coordination cannot be tested end-to-end.
-2. **`cherry-pit-agent` is unbuilt.** The composition layer that wires
-   policies to buses determines how multi-step processes are
-   configured. Saga design without `cherry-pit-agent` is speculative.
-3. **`CorrelationContext` (CHE-0039) is new.** Saga step tracking
-   requires correlation IDs to group related events. The propagation
-   mechanism must be validated in practice before building on it.
+Cherry-pit's `Policy` trait is a choreography primitive with no saga
+coordinator, step tracking, or automatic compensation. Three
+considerations argue for deferral: `CommandBus` is unbuilt (sagas
+cannot be tested end-to-end), `cherry-pit-agent` is unbuilt (saga
+design without the composition layer is speculative), and
+`CorrelationContext` (CHE-0039) is new and must be validated before
+building on it.
 
 ## Decision
 
 Deliberate deferral. Saga orchestration is out of scope for
 cherry-pit pre-1.0.
+
+R1 [5]: Use Policy::react for choreography-style coordination only;
+  no saga orchestrator exists pre-1.0
+R2 [5]: Model compensation as domain events reacted to by policies,
+  not as automatic framework-level rollback
 
 **What cherry-pit provides today:**
 
@@ -68,37 +55,22 @@ cherry-pit pre-1.0.
 
 ## Consequences
 
-- Framework stays minimal. Users own compensation logic entirely.
-- Complex business processes require careful policy graph design.
-  Users must reason about failure paths manually.
+- Framework stays minimal. Users own compensation logic entirely and
+  must reason about failure paths manually.
 - The choreography-first approach is consistent with event-sourcing
   philosophy: events are facts, policies react to facts, and
-  compensation is itself a fact (a domain event).
+  compensation is itself a domain event.
 - Dead-letter handling for failed policy outputs is the most likely
   near-term need. When `CommandBus` is built, it must decide what
-  happens when a policy-triggered command is rejected by the target
-  aggregate.
+  happens when a policy-triggered command is rejected.
 
 ### Revisit criteria
 
-Add saga orchestration when any of these conditions are met:
-
-1. `cherry-pit-agent` is built and policy wiring complexity is concrete —
-   the composition layer determines how multi-step processes are
-   configured and monitored.
-2. A user reports a multi-step process that cannot be decomposed
-   into independent policy reactions without unreasonable complexity.
-3. Dead-letter handling is needed for failed policy output commands
-   — the `CommandBus` implementation reveals the failure modes.
-4. `CorrelationContext` (CHE-0039) has been validated in practice
-   and step tracking can build on it.
-
-When revisiting, the saga design should:
-
-- Define a `ProcessManager` trait with associated `State` type
-  (the step tracking state machine).
-- Use `CorrelationContext` to group all events in a saga instance.
-- Support configurable compensation strategies (retry, compensate,
-  ignore) per step.
-- Handle timeout via `jiff::Timestamp` comparisons, not wall-clock
-  timers.
+Add saga orchestration when: `cherry-pit-agent` is built and policy
+wiring complexity is concrete, a multi-step process cannot be
+decomposed into independent policy reactions, dead-letter handling
+is needed, or `CorrelationContext` (CHE-0039) has been validated in
+practice. The saga design should define a `ProcessManager` trait
+with associated `State` type, use `CorrelationContext` for grouping,
+support configurable compensation strategies per step, and handle
+timeouts via `jiff::Timestamp` comparisons.

@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-- References: CHE-0022, PAR-0013
+References: PAR-0004, PAR-0013
 
 ## Context
 
@@ -38,6 +38,13 @@ Crash recovery: discard incomplete new stream/file, retry from intact old stream
 `event_id` values are preserved across migrations (not reset). The new stream's
 first post-migration `event_id` continues from the old stream's last
 `event_id + 1`.
+
+R1 [5]: Migrations create a new JetStream stream and genome file
+  rather than mutating existing streams or files
+R2 [5]: Atomically update the NATS KV registry pointer in a single
+  CAS operation during migration cutover
+R3 [6]: Preserve event_id values across migrations so the new stream
+  continues from the old stream's last event_id plus one
 
 ## Consequences
 

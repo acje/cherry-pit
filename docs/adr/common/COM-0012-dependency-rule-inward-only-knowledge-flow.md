@@ -7,55 +7,15 @@ Status: Accepted
 
 ## Related
 
-- References: COM-0004
+References: COM-0001, COM-0004
 
 ## Context
 
-Martin (Clean Architecture, Ch. 22, "The Clean Architecture")
-formalizes a principle present across multiple architectural styles:
-source code dependencies must point inward toward higher-level
-policy. Inner layers define abstractions; outer layers provide
-implementations. Nothing in an inner layer may know about, name,
-import, or reference anything in an outer layer.
+Martin (Clean Architecture, Ch. 22) and Cockburn's Hexagonal Architecture formalize the same principle: source code dependencies must point inward toward higher-level policy. Inner layers define abstractions; outer layers implement them. Nothing in an inner layer may reference anything in an outer layer. This is distinct from COM-0004 (different layer, different abstraction), which addresses *what* each layer abstracts; the dependency rule addresses *which direction* knowledge flows.
 
-Cockburn's Hexagonal Architecture (Ports and Adapters) expresses
-the same principle geometrically: the application core defines
-ports (interfaces); adapters in the outer ring implement them.
-The core never references an adapter. Data crossing boundaries
-is always in the form defined by the inner layer.
+Cherry-pit's crate DAG embodies this rule. `cherry-pit-core` defines traits (`Aggregate`, `EventStore`, `CommandGateway`, `DomainEvent`) knowing nothing about MessagePack, file I/O, or HTTP. `cherry-pit-gateway` and `cherry-pit-web` depend on core, never the reverse. `pardosa` implements the `EventStore` port depending only on core traits. The Cargo workspace (CHE-0029) enforces this physically — circular dependencies are compile errors.
 
-This principle is distinct from COM-0004 (different layer,
-different abstraction), which addresses *what* each layer
-abstracts. The dependency rule addresses *which direction*
-knowledge flows between layers.
-
-**Cherry-pit's architecture is structured around this rule:**
-
-- **cherry-pit-core** defines traits (`Aggregate`, `EventStore`,
-  `CommandGateway`, `DomainEvent`) and knows nothing about
-  MessagePack, file I/O, NATS, or HTTP.
-
-- **cherry-pit-gateway** implements `CommandGateway` by composing
-  an `EventStore` — it depends on core, never the reverse.
-
-- **cherry-pit-web** provides HTTP adapters — it depends on
-  gateway and core, never the reverse.
-
-- **pardosa** implements the `EventStore` port — it depends on core
-  traits, never on gateway or web.
-
-The Cargo workspace's crate DAG (CHE-0029) is the physical
-enforcement: circular dependencies between crates are a compile
-error.
-
-**Violation patterns:**
-
-- An inner module imports a concrete type from an outer module
-  instead of defining a trait
-- A domain type includes serialization annotations (`#[derive(Serialize)]`)
-  that couple it to an infrastructure concern
-- A core trait method signature references a library type from an
-  adapter crate (e.g., `nats::Message` in a core trait)
+Violation patterns include inner modules importing concrete outer types, domain types carrying serialization annotations, and core trait signatures referencing adapter library types.
 
 ## Decision
 
@@ -63,35 +23,19 @@ Source code dependencies point inward. Inner layers define
 abstractions; outer layers implement them. No inner layer may
 reference, import, or depend on an outer layer.
 
-### Rules
-
-1. **Inner layers own the abstractions.** Traits, domain types, and
-   error types are defined in the innermost layer that uses them.
-   Outer layers depend on these definitions; inner layers never
-   depend on outer implementations.
-
-2. **Data crosses boundaries in inner-layer types.** When data moves
-   from an outer layer to an inner layer, it is converted to the
-   inner layer's types at the boundary. The inner layer never
-   handles serialization formats, transport types, or framework
-   types.
-
-3. **No infrastructure in domain.** Domain logic (aggregates,
-   commands, events, policies) must not reference infrastructure
-   concerns: serialization libraries, database clients, network
-   protocols, file system operations. CHE-0045 (serialization
-   scope per crate) enforces this for serde specifically.
-
-4. **Enforce physically, not just logically.** The Cargo crate DAG
-   (CHE-0029) makes dependency violations a compile error. Logical
-   layering within a single crate is maintained through module
-   visibility (`pub(crate)`, private modules).
-
-5. **Dependency inversion for runtime flexibility.** When an inner
-   layer needs a capability provided by an outer layer, define a
-   trait in the inner layer and implement it in the outer layer.
-   The classic port-and-adapter pattern. The trait belongs to the
-   domain; the implementation belongs to infrastructure.
+R1 [2]: Traits, domain types, and error types are defined in the
+  innermost layer that uses them; outer layers depend on these
+  definitions, never the reverse
+R2 [2]: Data crossing boundaries is converted to the inner layer's
+  types at the boundary; inner layers never handle serialization
+  formats or transport types
+R3 [2]: Domain logic must not reference infrastructure concerns —
+  serialization libraries, database clients, network protocols,
+  or file system operations
+R4 [3]: The Cargo crate DAG makes dependency violations a compile
+  error; logical layering within a crate uses module visibility
+R5 [2]: When an inner layer needs an outer capability, define a
+  trait in the inner layer and implement it in the outer layer
 
 ## Consequences
 

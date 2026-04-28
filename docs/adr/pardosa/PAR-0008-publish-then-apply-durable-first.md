@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-- References: PAR-0004, PAR-0007
+References: PAR-0004, PAR-0007
 
 ## Context
 
@@ -53,6 +53,13 @@ wrapped in `tokio::time::timeout`. Default: 5 seconds, configurable via
   (PAR-0007). The timeout adds no new failure modes — it bounds an existing one.
 - *Interaction with fencing (PAR-0004):* Timeout and fencing rejection both
   map to `NatsUnavailable`. The caller's retry path is identical.
+
+R1 [1]: Update in-memory Dragline state only after receiving the
+  durable ACK from NATS or genome file append
+R2 [3]: Each CRUD operation is a single atomic publish-then-apply
+  cycle with no compound operations at the library layer
+R3 [3]: Wrap the NATS publish call inside the write lock with
+  tokio::time::timeout bounded by ServerConfig::publish_timeout
 
 ## Consequences
 

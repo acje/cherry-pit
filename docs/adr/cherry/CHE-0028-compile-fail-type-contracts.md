@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-- References: CHE-0002, CHE-0003, CHE-0005
+References: CHE-0001, CHE-0002, CHE-0003, CHE-0005
 
 ## Context
 
@@ -45,6 +45,13 @@ compile-fail tests. Each test is a `.rs` file in
 `tests/compile_fail/` that contains code violating one specific
 invariant.
 
+R1 [6]: Verify every architectural type safety guarantee with a
+  trybuild compile-fail test
+R2 [6]: Each compile-fail test file verifies exactly one type safety
+  contract
+R3 [6]: When a new trait bound or associated type constraint is
+  introduced, add a corresponding compile-fail test
+
 Current contracts:
 
 | File | Invariant tested |
@@ -72,28 +79,19 @@ trybuild = { workspace = true }
 
 ## Consequences
 
-- **Invariant regression detection** — if a refactoring accidentally
-  removes a trait bound (e.g., dropping `C: Command` from
-  `HandleCommand<C>`), the compile-fail test for that bound starts
-  passing (the code compiles when it should not), and the test suite
-  fails. This catches regressions that no runtime test can detect.
+- **Invariant regression detection** — if a refactoring removes a
+  trait bound, the compile-fail test starts passing and the suite
+  fails, catching regressions no runtime test can detect.
 - **Living documentation** — each compile-fail test file documents
-  exactly what the type system prevents. New contributors can read
-  `tests/compile_fail/` to understand the framework's safety
-  guarantees without reading trait definitions.
+  what the type system prevents. Contributors can read
+  `tests/compile_fail/` to understand safety guarantees.
 - **Compiler-version sensitivity** — compile-fail tests match on
-  error messages. Compiler upgrades may change error wording, causing
-  spurious test failures. `trybuild` handles this reasonably well
-  by comparing stderr output, but major Rust version bumps may
-  require updating expected error files.
-- **One invariant per file** — each compile-fail test verifies exactly
-  one type safety contract. This keeps failures precise: a failing
-  test identifies exactly which invariant was broken.
-- **New safety guarantees should add compile-fail tests** — when a
-  new trait bound or associated type constraint is introduced, a
-  corresponding compile-fail test should be added. The test suite
-  grows with the type safety surface area.
-- **These are architectural tests, not unit tests** — they verify
-  the framework's compile-time contract with users, not runtime
-  behavior. They belong alongside the traits they guard, in
+  error messages. Major Rust version bumps may require updating
+  expected `.stderr` files.
+- **One invariant per file** — failures are precise, identifying
+  exactly which contract was broken.
+- **New safety guarantees should add compile-fail tests** — the
+  suite grows with the type safety surface area.
+- **Architectural tests, not unit tests** — they verify the
+  framework's compile-time contract with users and belong in
   `cherry-pit-core`'s test suite.

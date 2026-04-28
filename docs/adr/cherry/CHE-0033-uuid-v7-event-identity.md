@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-- References: CHE-0006, CHE-0034
+References: CHE-0001, CHE-0006, CHE-0016, CHE-0034
 
 ## Context
 
@@ -35,6 +35,10 @@ Candidates:
 
 `event_id` is a UUID v7, generated via `uuid::Uuid::now_v7()`.
 
+R1 [10]: Generate event_id as UUID v7 via uuid::Uuid::now_v7()
+R2 [10]: UUID v7 IDs are globally unique across all aggregate types
+  and processes without coordination
+
 ```rust
 // EventEnvelope field
 pub event_id: uuid::Uuid,
@@ -51,29 +55,22 @@ uuid = { version = "1", features = ["v7", "serde"] }
 ## Consequences
 
 - **Natural chronological ordering** — sorting by `event_id`
-  approximates creation-time ordering. Useful for debugging, log
-  analysis, and cross-aggregate event correlation without requiring
-  timestamp comparison.
-- **Embedded timestamp** — the high 48 bits contain millisecond
-  Unix time. Event creation time can be extracted from the ID
-  itself, providing a secondary timestamp independent of the
-  `timestamp` field. Useful for forensic analysis.
-- **Global uniqueness** — UUID v7 IDs are unique across all
-  aggregate types, all processes, and all deployments without
-  coordination. Safe for use as correlation/causation IDs across
-  bounded contexts.
-- **122 bits per event ID** — 16 bytes on the wire. Larger than a
-  u64 (8 bytes) but smaller than a string representation (36 bytes).
-  MessagePack encodes UUIDs as binary, so wire overhead is minimal.
+  approximates creation-time ordering, useful for debugging and
+  cross-aggregate correlation without timestamp comparison.
+- **Embedded timestamp** — the high 48 bits contain millisecond Unix
+  time, providing a secondary timestamp independent of the
+  `timestamp` field for forensic analysis.
+- **Global uniqueness** — unique across all aggregate types,
+  processes, and deployments without coordination. Safe for use as
+  correlation/causation IDs across bounded contexts.
+- **16 bytes on the wire** — larger than u64 (8 bytes) but smaller
+  than string representation (36 bytes). MessagePack encodes UUIDs
+  as binary, so overhead is minimal.
 - **Monotonicity within a millisecond** — the `uuid` crate's
-  `now_v7()` uses the counter-based approach from RFC 9562 Section
-  6.2, providing monotonically increasing IDs within the same
-  millisecond. Events in the same batch (which share a timestamp
-  per CHE-0034) get strictly ordered IDs.
-- **No coordination required** — UUID v7 generation is local. No
-  central ID service, no distributed counter. Consistent with the
-  single-writer assumption (CHE-0006).
-- **Migration constraint** — switching to a different ID scheme
-  (e.g., ULID) would require a migration strategy for existing
-  event data. The UUID v7 choice is permanent for any events already
-  persisted.
+  `now_v7()` uses RFC 9562 Section 6.2 counter-based ordering.
+  Events in the same batch (CHE-0034) get strictly ordered IDs.
+- **No coordination required** — consistent with the single-writer
+  assumption (CHE-0006).
+- **Migration constraint** — switching ID schemes would require
+  migrating existing event data. The choice is permanent for
+  persisted events.

@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-- References: GEN-0002, GEN-0007
+References: PAR-0001
 
 ## Context
 
@@ -36,6 +36,13 @@ Guards:
 - `Index::checked_next()` caps at `u64::MAX - 1` — no valid index arithmetic
   can produce the sentinel.
 - `is_none()` / `is_some()` methods for ergonomic checking.
+
+R1 [9]: Reserve u64::MAX as Index::NONE sentinel replacing
+  Option<Index> for the precursor field
+R2 [9]: Index::new(v) panics if v equals u64::MAX to prevent
+  accidental sentinel construction from application code
+R3 [9]: Index::checked_next() caps at u64::MAX minus 1 so valid
+  index arithmetic never produces the sentinel value
 
 ## Consequences
 

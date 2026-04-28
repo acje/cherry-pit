@@ -7,42 +7,13 @@ Status: Accepted
 
 ## Related
 
-- References: COM-0002, COM-0003
+References: COM-0001, COM-0002, COM-0003
 
 ## Context
 
-Ousterhout (Ch. 7, "Different Layer, Different Abstraction") observes
-that well-designed systems have layers where each layer provides a
-distinct abstraction. When adjacent layers have similar abstractions,
-it signals a design problem: one of the layers is not adding value.
+Ousterhout (Ch. 7, "Different Layer, Different Abstraction") observes that well-designed systems have layers where each provides a distinct abstraction. When adjacent layers have similar abstractions, one is not adding value. Red flags include pass-through methods that merely forward arguments, pass-through variables threaded through layers unused by intermediaries, and signature mirroring where a method's parameters mirror the method it calls.
 
-**Red flags:**
-
-- **Pass-through methods** — a method that does nothing except
-  forward its arguments to another method with a similar signature.
-  The method exists but adds no abstraction. The caller could have
-  called the lower layer directly.
-
-- **Pass-through variables** — a variable passed through multiple
-  layers of the call stack without being used in intermediate layers.
-  Each intermediate layer pays interface complexity for a variable it
-  does not use.
-
-- **Signature mirroring** — when a method's parameter list mirrors
-  the method it calls, the calling layer provides no additional
-  abstraction. The question: "Why does this layer exist?"
-
-Cherry-pit's store/bus layering demonstrates the principle:
-
-- **Store layer** sees "event streams." An unknown aggregate is an
-  empty stream. `load` returns `Vec::new()`. No `NotFound` concept.
-- **Bus layer** sees "aggregate lifecycle." An empty stream before
-  command dispatch means the aggregate was never created. The bus
-  returns `DispatchError::AggregateNotFound`.
-
-Each layer provides a different abstraction over the same underlying
-reality. The store abstracts persistence; the bus abstracts dispatch
-semantics.
+Cherry-pit's store/bus layering demonstrates the principle. The store layer sees "event streams" — an unknown aggregate is an empty stream, so `load` returns `Vec::new()` with no `NotFound` concept. The bus layer sees "aggregate lifecycle" — an empty stream before command dispatch means the aggregate was never created, returning `DispatchError::AggregateNotFound`. Each layer provides a different abstraction over the same reality: the store abstracts persistence; the bus abstracts dispatch semantics.
 
 ## Decision
 
@@ -50,30 +21,14 @@ Adjacent layers in the architecture must provide distinct
 abstractions. Each layer should add semantic value that justifies
 its existence.
 
-### Rules
-
-1. **Pass-through methods are red flags.** If a method's
-   implementation is `self.inner.same_method(same_args)`, question
-   why the wrapping layer exists. Valid justifications: error
-   translation, logging, authorization, caching. Invalid: "it might
-   need logic later."
-
-2. **Pass-through variables trigger refactoring.** If a parameter
-   passes through 2+ layers unchanged, consider:
-   - Context objects that bundle cross-cutting concerns
-   - Moving the parameter to the layer that uses it
-   - Eliminating the parameter entirely (COM-0003: can the lower
-     layer compute it?)
-
-3. **Each layer names its concepts differently.** If two adjacent
-   layers use the same vocabulary for the same concept, they may be
-   the same abstraction split artificially. The store layer says
-   "event stream"; the bus layer says "aggregate." Different names
-   reflect different abstractions.
-
-4. **Layer elimination is valid.** If analysis shows a layer adds no
-   abstraction, removing it is the correct response. Layers exist to
-   serve the design, not the other way around.
+R1 [5]: Pass-through methods are red flags; a wrapping layer must add
+  semantic value such as error translation, logging, or caching
+R2 [5]: A parameter passing through two or more layers unchanged must
+  be refactored into a context object, moved, or eliminated
+R3 [5]: Adjacent layers must use different vocabulary for their
+  concepts; identical names signal artificially split abstractions
+R4 [6]: If analysis shows a layer adds no abstraction, removing the
+  layer is the correct response
 
 ## Consequences
 

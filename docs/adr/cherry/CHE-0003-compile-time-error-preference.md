@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-- References: CHE-0001, CHE-0002, CHE-0028
+References: CHE-0001, CHE-0002, CHE-0028
 
 ## Context
 
@@ -34,6 +34,13 @@ Prefer compile-time rejection over runtime validation at every layer.
 
 Runtime checks remain as defense-in-depth: `expected_sequence` on
 `append` guards against bugs, not as primary enforcement.
+
+R1 [2]: Prefer compile-time rejection over runtime validation at
+  every layer
+R2 [2]: Use trait bounds and associated types instead of runtime
+  type checks to enforce constraints
+R3 [2]: Add compile-fail tests for every type safety contract to
+  prevent regression
 
 ## Consequences
 

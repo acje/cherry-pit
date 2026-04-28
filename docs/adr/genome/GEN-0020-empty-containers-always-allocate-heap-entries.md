@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-- References: GEN-0017, GEN-0014
+References: GEN-0001, GEN-0017, GEN-0014
 
 ## Context
 
@@ -50,6 +50,13 @@ proceeds with zero iterations.
 position in the buffer, but zero bytes are read (unit type has 0 inline size).
 The offset may point to `buf.len()` — a 0-byte read at the end of the buffer
 is valid.
+
+R1 [5]: Offset 0 always means data at position 0 and is never
+  overloaded as a sentinel
+R2 [5]: The only sentinel value in the entire format is 0xFFFFFFFF
+  for Option::None
+R3 [5]: Empty containers always allocate a heap entry with len or
+  count equal to zero
 
 ## Consequences
 

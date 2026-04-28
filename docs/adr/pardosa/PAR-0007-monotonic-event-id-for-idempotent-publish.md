@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-- References: CHE-0041, PAR-0004
+References: PAR-0004, PAR-0008
 
 ## Context
 
@@ -37,6 +37,13 @@ Add `event_id: u64` to `Event<T>` as the first field. Properties:
   generation-scoped and remapped during migration), `event_id` is the
   permanent identity of an event across the entire lifetime of a pardosa
   instance.
+
+R1 [5]: Assign event_id as a monotonic u64 at append time in the
+  Dragline, never caller-supplied
+R2 [5]: Use event_id as Nats-Msg-Id for JetStream publish-side
+  deduplication in the format pardosa-{stream_name}-{event_id}
+R3 [6]: Continue event_id from the old stream's last value plus one
+  across stream generations without resets
 
 ## Consequences
 

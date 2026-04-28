@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-- References: CHE-0005
+References: CHE-0001, CHE-0005
 
 ## Context
 
@@ -34,6 +34,11 @@ The error type flows losslessly through the dispatch chain:
 - Callers receive `Result<..., DispatchError<ShipOrderError>>` — they
   can match on `Rejected(ShipOrderError::NotConfirmed)` without
   downcasting.
+
+R1 [5]: Define the error type as an associated type on
+  HandleCommand<C>, not on the Aggregate trait
+R2 [5]: Preserve the domain error type losslessly through the
+  dispatch chain without Box<dyn Error> downcasting
 
 ## Consequences
 

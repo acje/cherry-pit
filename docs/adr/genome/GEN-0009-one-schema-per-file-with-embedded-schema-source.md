@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-- References: GEN-0003
+References: GEN-0001, GEN-0003
 
 ## Context
 
@@ -32,6 +32,12 @@ file without the original source code. Bare messages do not carry embedded sourc
 are compact; the hash suffices).
 
 Schema changes require a new file (pardosa migration model).
+
+R1 [5]: All messages in a file share the same schema with the 8-byte
+  hash as the authoritative compatibility check
+R2 [6]: The GenomeSafe derive macro's SCHEMA_SOURCE is optionally
+  embedded in a schema block between the file header and first message
+R3 [5]: Schema changes require a new file — no in-place schema updates
 
 ## Consequences
 

@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-- References: GEN-0003
+References: GEN-0001, GEN-0003
 
 ## Context
 
@@ -65,6 +65,13 @@ deserialization.
 accidental corruption (disk errors, truncation, bit rot) but provides zero
 protection against intentional tampering. For tamper detection, use
 transport-level integrity (TLS/QUIC) or a future AEAD extension (v2).
+
+R1 [9]: Use xxHash64 for all file-level integrity checksums including
+  per-message and footer checksums
+R2 [9]: Never truncate a hash — all checksums use the full 64-bit
+  xxHash64 output
+R3 [9]: Both per-message and footer checksums are mandatory and always
+  verified before deserialization
 
 ## Consequences
 

@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-- References: CHE-0001
+References: CHE-0001
 
 ## Context
 
@@ -42,6 +42,13 @@ future crates in the workspace.
 Dependencies may use `unsafe` internally — that is their
 responsibility and their audit surface. Cherry-pit's own code is
 structurally memory-safe.
+
+R1 [5]: Every cherry-pit crate uses #![forbid(unsafe_code)] at the
+  crate root
+R2 [5]: No unsafe blocks, unsafe impl, or unsafe fn in any
+  cherry-pit crate
+R3 [5]: Every new crate added to the workspace must include
+  #![forbid(unsafe_code)]
 
 ## Consequences
 

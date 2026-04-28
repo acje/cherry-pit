@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-- References: GEN-0007
+References: GEN-0001, GEN-0007
 
 ## Context
 
@@ -43,6 +43,13 @@ produces `SerError::MessageTooLarge`. The check runs in all build profiles
 
 For payloads that approach 4 GiB, split data across multiple messages using
 `Writer`. Each message's buffer is independent.
+
+R1 [5]: Use u32 offsets for all intra-message references with maximum
+  message size of u32::MAX bytes
+R2 [5]: The value 0xFFFFFFFF serves as the Option::None sentinel and
+  is always an invalid offset
+R3 [6]: The file-level message index uses u64 offsets enabling
+  arbitrarily large files containing many messages
 
 ## Consequences
 

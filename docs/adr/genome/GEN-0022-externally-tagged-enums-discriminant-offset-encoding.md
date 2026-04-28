@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-- References: GEN-0004, GEN-0007, GEN-0018
+References: GEN-0001, GEN-0004, GEN-0007, GEN-0018
 
 ## Context
 
@@ -52,6 +52,14 @@ Only serde's **externally tagged** representation (the default, no attribute)
 is supported. Internally tagged (`#[serde(tag)]`), adjacently tagged
 (`#[serde(tag, content)]`), and untagged (`#[serde(untagged)]`) are rejected
 at compile time by `#[derive(GenomeSafe)]` (GEN-0004).
+
+R1 [5]: All enums use a fixed 8-byte inline encoding of discriminant-u32
+  plus offset-u32
+R2 [5]: Discriminant is the 0-indexed variant position in Rust enum
+  declaration order validated on deserialization
+R3 [5]: Unit variant offset must be 0x00000000 treated as padding
+R4 [5]: Only serde externally tagged representation is supported —
+  internally tagged, adjacently tagged, and untagged are rejected
 
 ## Consequences
 

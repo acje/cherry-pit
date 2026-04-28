@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-- References: PAR-0005
+References: PAR-0001, PAR-0005
 
 ## Context
 
@@ -37,6 +37,11 @@ pub enum LockedRescuePolicy {
 The `rescue()` method takes `LockedRescuePolicy` instead of `bool`.
 For `Detached → Rescue`, the policy is ignored — events remain in the
 current stream and the precursor chain continues.
+
+R1 [9]: Replace the acknowledge_data_loss bool parameter with a
+  LockedRescuePolicy enum on the rescue method
+R2 [9]: Derive Serialize and Deserialize on LockedRescuePolicy for
+  persistence and configuration support
 
 ## Consequences
 

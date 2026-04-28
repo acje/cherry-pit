@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-- Root: GEN-0008
+References: GEN-0001
 
 ## Context
 
@@ -27,6 +27,13 @@ would add dependencies, complicate feature flags, and limit reuse.
 Transport integration (NATS headers, JetStream stream lifecycle, KV-based discovery,
 metadata messages) is provided by a separate **`pardosa-genome-nats`** companion crate
 that depends on `pardosa-genome` for encode/decode.
+
+R1 [5]: pardosa-genome is strictly bytes-to-types with no transport
+  dependencies
+R2 [5]: Two wire formats are defined — bare message for IPC/network and
+  file format for multi-message persistence
+R3 [6]: Transport integration is provided by a separate companion crate
+  that depends on pardosa-genome for encode/decode
 
 ## Consequences
 

@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-- References: GEN-0005, GEN-0011
+References: GEN-0001, GEN-0005, GEN-0011
 
 ## Context
 
@@ -45,6 +45,14 @@ output for multi-level heap structures.
 (scalars, strings, bytes) produce no further heap items. Each breadth-first
 level is strictly smaller than the previous, reaching an empty level in bounded
 iterations.
+
+R1 [5]: Heap items are written in breadth-first order — all items
+  directly referenced by the inline region first, then items referenced
+  by those heap items, and so on
+R2 [5]: This ordering is a frozen wire format property — changing it
+  invalidates all existing genome files and bare messages
+R3 [6]: Golden test vectors pin the exact byte output for multi-level
+  heap structures
 
 ## Consequences
 

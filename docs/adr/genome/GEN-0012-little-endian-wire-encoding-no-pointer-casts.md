@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-- References: GEN-0006, GEN-0007, GEN-0024
+References: GEN-0001, GEN-0006, GEN-0007, GEN-0024
 
 ## Context
 
@@ -50,6 +50,13 @@ The input buffer (`&[u8]`) has no alignment requirements. Safe to use with:
 
 On big-endian targets, `from_le_bytes` performs a byte swap per read. This is
 the explicit tradeoff: universal safety over big-endian performance.
+
+R1 [5]: All multi-byte fields use little-endian encoding on the wire
+  regardless of host architecture
+R2 [5]: All scalar reads use from_le_bytes on byte slices — no pointer
+  casts and no alignment requirements on the input buffer
+R3 [6]: Floats use LE IEEE 754 via from_le_bytes with exact NaN bit
+  patterns preserved
 
 ## Consequences
 

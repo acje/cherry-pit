@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-- References: CHE-0004, COM-0005
+References: CHE-0001, CHE-0004, CHE-0008, COM-0005
 
 ## Context
 
@@ -31,6 +31,11 @@ Both `Aggregate::apply(&mut self, event: &Event)` and
 `()`. They cannot fail. If they encounter a truly unhandleable event
 (corrupted data, unknown variant), the only valid response is a panic
 — this represents a bug, not a runtime condition.
+
+R1 [4]: Aggregate::apply and Projection::apply return () and cannot
+  fail
+R2 [4]: Panic is the only error path for truly corrupt or unknown
+  event data in apply
 
 ## Consequences
 

@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-- References: CHE-0001, CHE-0004, CHE-0014
+References: CHE-0001, CHE-0004, CHE-0014
 
 ## Context
 
@@ -44,6 +44,13 @@ Three constraints enforce the pattern:
    No futures, no side effects in the type signature.
 
 Documentation mandates: "Must be pure — no I/O, no side effects."
+
+R1 [4]: HandleCommand::handle takes &self (shared reference) to
+  prevent direct mutation of aggregate state
+R2 [4]: Commands are consumed by value to enforce one-time intent
+  semantics
+R3 [4]: handle returns Result<Vec<Event>, Error> as plain data with
+  no futures or side effects in the type signature
 
 ## Consequences
 

@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-- References: CHE-0009, CHE-0013
+References: CHE-0001, CHE-0009, CHE-0013
 
 ## Context
 
@@ -19,6 +19,11 @@ No framework-level lifecycle trait or termination guard exists.
 ## Decision
 
 Termination is a domain concern, not a framework concern.
+
+R1 [5]: No framework lifecycle trait or termination guard exists;
+  lifecycle semantics are owned by the domain
+R2 [5]: Model termination as a domain event and reject post-termination
+  commands via domain errors in handle
 
 1. **No framework lifecycle trait** — no `is_terminated()` on
    `Aggregate`, no lifecycle state enum in cherry-pit-core.

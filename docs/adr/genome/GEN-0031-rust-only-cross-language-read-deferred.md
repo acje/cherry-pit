@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-- References: GEN-0003, GEN-0009
+References: GEN-0001, GEN-0003, GEN-0009
 
 ## Context
 
@@ -38,6 +38,12 @@ files) is deferred to a future version. The path forward:
 2. Embed the export alongside the Rust schema source in file headers.
 3. Build read-only libraries for target languages using the export.
 4. Writing remains Rust-only (requires `GenomeSafe` derive + serde).
+
+R1 [9]: pardosa-genome v1 is Rust-only with no cross-language
+  interoperability guarantees
+R2 [9]: The Rust type definition is the schema — no external IDL
+R3 [9]: Cross-language read-only support is deferred to a future
+  version with a language-neutral schema export format
 
 ## Consequences
 

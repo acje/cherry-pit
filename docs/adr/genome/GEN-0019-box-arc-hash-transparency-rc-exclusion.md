@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-- References: GEN-0004
+References: GEN-0001, GEN-0004
 
 ## Context
 
@@ -47,6 +47,12 @@ must use `Arc<T>`.
 (implicit bound). `Box<str>` and `Arc<str>` — where `T` is unsized — are
 documented as hash-transparent in [genome.md](../../plans/genome.md) but require a
 `?Sized` bound adjustment to compile. This will be addressed in a follow-up change.
+
+R1 [9]: Box and Arc delegate to T's SCHEMA_HASH and SCHEMA_SOURCE
+  making wrapping and unwrapping a schema-compatible change
+R2 [9]: No GenomeSafe implementation exists for Rc — attempting to
+  derive GenomeSafe with an Rc field produces a compile error
+R3 [9]: Users needing shared ownership must use Arc instead of Rc
 
 ## Consequences
 

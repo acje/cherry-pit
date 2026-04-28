@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-- References: GEN-0004
+References: GEN-0001, GEN-0004
 
 ## Context
 
@@ -47,6 +47,12 @@ always present at their compile-time offsets.
 
 The `default` path attribute (type-level `#[serde(default)]`) is also
 rejected with the same rationale.
+
+R1 [5]: derive(GenomeSafe) rejects serde(default) at compile time with
+  a clear error message
+R2 [5]: Both field-level and type-level serde(default) are rejected
+R3 [6]: Fixed-layout formats have no concept of missing fields — all
+  fields are always present at their compile-time offsets
 
 ## Consequences
 

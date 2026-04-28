@@ -7,53 +7,15 @@ Status: Accepted
 
 ## Related
 
-- References: COM-0006
+References: COM-0001, COM-0006
 
 ## Context
 
-Read (Communication Patterns, Ch. 1, "Why Communication Matters")
-argues that architecture is only as good as its communication.
-A well-designed system that cannot be understood by its developers
-will degrade over time as changes are made without understanding
-the original intent.
+Read (Communication Patterns, Ch. 1) argues that architecture is only as good as its communication — a system that cannot be understood will degrade as changes are made without understanding intent. Brown (Software Architecture for Developers, Vol. 1, Ch. 18) and Clements et al. (Documenting Software Architectures, Ch. 1) emphasize "architecture-evident coding style": the source tree should communicate structure without external documentation.
 
-Brown (Software Architecture for Developers, Vol. 1, Ch. 18)
-introduces the C4 model and emphasizes that the code itself should
-communicate architectural intent: a developer browsing the source
-tree should be able to infer the system's structure without external
-documentation. Clements et al. (Documenting Software Architectures,
-Ch. 1) call this "architecture-evident coding style."
+Structural communication channels include directory layout mirroring domain and crate boundaries, naming conventions that communicate architectural role unambiguously, the Cargo.toml dependency graph as a browsable and enforceable DAG, and the ADR system organized by domain with cross-references and linted indexes.
 
-**Structural communication channels:**
-
-- **Directory layout** — the source tree mirrors the architecture.
-  Domain boundaries, crate boundaries, and module hierarchies are
-  visible in the file system.
-
-- **Naming conventions** — crate names, module names, and type
-  names communicate architectural role. `cherry-pit-core` is
-  obviously the core; `cherry-pit-gateway` is obviously the
-  gateway. No ambiguity.
-
-- **Dependency structure** — the Cargo.toml dependency graph
-  communicates which components depend on which. The DAG is
-  browsable and enforceable.
-
-- **ADR system** — decisions are organized by domain, numbered
-  sequentially, cross-referenced, and linted. The README index
-  provides navigable entry points.
-
-Cherry-pit's structure communicates its architecture:
-
-- The `docs/adr/` tree with `common/`, `cherry/`, `pardosa/`,
-  `genome/` directories mirrors the four-domain taxonomy.
-- The crate DAG (`cherry-pit-core` → `cherry-pit-gateway` →
-  `cherry-pit-web`) mirrors the dependency rule (COM-0012).
-- Flat public APIs via private modules (CHE-0030) mean the public
-  surface is browsable from `lib.rs` without diving into
-  implementation modules.
-- Auto-generated README indexes (via `adr-fmt`) make the ADR
-  system self-documenting and always current.
+Cherry-pit's `docs/adr/` tree mirrors the four-domain taxonomy. The crate DAG (`cherry-pit-core` → `cherry-pit-gateway` → `cherry-pit-web`) mirrors the dependency rule (COM-0012). Flat public APIs via private modules (CHE-0030) make the surface browsable from `lib.rs`. Auto-generated README indexes via `adr-fmt` keep the ADR system self-documenting.
 
 ## Decision
 
@@ -62,33 +24,18 @@ itself. Directory layout, naming, dependency graphs, and the ADR
 system are primary communication channels — not supplements to
 external documentation.
 
-### Rules
-
-1. **Directory layout mirrors architecture.** The source tree should
-   reflect domain boundaries, layer boundaries, and crate
-   boundaries. A developer reading the directory listing should be
-   able to sketch the system's high-level architecture.
-
-2. **Names communicate role.** Crate names, module names, and type
-   names should communicate their architectural role without
-   requiring lookup. `cherry-pit-core` communicates "inner layer";
-   `cherry-pit-web` communicates "outer HTTP adapter."
-
-3. **Dependencies are explicit and browsable.** The Cargo.toml
-   dependency graph is the physical architecture diagram. It should
-   be inspectable, minimal, and aligned with the intended layering
-   (COM-0012).
-
-4. **Self-documenting indexes.** Generated indexes (README files,
-   dependency trees, cross-reference tables) are kept current
-   automatically. Stale indexes are worse than no indexes — they
-   communicate false architecture.
-
-5. **Prose supplements structure, not replaces it.** COM-0006
-   (interface documentation before implementation) covers prose
-   documentation. COM-0015 covers structural documentation. Both
-   are necessary: structure communicates "what exists and how it
-   relates"; prose communicates "why it exists and what it means."
+R1 [5]: The source tree must reflect domain boundaries, layer
+  boundaries, and crate boundaries so a developer can sketch
+  the architecture from the directory listing
+R2 [5]: Crate names, module names, and type names communicate their
+  architectural role without requiring lookup
+R3 [6]: The Cargo.toml dependency graph is the physical architecture
+  diagram; it must be inspectable, minimal, and aligned with
+  intended layering
+R4 [5]: Generated indexes are kept current automatically; stale
+  indexes communicate false architecture and are worse than none
+R5 [6]: Prose supplements structure but does not replace it;
+  structure communicates what exists, prose communicates why
 
 ## Consequences
 

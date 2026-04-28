@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-- References: CHE-0011
+References: CHE-0001, CHE-0011
 
 ## Context
 
@@ -39,6 +39,13 @@ Asymmetries:
 - `create` rejects empty events (an aggregate must have ≥1 event).
 - `append` treats empty events as a no-op.
 - `append` requires `expected_sequence` for optimistic concurrency.
+
+R1 [5]: Separate aggregate creation (create) from mutation (send) as
+  distinct API operations
+R2 [5]: create rejects empty events because an aggregate must have at
+  least one event
+R3 [5]: Model aggregate termination as a domain event, not as an
+  infrastructure delete operation
 
 ## Consequences
 

@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-- References: CHE-0009, CHE-0010, CHE-0040
+References: CHE-0001, CHE-0009, CHE-0010, CHE-0040
 
 ## Context
 
@@ -47,6 +47,11 @@ Two approaches:
 No snapshot support. Full event replay for every aggregate
 reconstruction. Deliberate deferral, not oversight.
 
+R1 [11]: Full event replay for every aggregate reconstruction with no
+  snapshot support
+R2 [11]: Aggregates do not need Serialize or Deserialize bounds on
+  their state type
+
 Snapshots are not needed when:
 
 - Aggregates are short-lived (bounded event count)
@@ -58,41 +63,23 @@ All three conditions hold for cherry-pit's current deployment model
 
 ## Consequences
 
-- **Performance ceiling** — aggregate reconstruction time is O(n)
-  where n = total events. An aggregate with 10,000 events replays
-  all 10,000 on every command dispatch. For most domain models, this
-  is sub-millisecond (apply is pure in-memory state mutation), but
-  it becomes noticeable at scale.
+- **Performance ceiling** — reconstruction is O(n) where n = total
+  events. For most domain models this is sub-millisecond (pure
+  in-memory mutation), but becomes noticeable at scale.
 - **No snapshot serialization requirement** — aggregates do not need
-  to implement `Serialize`/`Deserialize` for their state. Only
-  events need serde (CHE-0010). This keeps the aggregate trait
-  bounds minimal: `Default + Send + Sync + 'static`.
-- **Simpler `EventStore` trait** — no `load_from_sequence`,
-  `save_snapshot`, or snapshot interval configuration. The trait
-  surface stays small.
-- **Simpler `CommandBus` implementations** — always load + replay.
-  No snapshot lookup, no fallback logic, no snapshot staleness
-  handling.
-- **Full history always available** — debugging and auditing can
-  replay the exact sequence of events without worrying about snapshot
-  boundaries or stale snapshots.
+  `Serialize`/`Deserialize` for their state; only events need serde
+  (CHE-0010). Trait bounds stay minimal: `Default + Send + Sync`.
+- **Simpler traits and bus** — no `load_from_sequence`,
+  `save_snapshot`, snapshot interval, or staleness handling.
+- **Full history always available** — debugging and auditing replay
+  the exact event sequence without snapshot boundaries.
 
 ### Revisit criteria
 
-Add snapshot support when any of these conditions are met:
-
-1. An aggregate type routinely exceeds 10,000 events
-2. Command dispatch latency exceeds acceptable SLA (measured, not
-   estimated)
-3. A database-backed event store is deployed where full-stream reads
-   have non-trivial I/O cost
-4. Multi-process deployment where replay latency affects failover
-   time
-
-When revisiting, the snapshot design should:
-
-- Add a `SnapshotStore` trait in `cherry-pit-core` (optional port)
-- Require `Serialize + DeserializeOwned` on aggregate state (breaking
-  change to `Aggregate` trait bounds)
-- Support configurable snapshot intervals
-- Handle snapshot-event consistency (what if snapshot is stale?)
+Add snapshot support when: an aggregate routinely exceeds 10,000
+events, dispatch latency exceeds SLA (measured), a database-backed
+store makes full-stream reads expensive, or multi-process deployment
+makes replay latency affect failover. When revisiting, add a
+`SnapshotStore` trait in `cherry-pit-core`, require
+`Serialize + DeserializeOwned` on aggregate state, support
+configurable intervals, and handle snapshot-event consistency.

@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-- Root: PAR-0011
+References: PAR-0001
 
 ## Context
 
@@ -30,6 +30,11 @@ compile_error!("pardosa requires a 64-bit target (usize must be at least 8 bytes
 
 This is placed at the crate root (`crates/pardosa/src/lib.rs`) so it fires
 immediately on any attempt to compile pardosa for a 32-bit target.
+
+R1 [9]: Place a compile_error macro at the pardosa crate root
+  rejecting targets where target_pointer_width is not 64
+R2 [9]: Use Index::value() as usize without checked conversion
+  relying on the 64-bit compile gate for lossless cast
 
 ## Consequences
 

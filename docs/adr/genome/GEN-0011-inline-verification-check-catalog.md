@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-- References: GEN-0006
+References: GEN-0001, GEN-0006
 
 ## Context
 
@@ -58,6 +58,13 @@ The 20 checks, performed on every deserialization:
 
 Enum unit variant offset fields are treated as padding (must be `0x00000000`) and
 are exempt from the backward offset check (#6).
+
+R1 [5]: Every call to decode performs all 20 structural checks inline
+  during deserialization with no way to skip individual checks
+R2 [5]: There is no decode_unchecked, no standalone verify function,
+  and no opt-out mechanism for verification
+R3 [6]: Each check maps to a specific DeError or FileError variant for
+  unambiguous error reporting
 
 ## Consequences
 

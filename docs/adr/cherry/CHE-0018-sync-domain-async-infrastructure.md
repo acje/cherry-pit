@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-- References: CHE-0008, CHE-0025
+References: CHE-0001, CHE-0008, CHE-0025
 
 ## Context
 
@@ -41,6 +41,12 @@ Two design approaches:
 
 Domain traits are synchronous. Infrastructure ports are asynchronous.
 The boundary is at the port trait signatures.
+
+R1 [5]: All domain traits (Aggregate::apply, HandleCommand::handle,
+  Policy::react, Projection::apply) are synchronous
+R2 [5]: All infrastructure port traits (EventStore, EventBus,
+  CommandBus, CommandGateway) are asynchronous
+R3 [5]: cherry-pit-core has zero dependency on any async runtime
 
 **Synchronous (no futures, no runtime dependency):**
 

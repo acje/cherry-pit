@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-- References: CHE-0004, COM-0003
+References: CHE-0001, CHE-0004, COM-0003
 
 ## Context
 
@@ -42,6 +42,13 @@ Callers pass `Vec<Event>` to the store. The store creates
 Correlation and causation IDs are `Option<Uuid>` — `None` for events
 from user-initiated commands without tracing context, `Some` when
 propagated through policies or sagas.
+
+R1 [5]: Callers pass Vec<Event> to the store; the store creates
+  EventEnvelope by stamping all metadata
+R2 [5]: Callers never construct EventEnvelope instances directly;
+  only the store creates envelopes
+R3 [5]: Include correlation_id and causation_id as Option<Uuid>
+  fields on every envelope for distributed tracing
 
 ## Consequences
 

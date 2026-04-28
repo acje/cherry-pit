@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-- References: CHE-0002, CHE-0010, CHE-0016, CHE-0033, CHE-0034, CHE-0039
+References: CHE-0001, CHE-0002, CHE-0010, CHE-0016, CHE-0033, CHE-0034, CHE-0039
 
 ## Context
 
@@ -173,34 +173,19 @@ storage is caught at load time.
 
 - **CHE-0002 compliance restored.** External code cannot construct
   malformed envelopes via struct literal. The validated constructor
-  rejects nil event_id. Zero sequence is eliminated at the type
-  level via `NonZeroU64`. Post-deserialization validation catches
-  corrupt stored data.
-- **Breaking change.** 48 locations in `cherry-pit-gateway` change:
-  1 production field access → accessor, 42 test field accesses →
-  accessors, 3 struct literal constructions → `EventEnvelope::new()`
-  calls, 2 new `CorrelationContext` parameters (from CHE-0039).
-  All changes are mechanical.
+  rejects nil event_id, `NonZeroU64` eliminates zero sequences, and
+  post-deserialization validation catches corrupt stored data.
+- **Breaking change.** 48 locations in `cherry-pit-gateway` change
+  (field accesses → accessors, struct literals → `new()` calls,
+  new `CorrelationContext` parameters from CHE-0039). All mechanical.
 - **Sequencing dependency on CHE-0039.** The constructor accepts
-  `correlation_id` and `causation_id` as `Option<uuid::Uuid>`
-  parameters (extracted from `CorrelationContext` at the call
-  site). CHE-0039 must be implemented first so the
-  `CorrelationContext` type exists for the store to propagate.
-- **Test migration.** Test code that constructs envelopes with
-  specific metadata (e.g., the correlation roundtrip test) uses
-  `EventEnvelope::new()` with a `CorrelationContext::new(corr,
-  cause)`. No test-only constructor needed — the public validated
-  constructor serves both production and test code.
+  correlation/causation IDs extracted from `CorrelationContext`;
+  CHE-0039 must be implemented first.
 - **Serde bypass is defense-in-depth.** The `validate()` method in
-  `load()` catches corrupt data. The window where an invalid
-  envelope exists in memory (between deserialization and validation)
-  is contained within the store implementation.
-- **`pub fn new()` visibility.** External code (user code) CAN call
-  `EventEnvelope::new()`. This is acceptable because the constructor
-  validates invariants. The convention "only the store constructs
-  envelopes" remains the design intent, but violations are no longer
-  dangerous — they produce valid envelopes with potentially wrong
-  metadata, not structurally invalid envelopes.
-- **Future compile-fail test.** A `trybuild` test should verify
-  that direct struct literal construction of `EventEnvelope` fails
-  (CHE-0028). This proves the private-field invariant holds.
+  `load()` catches corrupt data; the window of invalid in-memory
+  state is contained within the store implementation.
+- **`pub fn new()` visibility.** External code can call the
+  constructor, but violations produce valid envelopes with potentially
+  wrong metadata, not structurally invalid ones.
+- **Future compile-fail test** (CHE-0028) should verify that direct
+  struct literal construction fails.

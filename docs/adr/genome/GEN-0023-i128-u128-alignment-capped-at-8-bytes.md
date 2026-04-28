@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-- References: GEN-0007
+References: GEN-0001, GEN-0007
 
 ## Context
 
@@ -38,6 +38,12 @@ This is consistent with the maximum alignment of any other supported type
 where the next-lower-aligned field would leave up to 15 bytes of zeros.
 
 The encoding is 16 bytes LE, written at an 8-byte-aligned cursor position.
+
+R1 [9]: i128 and u128 align to 8 bytes in the wire format not 16
+R2 [9]: The encoding is 16 bytes LE written at an 8-byte-aligned
+  cursor position
+R3 [9]: Maximum alignment of any supported type is 8 bytes across all
+  platforms
 
 ## Consequences
 

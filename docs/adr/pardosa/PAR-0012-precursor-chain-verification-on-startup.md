@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-- References: PAR-0008
+References: PAR-0004, PAR-0008
 
 ## Context
 
@@ -36,6 +36,13 @@ after replay completes, before the server accepts writes.
 
 On failure, returns `PardosaError::BrokenPrecursorChain { event_id, precursor }`
 with enough context to identify the corrupted event.
+
+R1 [5]: Run Dragline::verify_precursor_chains as an O(n) single pass
+  after replay completes and before the server accepts writes
+R2 [5]: Reject any event whose precursor index is greater than or
+  equal to the event's own position in the line
+R3 [6]: Reject any event whose precursor references an event with a
+  different domain_id than the event itself
 
 ## Consequences
 

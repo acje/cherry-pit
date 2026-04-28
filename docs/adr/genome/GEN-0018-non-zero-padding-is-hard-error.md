@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-- References: GEN-0011
+References: GEN-0001, GEN-0011
 
 ## Context
 
@@ -53,6 +53,12 @@ field is unused — it must be `0x00000000`. Non-zero offset on a unit variant
 produces `DeError::NonZeroPadding`. The backward offset check (GEN-0011, check #6)
 does not apply to unit variant offsets — they are treated as padding, not as
 heap references.
+
+R1 [5]: All padding bytes must be 0x00 — non-zero padding produces
+  DeError::NonZeroPadding as a hard non-recoverable error
+R2 [5]: There is no lenient mode for padding validation
+R3 [6]: Enum unit variant offset fields must be 0x00000000 and are
+  treated as padding not as heap references
 
 ## Consequences
 

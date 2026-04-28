@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-- References: CHE-0005
+References: CHE-0001, CHE-0005
 
 ## Context
 
@@ -50,6 +50,11 @@ enum OrderPolicyOutput {
 
 Infrastructure dispatches by matching on the enum — the compiler
 verifies all variants are handled.
+
+R1 [5]: Policy::Output is a static associated type with Send + Sync
+  + 'static bounds, not bounded by Command
+R2 [5]: Define policy output as an enum so the compiler verifies
+  exhaustive matching at all dispatch sites
 
 ## Consequences
 

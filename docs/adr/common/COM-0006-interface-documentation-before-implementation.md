@@ -7,80 +7,29 @@ Status: Accepted
 
 ## Related
 
-- References: COM-0001
+References: COM-0001, COM-0002
 
 ## Context
 
-Ousterhout (Ch. 13, "Comments Should Describe Things That Aren't
-Obvious from the Code"; Ch. 15, "Write The Comments First") argues
-that documentation is a design tool, not a post-hoc annotation.
-Writing interface comments before implementation forces the author
-to think about the abstraction — what the module does and why —
-before getting lost in how it does it.
+Ousterhout (Ch. 13, "Comments Should Describe Things That Aren't Obvious from the Code"; Ch. 15, "Write The Comments First") argues that documentation is a design tool, not a post-hoc annotation. Writing interface comments before implementation forces the author to think about the abstraction — what and why — before getting lost in how. If you cannot describe the abstraction clearly, the abstraction itself is likely unclear. Comments written after implementation tend to restate function names and describe code rather than purpose. Reviewers can evaluate interface design from comments alone.
 
-**Documentation-first benefits:**
+Cherry-pit's 685-line `cherry-pit-core.md` trait design document was written before implementations existed, describing what each trait does, why it exists, and how traits relate — information not inferable from method signatures.
 
-1. **Design clarity** — if you cannot describe the abstraction in a
-   clear comment, the abstraction is likely unclear. Writing the
-   comment first surfaces design problems before code is written.
-
-2. **Interface stability** — comments written after implementation
-   tend to describe the code rather than the abstraction. They
-   restate the function name, describe parameters by type rather than
-   purpose, and omit the "why."
-
-3. **Review quality** — reviewers can evaluate the interface design
-   from the comments alone, without reading the implementation. If
-   the comments are unclear, the interface is unclear.
-
-Cherry-pit's 685-line `cherry-pit-core.md` trait design document was written
-before the trait implementations existed. It describes what each
-trait does, why it exists, and how traits relate — information that
-cannot be inferred from method signatures.
-
-**Red flags for bad documentation:**
-
-- Comment restates the function name: `/// Returns the aggregate ID`
-  on `fn aggregate_id() -> AggregateId`. This adds no information.
-- Comment describes the implementation: `/// Uses a HashMap to look
-  up...`. This belongs in the implementation, not the interface.
-- Comment is absent on a public API. If the interface is
-  self-documenting, the comment should explain why it exists, not
-  what it does.
+Red flags include comments restating function names (`/// Returns the aggregate ID` on `fn aggregate_id()`), comments describing implementation details rather than abstractions, and absent comments on public APIs where the explanation of why the interface exists is missing.
 
 ## Decision
 
 Interface documentation is written before implementation. Comments
 describe the abstraction ("what" and "why"), not the code ("how").
 
-### Rules
-
-1. **Write interface comments first.** Before implementing a public
-   function, trait, or type, write the doc comment describing its
-   purpose, preconditions, postconditions, and semantics. The
-   comment is a design artifact, not an afterthought.
-
-2. **Comments describe abstractions.** Interface comments answer:
-   - What does this do? (purpose)
-   - When should it be used? (context)
-   - What are the guarantees? (postconditions)
-   - What are the requirements? (preconditions)
-   - Why does it exist? (motivation)
-
-3. **Comments do not describe code.** Implementation details belong
-   in inline comments within the function body, not in interface
-   documentation. If an interface comment mentions data structures,
-   algorithms, or internal state, it is leaking the abstraction.
-
-4. **Restate-the-name comments must be rewritten.** If a doc comment
-   could be mechanically generated from the function signature, it
-   adds no value. Rewrite it to describe the abstraction.
-
-5. **Design documents precede implementation.** For complex
-   subsystems (trait hierarchies, infrastructure ports), a design
-   document describing the abstractions and their relationships is
-   written before any code. The document is the design; the code is
-   the implementation.
+R1 [5]: Write doc comments for public functions, traits, and types
+  before implementing them — the comment is a design artifact
+R2 [5]: Interface comments answer purpose, context, guarantees,
+  requirements, and motivation — never implementation details
+R3 [6]: Comments that restate the function name or describe code
+  rather than the abstraction must be rewritten
+R4 [5]: For complex subsystems, a design document describing
+  abstractions and relationships is written before any code
 
 ## Consequences
 

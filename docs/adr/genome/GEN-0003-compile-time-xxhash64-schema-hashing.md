@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-- References: GEN-0001
+References: GEN-0001
 
 ## Context
 
@@ -51,6 +51,15 @@ Schema-compatible substitutions within a class (e.g., `&str` → `Cow<str>`) pre
 the hash. Cross-class substitutions (`String` → `&str`) break the hash intentionally —
 they change zero-copy deserialization semantics. The bytes/Vec\<u8\> split parallels
 the str/String split: `&[u8]` supports zero-copy borrowing, `Vec<u8>` does not.
+
+R1 [5]: Compute an 8-byte xxHash64 fingerprint at compile time from the
+  type's serde structure including root type name, field names, field
+  types, enum variant names, and shapes
+R2 [5]: The hash algorithm inputs are frozen — any change invalidates
+  all existing data
+R3 [5]: String and bytes types use equivalence classes for schema hash
+  identity — substitutions within a class preserve the hash, cross-class
+  substitutions break it intentionally
 
 ## Consequences
 

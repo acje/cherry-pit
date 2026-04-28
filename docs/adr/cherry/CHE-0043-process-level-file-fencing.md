@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-- References: CHE-0006, CHE-0021, CHE-0032, CHE-0035, COM-0003, PAR-0004
+References: CHE-0001, CHE-0006, CHE-0021, CHE-0032, CHE-0035, COM-0003, PAR-0004
 
 ## Context
 
@@ -25,6 +25,13 @@ directory, data corruption is possible") but deferred mitigation.
 `MsgpackFileStore` acquires an exclusive advisory file lock on
 `{store_dir}/.lock` before its first write operation (`create` or
 `append`). The lock is:
+
+R1 [10]: Acquire an exclusive advisory file lock on {store_dir}/.lock
+  before the first write operation
+R2 [10]: Lock acquisition is lazy via OnceCell, triggered on first
+  write not on construction
+R3 [10]: A second process on the same directory gets
+  StoreError::StoreLocked instead of silent data corruption
 
 1. **Lazy** — acquired on first write via `tokio::sync::OnceCell`,
    not on construction. Read-only operations (`load`) do not fence.

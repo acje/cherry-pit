@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-- References: CHE-0009, CHE-0010, CHE-0021, CHE-0031, GEN-0002
+References: CHE-0001, CHE-0009, CHE-0010, CHE-0021, CHE-0031, GEN-0002
 
 ## Context
 
@@ -21,6 +21,15 @@ but unbuilt.
 ## Decision
 
 Additive-only event evolution:
+
+R1 [5]: New enum variants are allowed and intentionally compile-breaking
+  to force all apply implementations to handle them
+R2 [5]: Removing or renaming persisted event variants is forbidden
+R3 [5]: New fields on existing variants must be Option<T> with
+  #[serde(default)]
+R4 [5]: event_type() strings are immutable once events exist in a log
+R5 [5]: Do not use #[non_exhaustive] on domain event enums; exhaustive
+  matching in apply is required
 
 1. **New enum variants**: allowed. Adding a variant is intentionally
    a compile-breaking change — all `apply` implementations must be

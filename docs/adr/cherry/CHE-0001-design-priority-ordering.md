@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-- References: COM-0001
+References: COM-0001
 
 ## Context
 
@@ -52,6 +52,13 @@ lower-priority concern at the expense of a higher one.
 
 This ADR is the canonical source for the priority system. Other ADRs
 cite it by number when invoking a priority tradeoff.
+
+R1 [1]: Evaluate every design decision against the priority ordering
+  P1 Correctness > P2 Security > P3 Energy efficiency > P4 Response time
+R2 [1]: When two priorities conflict the higher-ranked priority wins
+  without debate
+R3 [1]: Every ADR must cite the priority tradeoff that drove the
+  decision
 
 ## Consequences
 

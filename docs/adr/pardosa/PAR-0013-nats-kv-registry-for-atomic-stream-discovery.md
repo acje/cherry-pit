@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-- References: PAR-0005, PAR-0007
+References: PAR-0005, PAR-0007
 
 ## Context
 
@@ -48,6 +48,13 @@ its migration and clean up the orphan stream it created.
 to the new stream, re-read `Pardosa-*` headers, and resume processing by
 skipping events with `event_id <= last_processed_event_id` (idempotent
 catch-up via PAR-0007).
+
+R1 [5]: Store the active stream pointer as a single KV key in format
+  generation:stream_name for atomic discovery
+R2 [5]: Use CAS update via kv.update with expected_revision for
+  migration cutover to prevent stale overwrites
+R3 [6]: Consumers watch the KV key and reconnect to the new stream
+  on change using event_id for idempotent catch-up
 
 ## Consequences
 

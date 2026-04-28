@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-- References: CHE-0002, CHE-0006
+References: CHE-0001, CHE-0002, CHE-0006
 
 ## Context
 
@@ -33,6 +33,11 @@ directly. `TryFrom<u64>` is provided for fallible conversion from raw
 values. `From<u64>` is removed (replaced by `TryFrom`).
 
 Store-assigned IDs auto-increment from 1 via `NonZeroU64`.
+
+R1 [6]: AggregateId wraps NonZeroU64, eliminating zero as a valid
+  identifier at the type level
+R2 [6]: Use TryFrom<u64> for fallible conversion from raw values
+  instead of From<u64>
 
 ## Consequences
 

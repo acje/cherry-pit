@@ -7,52 +7,41 @@ Status: Accepted
 
 ## Related
 
-- References: CHE-0016, CHE-0004, CHE-0017
+References: CHE-0016, CHE-0004, CHE-0017
 
 ## Context
 
 `EventEnvelope` carries `correlation_id` and `causation_id` fields
-(CHE-0016). These fields enable distributed tracing across aggregates
-and bounded contexts. However, the current API makes it structurally
-impossible to populate them:
+(CHE-0016) for distributed tracing, but the current API cannot
+populate them. `EventStore::create`, `EventStore::append`,
+`CommandBus`, and `CommandGateway` signatures carry no correlation
+parameter, and `MsgpackFileStore::build_envelopes` hardcodes both
+to `None`. The schema is "tracing-ready" but the port traits are not.
 
-- `EventStore::create(events: Vec<Self::Event>)` — no correlation
-  parameter.
-- `EventStore::append(id, expected_sequence, events)` — no
-  correlation parameter.
-- `MsgpackFileStore::build_envelopes` hardcodes both fields to
-  `None`.
-- `CommandBus` and `CommandGateway` trait signatures carry no
-  correlation context.
+The `tracing` crate serves a different purpose: Spans are
+process-local diagnostic context, while `correlation_id` is
+cross-process persisted causal context.
 
-The envelope schema is "tracing-ready" (CHE-0016) but the port
-traits are not. The fields exist but are structurally dead.
-
-The `tracing` crate is a workspace dependency but has zero usage in
-source code. `tracing` Spans and `correlation_id` serve overlapping
-but distinct purposes: Spans are process-local diagnostic context;
-`correlation_id` is cross-process, persisted causal context.
-
-Three propagation styles were considered:
-
-1. **Explicit parameter** — add a `CorrelationContext` struct as a
-   parameter to every port method that produces envelopes. Transparent,
-   verbose, no magic. Consistent with CHE-0003 (compile-time
-   preference) and CHE-0001 (P1 correctness).
-2. **Task-local context** — use `tokio::task_local!` to propagate
-   correlation IDs implicitly through the async runtime. Ergonomic
-   but invisible — violates the "no magic" philosophy. Callers cannot
-   see from the type signature that correlation is expected.
-3. **Middleware/interceptor** — the `CommandGateway` injects
-   correlation context as a cross-cutting concern. Deferred to
-   `cherry-pit-agent` composition layer. Does not solve the `EventStore`
-   API gap.
+Three propagation styles were considered. Explicit parameter — a
+`CorrelationContext` struct on every envelope-producing method;
+transparent, consistent with CHE-0003 and CHE-0001. Task-local
+context via `tokio::task_local!` — ergonomic but invisible, violating
+the "no magic" philosophy. Middleware/interceptor — deferred to
+`cherry-pit-agent`, does not solve the `EventStore` API gap.
 
 ## Decision
 
 Explicit parameter propagation. A `CorrelationContext` struct is
 added to `cherry-pit-core` and threaded through all port methods that
 produce `EventEnvelope`s.
+
+R1 [4]: Thread CorrelationContext as an explicit parameter through
+  all port methods that produce EventEnvelopes
+R2 [4]: CorrelationContext does not implement Default; every call site
+  must explicitly choose none(), correlated(id), or new(corr, cause)
+R3 [4]: Policy implementations construct CorrelationContext for
+  downstream commands using the source event's event_id and
+  correlation_id
 
 ### Type definition
 

@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-- References: GEN-0014
+References: GEN-0001, GEN-0014
 
 ## Context
 
@@ -58,6 +58,12 @@ The file header reserves 3 bits for the compression algorithm (7 possible
 values), ensuring brotli can be added in a future version without a format
 version bump. v1 readers reject unknown algorithm codes, ensuring clean
 forward compatibility.
+
+R1 [9]: v1 supports zstd only — Brotli is deferred to a future version
+R2 [9]: Zstd is behind the zstd Cargo feature flag and is opt-in —
+  not included in default features
+R3 [9]: Reserved algorithm codes 0x02 through 0x07 must be rejected
+  with FileError::UnsupportedCompression
 
 ## Consequences
 

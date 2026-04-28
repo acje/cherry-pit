@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-- References: PAR-0004, PAR-0008
+References: PAR-0004, PAR-0008
 
 ## Context
 
@@ -39,6 +39,13 @@ consuming tokio tasks and degrading read availability.
    retry logic. The circuit breaker must not interfere with
    migration-initiated NATS operations, which may cause transient failures
    during stream creation.
+
+R1 [7]: After circuit_breaker_threshold consecutive NatsUnavailable
+  errors, reject writes immediately without attempting NATS publish
+R2 [7]: Continue serving reads from in-memory state during degraded
+  mode while writes are rejected
+R3 [8]: Reset the circuit breaker failure counter on the next
+  successful NATS health check or publish operation
 
 4. **Future: bounded publish channel** — For a `transact()` batching
    pattern, a bounded channel between the application write path and the

@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-- References: GEN-0004, GEN-0018, GEN-0020, GEN-0021, GEN-0024, GEN-0029, GEN-0033
+References: GEN-0001, GEN-0004, GEN-0018, GEN-0020, GEN-0021, GEN-0024, GEN-0029, GEN-0033
 
 ## Context
 
@@ -58,6 +58,14 @@ The following invariants collectively guarantee canonical encoding:
    deserialize, re-serialize, and compare bytes. This catches any violation of the
    canonical encoding contract that escapes compile-time checks (e.g., manual
    `Serialize` impls, `#[serde(with)]` modules, incorrect `GenomeOrd` impls).
+
+R1 [2]: The same logical value must always produce the same bytes —
+  canonical encoding is required for content-addressable storage
+R2 [2]: Seven invariants collectively guarantee canonical encoding
+  including deterministic map ordering, fixed field ordering,
+  breadth-first heap layout, and padding canonicalization
+R3 [2]: verify_roundtrip provides defense-in-depth by serialize,
+  deserialize, re-serialize, and byte comparison
 
 ## Consequences
 

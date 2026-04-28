@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-- References: CHE-0013, COM-0004, COM-0005
+References: CHE-0001, CHE-0013, COM-0004, COM-0005
 
 ## Context
 
@@ -36,6 +36,13 @@ This creates a clean semantic boundary:
 - **Bus layer:** dispatching a command to an empty stream means the
   aggregate was never created. This IS an error — the bus returns
   `DispatchError::AggregateNotFound`.
+
+R1 [5]: EventStore::load returns Ok(Vec::new()) for unknown
+  aggregates, not an error
+R2 [5]: AggregateNotFound is a DispatchError variant at the
+  CommandBus level, not a StoreError variant
+R3 [5]: EventStore::append to a never-created aggregate returns
+  StoreError::Infrastructure
 
 `EventStore::append` to a never-created aggregate (file does not
 exist) is an error: `StoreError::Infrastructure`. The aggregate must

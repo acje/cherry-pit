@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-- References: CHE-0029, COM-0002
+References: CHE-0001, CHE-0029, COM-0002
 
 ## Context
 
@@ -27,6 +27,11 @@ module structure can be visible (via `pub mod`) or hidden (via private
 
 All cherry-pit crates use private modules with selective `pub use`
 re-exports. Users interact with a flat namespace:
+
+R1 [5]: Use private modules with selective pub use re-exports in all
+  cherry-pit crates
+R2 [5]: Internal module structure is an implementation detail; the
+  public API is the set of re-exported items
 
 ```rust
 use cherry_pit_core::{Aggregate, HandleCommand, DomainEvent, EventEnvelope};

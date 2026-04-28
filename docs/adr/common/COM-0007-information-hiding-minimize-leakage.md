@@ -7,55 +7,15 @@ Status: Accepted
 
 ## Related
 
-- References: COM-0002
+References: COM-0001, COM-0002
 
 ## Context
 
-Ousterhout (Ch. 5, "Information Hiding (and Leakage)") refines the
-deep-module principle (COM-0002) from *how much* to hide to *what
-specifically* to hide. A deep module is necessary but not sufficient
-— if the wrong details leak through the interface, the module is
-deep in implementation but shallow in abstraction.
+Ousterhout (Ch. 5, "Information Hiding (and Leakage)") refines the deep-module principle (COM-0002) from *how much* to hide to *what specifically* to hide. A deep module is necessary but not sufficient — if the wrong details leak, the module is deep in implementation but shallow in abstraction. Information hiding means each module encapsulates its design decisions so other modules cannot depend on them. Information leakage — when a decision is reflected in multiple modules — creates hidden coupling requiring coordinated changes.
 
-**Information hiding** means each module encapsulates knowledge of
-its design decisions — data representations, algorithms, low-level
-mechanisms — so that other modules cannot depend on them. The
-complement is **information leakage**: when a design decision is
-reflected in multiple modules, creating hidden coupling. Changing
-the decision requires coordinated changes across all leaked sites.
+Leakage takes several forms: interface leakage through method signatures or public fields; temporal decomposition where sequential phases share knowledge of formats and intermediate state; and back-channel leakage through documentation or implicit contracts that create practical coupling despite formal decoupling.
 
-**Forms of leakage:**
-
-- **Interface leakage** — implementation details exposed through
-  method signatures, type parameters, or public fields. Callers
-  become coupled to the representation.
-
-- **Temporal decomposition** — splitting a task into sequential
-  phases where each phase becomes a module. The modules share
-  knowledge about the overall sequence, data formats, and
-  intermediate state. Example: separate "read config," "parse
-  config," and "validate config" modules that all know the config
-  format.
-
-- **Back-channel leakage** — implementation details shared through
-  documentation, conventions, or implicit contracts rather than
-  through the interface itself. Formally decoupled but practically
-  coupled.
-
-Cherry-pit demonstrates information hiding at several boundaries:
-
-- **EventEnvelope fields** are `pub(crate)` — consumers access
-  envelope data through methods, not direct field access. The
-  internal representation (field layout, optional fields) can
-  change without affecting consumers.
-
-- **MsgPack format** is invisible to trait users — `EventStore`
-  consumes and produces domain types. The serialization format is a
-  hidden design decision inside `MsgpackFileStore`.
-
-- **File layout** (one file per stream, atomic rename) is hidden
-  behind the `EventStore` trait. Callers never construct file paths
-  or manage file handles.
+Cherry-pit demonstrates information hiding at several boundaries. `EventEnvelope` fields are `pub(crate)`, with consumers accessing data through methods so internal layout can change freely. The MsgPack format is invisible to trait users — `EventStore` consumes and produces domain types. File layout (one file per stream, atomic rename) is hidden behind the `EventStore` trait; callers never construct file paths or manage handles.
 
 ## Decision
 
@@ -63,37 +23,18 @@ Design decisions should be encapsulated within the module that owns
 them. No other module should need to know — or be able to depend
 on — the decision.
 
-### Rules
-
-1. **Identify the design decisions.** Before implementing a module,
-   list the design decisions it embodies: data representation,
-   algorithm choice, protocol details, resource management strategy.
-   These are candidates for hiding.
-
-2. **Hide representation.** Types exposed through interfaces should
-   describe the abstraction, not the implementation. Return
-   `AggregateId`, not `NonZeroU64`. Accept `impl Iterator`, not
-   `Vec`. Expose methods, not fields.
-
-3. **Detect temporal decomposition.** If multiple modules must be
-   modified together when a format, protocol, or sequence changes,
-   they share leaked knowledge. Consolidate them into a single
-   module that owns the full sequence.
-
-4. **Minimize pub surface.** Default to private. Promote to
-   `pub(crate)` only when another module within the crate needs
-   access. Promote to `pub` only when another crate needs access.
-   Every visibility increase is a leakage risk.
-
-5. **Red flags for leakage:**
-   - Two modules parsing the same data format — format knowledge
-     leaked
-   - A type that mirrors an internal data structure in its public
-     API — representation leaked
-   - A caller that must sequence calls in a specific order because
-     the module does not manage its own state — temporal leakage
-   - Documentation that says "this must match the implementation
-     in module X" — back-channel leakage
+R1 [5]: Before implementing a module, list its design decisions —
+  data representation, algorithm, protocol, resource strategy —
+  as candidates for hiding
+R2 [5]: Types exposed through interfaces describe the abstraction,
+  not the implementation; return AggregateId not NonZeroU64, accept
+  impl Iterator not Vec
+R3 [6]: When multiple modules must change together for a format or
+  protocol change, consolidate them into a single module that owns
+  the full sequence
+R4 [5]: Default to private visibility; promote to pub(crate) only
+  when needed within the crate, and to pub only when needed by
+  another crate
 
 ## Consequences
 

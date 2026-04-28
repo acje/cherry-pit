@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-- References: GEN-0004
+References: GEN-0001, GEN-0004
 
 ## Context
 
@@ -45,6 +45,12 @@ The `GenomeSafe` trait provides blanket implementations for all standard
 library types in this set: primitives, `String`, `str`, `&str`, `&[u8]`,
 `Vec<T>`, `Option<T>`, `Box<T>`, `Arc<T>`, `Cow<T>`, `BTreeMap<K,V>`,
 `BTreeSet<T>`, `PhantomData<T>`, `[T; N]`, tuples (1–16), and `()`.
+
+R1 [5]: Support the full serde data model including tuples, non-string
+  map keys, char, unit structs, and all four enum variant forms
+R2 [5]: GenomeSafe provides blanket implementations for all standard
+  library types in the supported set
+R3 [6]: Fixed-size arrays use array length in the schema hash
 
 ## Consequences
 

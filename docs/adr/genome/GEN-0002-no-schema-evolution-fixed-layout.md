@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-- References: CHE-0022, PAR-0002
+References: GEN-0001, CHE-0022, PAR-0002
 
 ## Context
 
@@ -28,6 +28,12 @@ Schema changes require a new file (pardosa migration model). Enum variant additi
 the only in-schema flexibility — the discriminant-based layout handles new variants
 without breaking existing readers (readers reject unknown discriminants with
 `DeError::UnknownVariant`).
+
+R1 [2]: Struct layout is fixed at compile time with no vtables, no field
+  presence bits, and no default values for missing fields
+R2 [2]: Schema changes require a new file — no in-place schema evolution
+R3 [5]: A compile-time xxHash64 schema fingerprint detects type
+  mismatches at deserialization time with DeError::SchemaMismatch
 
 **Cross-crate sentinel reservation:** Pardosa reserves `u64::MAX` as the
 `Index::NONE` sentinel in `Index(u64)`, a genome-encoded newtype. This value

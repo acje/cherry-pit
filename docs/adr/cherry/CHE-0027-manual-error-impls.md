@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-- References: CHE-0001, CHE-0015
+References: CHE-0001, CHE-0015
 
 ## Context
 
@@ -37,6 +37,11 @@ convenience.
 
 `cherry-pit-core` uses manual `Display` and `Error` implementations. No
 `thiserror` dependency.
+
+R1 [9]: cherry-pit-core uses manual Display and Error implementations
+  with no thiserror dependency
+R2 [9]: Infrastructure crates may use thiserror where dependency
+  count is less critical
 
 Manual `Display::fmt` matches on all `DispatchError` variants with
 structured formatting (aggregate_id, expected/actual sequence in

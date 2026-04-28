@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-- References: GEN-0004, GEN-0032
+References: GEN-0001, GEN-0004, GEN-0032
 
 ## Context
 
@@ -87,7 +87,14 @@ catches ordering violations at runtime.
   detected. Users must add `GenomeOrd` bounds manually in such cases.
 - **Breaking change:** Adding `GenomeOrd` to `BTreeMap`/`BTreeSet` bounds is a
   compile-breaking change for existing custom key types. Migration: add
-  `impl GenomeOrd for MyKey {}`. Acceptable pre-1.0.
+   `impl GenomeOrd for MyKey {}`. Acceptable pre-1.0.
+
+R1 [4]: GenomeOrd is a marker trait asserting deterministic, total,
+  platform-independent Ord suitable for BTreeMap and BTreeSet keys
+R2 [4]: BTreeMap and BTreeSet require K: GenomeSafe + GenomeOrd
+  enforced at compile time
+R3 [4]: The derive macro auto-detects generic parameters used in
+  BTreeMap key position and adds GenomeOrd bounds automatically
 
 ## Consequences
 
