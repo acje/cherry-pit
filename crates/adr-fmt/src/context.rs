@@ -4,7 +4,7 @@
 //! and extracts their tagged decision rules.
 
 use crate::config::Config;
-use crate::model::{AdrRecord, Tier};
+use crate::model::{AdrRecord, Status, Tier};
 use crate::output::CrateRule;
 
 /// Resolve decision rules applicable to a crate.
@@ -15,8 +15,8 @@ use crate::output::CrateRule;
 ///    to ADRs where `crate_name` ∈ `adr.crates`; else include all domain ADRs
 /// 3. Always include all ADRs from `foundation = true` domains
 ///
-/// Returns `CrateRule` entries ordered: foundation first (by prefix),
-/// then non-foundation by tier (S→D), then by ADR ID.
+/// Returns `CrateRule` entries ordered by tier (S→D), then by ADR ID.
+/// Only Accepted ADRs are included.
 pub fn context(crate_name: &str, records: &[AdrRecord], config: &Config) -> Vec<CrateRule> {
     // Find candidate domains
     let candidate_domains: Vec<&str> = config
@@ -49,9 +49,12 @@ pub fn context(crate_name: &str, records: &[AdrRecord], config: &Config) -> Vec<
 
     let mut rules = Vec::new();
 
-    // Collect foundation domain ADRs
+    // Collect foundation domain ADRs (Accepted only)
     for record in records {
         if record.is_stale {
+            continue;
+        }
+        if record.status.as_ref() != Some(&Status::Accepted) {
             continue;
         }
         if !foundation_prefixes.contains(&record.id.prefix.as_str()) {
@@ -73,11 +76,15 @@ pub fn context(crate_name: &str, records: &[AdrRecord], config: &Config) -> Vec<
         });
     }
 
-    // Collect candidate domain ADRs
+    // Collect candidate domain ADRs (Accepted only)
     for prefix in &candidate_domains {
         let domain_records: Vec<&AdrRecord> = records
             .iter()
-            .filter(|r| !r.is_stale && r.id.prefix == *prefix)
+            .filter(|r| {
+                !r.is_stale
+                    && r.id.prefix == *prefix
+                    && r.status.as_ref() == Some(&Status::Accepted)
+            })
             .collect();
 
         // Check if any ADR in this domain has a populated `crates` field
@@ -109,22 +116,13 @@ pub fn context(crate_name: &str, records: &[AdrRecord], config: &Config) -> Vec<
         }
     }
 
-    // Sort: foundation first (by prefix), then non-foundation by tier, then by ID
+    // Sort by tier (S→D), then by prefix, then by ID number
     rules.sort_by(|a, b| {
-        let a_foundation = foundation_prefixes.contains(&a.adr_id.prefix.as_str());
-        let b_foundation = foundation_prefixes.contains(&b.adr_id.prefix.as_str());
-
-        match (a_foundation, b_foundation) {
-            (true, false) => std::cmp::Ordering::Less,
-            (false, true) => std::cmp::Ordering::Greater,
-            _ => {
-                let ta = a.tier.unwrap_or(Tier::D).rank();
-                let tb = b.tier.unwrap_or(Tier::D).rank();
-                ta.cmp(&tb)
-                    .then(a.adr_id.prefix.cmp(&b.adr_id.prefix))
-                    .then(a.adr_id.number.cmp(&b.adr_id.number))
-            }
-        }
+        let ta = a.tier.unwrap_or(Tier::D).rank();
+        let tb = b.tier.unwrap_or(Tier::D).rank();
+        ta.cmp(&tb)
+            .then(a.adr_id.prefix.cmp(&b.adr_id.prefix))
+            .then(a.adr_id.number.cmp(&b.adr_id.number))
     });
 
     rules
@@ -219,15 +217,76 @@ description = "test"
     }
 
     #[test]
-    fn context_foundation_first() {
+    fn context_sorts_by_tier() {
+        let mut com_d = make_record_with_rules("COM", 1, vec![], vec![("R1", "Foundation rule")]);
+        com_d.tier = Some(Tier::D);
+        let mut che_s = make_record_with_rules("CHE", 1, vec![], vec![("R1", "Cherry rule")]);
+        che_s.tier = Some(Tier::S);
+
+        let records = vec![com_d, che_s];
+        let config = make_config();
+        let rules = context("cherry-pit-core", &records, &config);
+
+        // S-tier CHE should come before D-tier COM (tier wins over foundation)
+        assert_eq!(rules[0].adr_id.prefix, "CHE", "S-tier should be first");
+        assert_eq!(rules[1].adr_id.prefix, "COM", "D-tier should be second");
+    }
+
+    #[test]
+    fn context_excludes_draft() {
+        let mut draft =
+            make_record_with_rules("CHE", 2, vec![], vec![("R1", "Draft rule")]);
+        draft.status = Some(Status::Draft);
+        draft.status_raw = Some("Draft".into());
+
         let records = vec![
-            make_record_with_rules("CHE", 1, vec![], vec![("R1", "Cherry rule")]),
-            make_record_with_rules("COM", 1, vec![], vec![("R1", "Foundation rule")]),
+            make_record_with_rules("CHE", 1, vec![], vec![("R1", "Active rule")]),
+            draft,
         ];
         let config = make_config();
         let rules = context("cherry-pit-core", &records, &config);
 
-        assert_eq!(rules[0].adr_id.prefix, "COM", "foundation should be first");
+        let ids: Vec<u16> = rules.iter().map(|r| r.adr_id.number).collect();
+        assert!(ids.contains(&1), "accepted should be included");
+        assert!(!ids.contains(&2), "draft should be excluded");
+    }
+
+    #[test]
+    fn context_excludes_rejected() {
+        let mut rejected =
+            make_record_with_rules("CHE", 2, vec![], vec![("R1", "Rejected rule")]);
+        rejected.status = Some(Status::Rejected);
+        rejected.status_raw = Some("Rejected".into());
+
+        let records = vec![
+            make_record_with_rules("CHE", 1, vec![], vec![("R1", "Active rule")]),
+            rejected,
+        ];
+        let config = make_config();
+        let rules = context("cherry-pit-core", &records, &config);
+
+        let ids: Vec<u16> = rules.iter().map(|r| r.adr_id.number).collect();
+        assert!(ids.contains(&1), "accepted should be included");
+        assert!(!ids.contains(&2), "rejected should be excluded");
+    }
+
+    #[test]
+    fn context_excludes_proposed_foundation() {
+        let mut proposed =
+            make_record_with_rules("COM", 1, vec![], vec![("R1", "Proposed foundation rule")]);
+        proposed.status = Some(Status::Proposed);
+        proposed.status_raw = Some("Proposed".into());
+
+        let records = vec![
+            proposed,
+            make_record_with_rules("CHE", 1, vec![], vec![("R1", "Active rule")]),
+        ];
+        let config = make_config();
+        let rules = context("cherry-pit-core", &records, &config);
+
+        let prefixes: Vec<&str> = rules.iter().map(|r| r.adr_id.prefix.as_str()).collect();
+        assert!(!prefixes.contains(&"COM"), "proposed foundation should be excluded");
+        assert!(prefixes.contains(&"CHE"), "accepted should be included");
     }
 
     #[test]

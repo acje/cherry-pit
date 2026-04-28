@@ -90,7 +90,7 @@ crates = ["adr-fmt"]
 #
 # Only declare rules whose defaults you want to change.
 # Hardcoded defaults: T015 min_words=7, max_words=50
-#                     T016 max_rules=10, min_rule_words=7, max_rule_words=50
+#                     T016 max_rules=5, min_rule_words=7, max_rule_words=60
 
 [[rules]]
 id = "T015"
@@ -98,4 +98,4 @@ params = { min_words = 7, max_words = 50 }
 
 [[rules]]
 id = "T016"
-params = { max_rules = 10, min_rule_words = 7, max_rule_words = 50 }
+params = { max_rules = 5, min_rule_words = 7, max_rule_words = 60 }

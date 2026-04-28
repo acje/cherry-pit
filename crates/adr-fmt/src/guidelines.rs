@@ -207,7 +207,7 @@ fn print_template() {
     println!("    T013  Section order (Status → Related → Context → Decision → Consequences)");
     println!("    T014  Code block size limit (max 30 lines)");
     println!("    T015  Prose section word count (7–50 words: Context, Consequences, Retirement)");
-    println!("    T016  Tagged rules in Decision (≥1 rule, sequential IDs, max 10, 7–50 words)");
+    println!("    T016  Tagged rules in Decision (≥1 rule, sequential IDs, max 5, 7–60 words)");
     println!();
 }
 
@@ -217,16 +217,17 @@ fn print_tagged_rules() {
     println!("TAGGED RULES (Decision Section)");
     println!("───────────────────────────────");
     println!();
-    println!("  Format:  - **R1**: Rule statement (7–50 words)");
+    println!("  Format:  - **R1**: Rule statement (7–60 words)");
     println!("           - **R2**: Next rule statement");
+    println!("           Multi-line rules: indent continuation ≥2 spaces");
     println!();
     println!("  Global ID: PREFIX-NNNN:R1  (e.g., CHE-0042:R1)");
     println!();
     println!("  Constraints:");
     println!("    • At least 1 tagged rule per Decision section");
-    println!("    • Maximum 10 rules per ADR");
+    println!("    • Maximum 5 rules per ADR");
     println!("    • IDs must be sequential (R1, R2, R3 — no gaps)");
-    println!("    • Each rule: 7–50 words");
+    println!("    • Each rule: 7–60 words");
     println!("    • Exempt: Draft and Proposed statuses");
     println!();
 }

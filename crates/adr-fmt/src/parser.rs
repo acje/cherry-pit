@@ -390,6 +390,10 @@ fn extract_decision_content(lines: &[&str]) -> Option<String> {
 /// Extract tagged rules from the Decision section.
 ///
 /// Matches `- **RN**: text` pattern within the Decision section.
+/// Continuation lines (indented ≥2 spaces, not a new tagged rule
+/// or untagged bullet) are joined to the current rule with a space.
+/// A blank line terminates continuation.
+///
 /// When no tagged rules are found, produces a single R0 fallback
 /// with the full decision content.
 fn extract_tagged_rules(lines: &[&str], decision_content: Option<&String>) -> Vec<TaggedRule> {
@@ -397,24 +401,63 @@ fn extract_tagged_rules(lines: &[&str], decision_content: Option<&String>) -> Ve
     let mut rules = Vec::new();
     let mut in_decision = false;
 
-    for (i, line) in lines.iter().enumerate() {
-        if *line == "## Decision" {
+    let mut i = 0;
+    while i < lines.len() {
+        let line = lines[i];
+        if line == "## Decision" {
             in_decision = true;
+            i += 1;
             continue;
         }
-        if in_decision {
-            if line.starts_with("## ") {
-                break;
+        if !in_decision {
+            i += 1;
+            continue;
+        }
+        if line.starts_with("## ") {
+            break;
+        }
+        if let Some(caps) = rule_re.captures(line) {
+            let num = caps.get(1).unwrap().as_str();
+            let mut text = caps.get(2).unwrap().as_str().trim().to_owned();
+            let rule_line = i + 1;
+
+            // Collect continuation lines
+            i += 1;
+            while i < lines.len() {
+                let next = lines[i];
+                // Blank line terminates continuation
+                if next.trim().is_empty() {
+                    break;
+                }
+                // Next section terminates
+                if next.starts_with("## ") {
+                    break;
+                }
+                // New tagged rule terminates
+                if rule_re.is_match(next) {
+                    break;
+                }
+                // Untagged bullet terminates (e.g., `- some text`)
+                if next.trim_start().starts_with("- ") {
+                    break;
+                }
+                // Must be indented ≥2 spaces to be continuation
+                if next.len() >= 2 && next.starts_with("  ") {
+                    text.push(' ');
+                    text.push_str(next.trim());
+                    i += 1;
+                } else {
+                    break;
+                }
             }
-            if let Some(caps) = rule_re.captures(line) {
-                let num = caps.get(1).unwrap().as_str();
-                let text = caps.get(2).unwrap().as_str().trim().to_owned();
-                rules.push(TaggedRule {
-                    id: format!("R{num}"),
-                    text,
-                    line: i + 1,
-                });
-            }
+
+            rules.push(TaggedRule {
+                id: format!("R{num}"),
+                text,
+                line: rule_line,
+            });
+        } else {
+            i += 1;
         }
     }
 
@@ -929,5 +972,88 @@ mod tests {
         let rules = extract_tagged_rules(&lines, decision_content.as_ref());
         assert_eq!(rules.len(), 1);
         assert_eq!(rules[0].id, "R1");
+    }
+
+    #[test]
+    fn extract_tagged_rules_multiline() {
+        let lines = vec![
+            "## Decision",
+            "",
+            "- **R1**: Construct EventEnvelope exclusively through",
+            "  EventEnvelope::new(), which validates non-nil event_id",
+            "  and returns Result<Self, EnvelopeError>",
+            "- **R2**: Use NonZeroU64 for the sequence field",
+            "",
+            "## Consequences",
+        ];
+        let decision_content = extract_decision_content(&lines);
+        let rules = extract_tagged_rules(&lines, decision_content.as_ref());
+        assert_eq!(rules.len(), 2);
+        assert_eq!(rules[0].id, "R1");
+        assert_eq!(
+            rules[0].text,
+            "Construct EventEnvelope exclusively through \
+             EventEnvelope::new(), which validates non-nil event_id \
+             and returns Result<Self, EnvelopeError>"
+        );
+        assert_eq!(rules[1].id, "R2");
+        assert_eq!(rules[1].text, "Use NonZeroU64 for the sequence field");
+    }
+
+    #[test]
+    fn extract_tagged_rules_blank_line_terminates_continuation() {
+        let lines = vec![
+            "## Decision",
+            "",
+            "- **R1**: First part of rule",
+            "",
+            "  This should NOT be continuation (after blank line)",
+            "- **R2**: Second rule",
+            "",
+            "## Consequences",
+        ];
+        let decision_content = extract_decision_content(&lines);
+        let rules = extract_tagged_rules(&lines, decision_content.as_ref());
+        assert_eq!(rules.len(), 2);
+        assert_eq!(rules[0].text, "First part of rule");
+        assert_eq!(rules[1].text, "Second rule");
+    }
+
+    #[test]
+    fn extract_tagged_rules_untagged_bullet_not_continuation() {
+        let lines = vec![
+            "## Decision",
+            "",
+            "- **R1**: Tagged rule text",
+            "- Some untagged bullet point",
+            "- **R2**: Another tagged rule",
+            "",
+            "## Consequences",
+        ];
+        let decision_content = extract_decision_content(&lines);
+        let rules = extract_tagged_rules(&lines, decision_content.as_ref());
+        assert_eq!(rules.len(), 2);
+        assert_eq!(rules[0].text, "Tagged rule text");
+        assert_eq!(rules[1].text, "Another tagged rule");
+    }
+
+    #[test]
+    fn extract_tagged_rules_backtick_content_preserved() {
+        let lines = vec![
+            "## Decision",
+            "",
+            "- **R1**: Construct via `EventEnvelope::new()` which",
+            "  returns `Result<Self, EnvelopeError>`",
+            "",
+            "## Consequences",
+        ];
+        let decision_content = extract_decision_content(&lines);
+        let rules = extract_tagged_rules(&lines, decision_content.as_ref());
+        assert_eq!(rules.len(), 1);
+        assert_eq!(
+            rules[0].text,
+            "Construct via `EventEnvelope::new()` which \
+             returns `Result<Self, EnvelopeError>`"
+        );
     }
 }

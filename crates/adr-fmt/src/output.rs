@@ -41,7 +41,9 @@ pub enum OutputBlock {
 pub struct CrateRule {
     pub adr_id: AdrId,
     pub tier: Option<Tier>,
+    #[allow(dead_code)] // Retained for potential future metadata output
     pub status: String,
+    #[allow(dead_code)] // Retained for potential future metadata output
     pub domain: String,
     pub rules: Vec<TaggedRule>,
 }
@@ -165,24 +167,52 @@ pub fn render_diagnostics(diagnostics: &[Diagnostic], record_count: usize) -> St
 
 // ── Rules rendering (--context mode) ───────────────────────────────
 
-/// Render context mode output: per-ADR rule blocks ordered by tier.
+/// Tier labels in render order (S→D).
+const TIER_ORDER: &[(Tier, &str)] = &[
+    (Tier::S, "S-tier"),
+    (Tier::A, "A-tier"),
+    (Tier::B, "B-tier"),
+    (Tier::C, "C-tier"),
+    (Tier::D, "D-tier"),
+];
+
+/// Render context mode output: tier-grouped flat list with preamble.
+///
+/// Rules are grouped by tier (S→D). Each tier with rules gets a `## X-tier`
+/// heading. Rule lines use `- {text} [{ADR_ID}:{RULE_ID}]` format with the
+/// anchoring ID at the end. Rules with `tier=None` render under D-tier.
 pub fn render_rules(crate_name: &str, rules: &[CrateRule]) -> String {
     let mut out = String::new();
-    writeln!(out, "## Rules for crate: {crate_name}\n").unwrap();
 
-    for cr in rules {
-        let tier = cr.tier.map_or_else(|| "?".into(), |t| format!("{t:?}"));
-        writeln!(
-            out,
-            "### {} | {} | Tier: {} | Status: {}",
-            cr.adr_id, cr.domain, tier, cr.status
-        )
-        .unwrap();
+    // Preamble
+    writeln!(out, "# Architecture Rules").unwrap();
+    writeln!(out).unwrap();
+    writeln!(
+        out,
+        "These rules are mandatory constraints for all code in crate `{crate_name}`."
+    )
+    .unwrap();
+    writeln!(out, "Follow every rule without exception.").unwrap();
 
-        for rule in &cr.rules {
-            writeln!(out, "- **{}:{}**: {}", cr.adr_id, rule.id, rule.text).unwrap();
+    // Group rules by effective tier
+    for &(tier, label) in TIER_ORDER {
+        let tier_rules: Vec<_> = rules
+            .iter()
+            .filter(|cr| cr.tier.unwrap_or(Tier::D) == tier)
+            .collect();
+
+        if tier_rules.is_empty() {
+            continue;
         }
-        out.push('\n');
+
+        writeln!(out).unwrap();
+        writeln!(out, "## {label}").unwrap();
+
+        for cr in &tier_rules {
+            for rule in &cr.rules {
+                writeln!(out, "- {} [{}:{}]", rule.text, cr.adr_id, rule.id).unwrap();
+            }
+        }
     }
 
     out
@@ -421,7 +451,102 @@ mod tests {
             }],
         }];
         let output = render_rules("cherry-pit-core", &rules);
-        assert!(output.contains("cherry-pit-core"), "output:\n{output}");
-        assert!(output.contains("CHE-0042:R1"), "output:\n{output}");
+        // Preamble
+        assert!(output.contains("# Architecture Rules"), "output:\n{output}");
+        assert!(
+            output.contains("crate `cherry-pit-core`"),
+            "output:\n{output}"
+        );
+        assert!(
+            output.contains("Follow every rule without exception"),
+            "output:\n{output}"
+        );
+        // Tier header
+        assert!(output.contains("## A-tier"), "output:\n{output}");
+        // Rule with ID at end
+        assert!(
+            output.contains("- All events versioned [CHE-0042:R1]"),
+            "output:\n{output}"
+        );
+        // No old metadata separators
+        assert!(!output.contains("| Cherry"), "output:\n{output}");
+        assert!(!output.contains("| Status:"), "output:\n{output}");
+    }
+
+    #[test]
+    fn render_rules_tier_grouping() {
+        let rules = vec![
+            CrateRule {
+                adr_id: make_id("CHE", 1),
+                tier: Some(Tier::A),
+                status: "Accepted".into(),
+                domain: "Cherry".into(),
+                rules: vec![TaggedRule {
+                    id: "R1".into(),
+                    text: "A-tier rule".into(),
+                    line: 10,
+                }],
+            },
+            CrateRule {
+                adr_id: make_id("COM", 1),
+                tier: Some(Tier::S),
+                status: "Accepted".into(),
+                domain: "Common".into(),
+                rules: vec![TaggedRule {
+                    id: "R1".into(),
+                    text: "S-tier rule".into(),
+                    line: 10,
+                }],
+            },
+        ];
+        let output = render_rules("cherry-pit-core", &rules);
+        let s_pos = output.find("## S-tier").expect("S-tier header missing");
+        let a_pos = output.find("## A-tier").expect("A-tier header missing");
+        assert!(s_pos < a_pos, "S-tier should appear before A-tier");
+    }
+
+    #[test]
+    fn render_rules_empty_tier_skipped() {
+        let rules = vec![CrateRule {
+            adr_id: make_id("CHE", 1),
+            tier: Some(Tier::B),
+            status: "Accepted".into(),
+            domain: "Cherry".into(),
+            rules: vec![TaggedRule {
+                id: "R1".into(),
+                text: "B-tier only".into(),
+                line: 10,
+            }],
+        }];
+        let output = render_rules("cherry-pit-core", &rules);
+        assert!(output.contains("## B-tier"), "output:\n{output}");
+        assert!(!output.contains("## S-tier"), "empty S-tier should be skipped");
+        assert!(!output.contains("## A-tier"), "empty A-tier should be skipped");
+        assert!(!output.contains("## C-tier"), "empty C-tier should be skipped");
+        assert!(!output.contains("## D-tier"), "empty D-tier should be skipped");
+    }
+
+    #[test]
+    fn render_rules_tier_none_maps_to_d() {
+        let rules = vec![CrateRule {
+            adr_id: make_id("CHE", 1),
+            tier: None,
+            status: "Accepted".into(),
+            domain: "Cherry".into(),
+            rules: vec![TaggedRule {
+                id: "R1".into(),
+                text: "Unclassified rule".into(),
+                line: 10,
+            }],
+        }];
+        let output = render_rules("cherry-pit-core", &rules);
+        assert!(
+            output.contains("## D-tier"),
+            "tier=None should render under D-tier"
+        );
+        assert!(
+            output.contains("- Unclassified rule [CHE-0001:R1]"),
+            "output:\n{output}"
+        );
     }
 }

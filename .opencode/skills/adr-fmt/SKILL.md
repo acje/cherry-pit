@@ -104,7 +104,7 @@ binary; config only provides parameter overrides.
 | T013 | *(reserved)* |
 | T014 | Section order: Status → Related → Context → Decision → Consequences (+ Retirement for stale) |
 | T015 | Prose section word count 7–50 (Context, Consequences, Retirement). Configurable: `min_words`, `max_words` |
-| T016 | Decision section tagged rules: ≥1 rule, sequential IDs, max 10, 7–50 words each. Exempt: Draft, Proposed |
+| T016 | Decision section tagged rules: ≥1 rule, sequential IDs, max 5, 7–60 words each. Exempt: Draft, Proposed |
 
 ### Link (L001–L009)
 
@@ -175,12 +175,14 @@ no L006 warning (rule removed); they remain as documentation of migration path.
 Decision sections must contain tagged rules:
 
 ```markdown
-- **R1**: First rule or decision statement (7–50 words)
-- **R2**: Second rule or decision statement (7–50 words)
+- **R1**: First rule or decision statement (7–60 words)
+- **R2**: Second rule, can span multiple lines with
+  continuation indented ≥2 spaces (7–60 words total)
 ```
 
 Global identifier: `PREFIX-NNNN:RN` (e.g., `CHE-0042:R1`).
-Constraints: sequential IDs, max 10 per ADR, 7–50 words each.
+Constraints: sequential IDs, max 5 per ADR, 7–60 words each.
+Multi-line: indent continuation ≥2 spaces; blank line terminates.
 When no tagged rules found, entire Decision text is captured as R0 (triggers T016).
 
 ### Crates Metadata

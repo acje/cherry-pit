@@ -1,6 +1,6 @@
 # ADR Template — Golden Reference
 
-Last-updated: 2026-04-27
+Last-updated: 2026-04-28
 
 This template defines the canonical structure for Architecture Decision
 Records in the cherry-pit workspace. It serves two audiences
@@ -22,20 +22,13 @@ people, write tagged rules for machines.
 ````markdown
 # PREFIX-NNNN. Title
 
-Date: YYYY-MM-DD
 Last-reviewed: YYYY-MM-DD
 Tier: S|A|B|C|D
-Crates: crate-a, crate-b
-
-## Status
-
-Draft | Proposed | Accepted | Rejected | Deprecated | Superseded by PREFIX-NNNN
+Status: Draft | Proposed | Accepted | Rejected | Deprecated | Superseded by PREFIX-NNNN
 
 ## Related
 
-- Root: OWN-ID
-- References: PREFIX-NNNN, PREFIX-NNNN
-- Supersedes: PREFIX-NNNN
+Root: OWN-ID | References: PREFIX-NNNN, PREFIX-NNNN | Supersedes: PREFIX-NNNN
 
 ## Context
 
@@ -46,8 +39,8 @@ code blocks.]
 
 [1–3 sentence summary of the chosen approach.]
 
-- **R1**: [Tagged rule — 7–50 words, positive imperative voice]
-- **R2**: [Tagged rule — 7–50 words, positive imperative voice]
+- **R1**: [Tagged rule — 7–60 words, positive imperative, unconditional]
+- **R2**: [Tagged rule — 7–60 words, positive imperative, unconditional]
 
 ## Consequences
 
@@ -111,9 +104,9 @@ signal.
 Tier: A
 ```
 
-Architectural significance level. Determines stability expectations
-and sort order in `--context` output (S first, D last). Assignment
-questions (answer "Yes" → assign that tier, start from S):
+Architectural significance level. Determines sort order in `--context`
+output (S first, D last). Assignment questions (answer "Yes" → assign
+that tier, start from S):
 
 | Tier | Test question |
 |------|---------------|
@@ -252,8 +245,9 @@ words (configurable via T015).
 
 [1–3 sentence summary of what was chosen.]
 
-- **R1**: [Rule text — positive imperative, 7–50 words]
-- **R2**: [Rule text — positive imperative, 7–50 words]
+- **R1**: [Rule text — positive imperative, 7–60 words]
+  [Optional continuation indented ≥2 spaces]
+- **R2**: [Rule text — positive imperative, 7–60 words]
 ```
 
 **Audience:** Dual. The prose summary is for humans. The tagged
@@ -267,14 +261,18 @@ write effective tagged rules.
 #### Tagged Rules Format
 
 ```
-- **R1**: Rule text here
-- **R2**: Another rule here
+- **R1**: Rule text here, naming specific types and methods
+- **R2**: Continuation-capable rule that wraps to
+  the next line with two-space indent
 ```
 
 - Pattern: `- **RN**: text` where N is a sequential integer
+- Multi-line: indent continuation lines ≥2 spaces. A blank line
+  or next `- **RN**:` terminates the rule. Continuation lines
+  are joined with a space.
 - Global identifier: `PREFIX-NNNN:RN` (e.g., `CHE-0042:R1`)
-- Constraints: sequential IDs starting at R1, max 10 per ADR,
-  7–50 words per rule
+- Constraints: sequential IDs starting at R1, max 5 per ADR,
+  7–60 words per rule
 - Exempt from T016: Draft and Proposed status (rules crystallize
   during review)
 
@@ -282,6 +280,11 @@ When no tagged rules are found, the entire Decision text is
 captured as R0 — a fallback that produces suboptimal agent context
 (the agent receives a prose blob instead of scannable rules).
 Every Accepted ADR should have explicit tagged rules.
+
+**Why max 5 rules per ADR:** Research shows P(all rules followed)
+= P(individual)^N. At 90% per-rule compliance, 5 rules yield 59%
+all-correct; 10 rules yield 35%. Fewer rules with higher
+individual compliance beats more rules.
 
 #### Writing Agent-Optimal Rules
 
@@ -292,55 +295,67 @@ Consequences, and even the ADR title are not included in
 
 **Research-backed principles for rules that stick:**
 
-**1. Positive imperative voice — avoid the Pink Elephant.**
+**1. Positive commission only — no exceptions.**
 
-Telling an LLM "do not use tRPC" activates `tRPC` in the
-attention window, potentially *causing* the violation. State what
-to do, not what to avoid.
+Telling an LLM "do not use struct literals" activates `struct
+literals` in the attention window, causing the violation. Research
+(n=40,000) shows 87.5% of negative-constraint violations are
+priming failures — naming the forbidden thing triggers it.
+
+Every rule must state what to do. Every prohibition must be
+reframed as a positive commission. No exceptions.
 
 ```markdown
-# BAD — activates the unwanted concept
+# BAD — primes the unwanted concept (87.5% violation rate via priming)
 - **R1**: Never construct EventEnvelope via struct literal
 
-# GOOD — states the positive action
-- **R1**: Construct EventEnvelope exclusively through EventEnvelope::new(),
-  which validates invariants and rejects nil event_id
+# GOOD — states the required action
+- **R1**: Construct EventEnvelope exclusively through
+  EventEnvelope::new(), which validates non-nil event_id and
+  returns Result<Self, EnvelopeError>
+
+# BAD — primes the bypass path
+- **R2**: Never bypass the domain layer
+
+# GOOD — names the required path
+- **R2**: Route all domain operations through port traits
+  defined in cherry-pit-core
 ```
 
-Only use negative framing for genuine hard stops (security,
-data loss) where there is no positive reframe.
+**2. Unconditional — no "when X" patterns.**
 
-**2. Embed consequence or rationale inline.**
+Conditional rules ("when doing X, always Y") lose 15–20 percentage
+points of compliance versus unconditional rules. Over 30% of
+conditional-rule failures are condition-check errors — the model
+fails to recognize the trigger condition.
 
-The agent receives only the rule text. If it doesn't contain the
-*why*, the agent treats it as an arbitrary directive — compliance
-drops on edge cases. A brief "because" clause or consequence
-anchors the rule to architectural reasoning.
+If a rule applies only in specific contexts, scope it via the
+`Crates:` metadata field, not via conditional rule text.
 
 ```markdown
-# WEAK — arbitrary directive
-- **R1**: Use raw SQL for reporting queries
+# BAD — conditional framing (15–20pp compliance loss)
+- **R1**: When implementing EventStore, validate envelopes
+  after deserialization
 
-# STRONG — embedded rationale
-- **R1**: Use raw SQL via query builder for reporting endpoints
-  because ORM-generated report queries cause N+1 patterns and
-  production latency spikes
+# GOOD — unconditional, scoped via Crates: field
+- **R1**: Call EventEnvelope::validate() after deserialization
+  in EventStore::load implementations to catch corrupt data
 ```
 
-Keep the rationale to one clause. The full story belongs in
-Context, not in the rule.
+**3. Concrete — name types, methods, and files.**
 
-**3. Use named principles where applicable.**
-
-LLMs activate pre-trained knowledge clusters when they encounter
-established principle names. "Follow hexagonal architecture" is
-more effective than describing ports and adapters from scratch.
-Reference COM principles by ID when relevant.
+Every rule MUST name at least one type, method, file, or trait.
+Abstract descriptions ("use the validated constructor") are
+position-fragile — they lose compliance when they appear in the
+middle of the context window. Concrete names anchor attention.
 
 ```markdown
-- **R1**: Apply hexagonal architecture (COM-0004): domain logic
-  in core crate with no infrastructure imports, adapters in
-  gateway crate behind port traits
+# BAD — abstract, position-fragile
+- **R1**: Use the validated constructor for all envelope creation
+
+# GOOD — concrete types and methods anchor attention
+- **R1**: Construct EventEnvelope exclusively through
+  EventEnvelope::new() in cherry-pit-core/src/envelope.rs
 ```
 
 **4. One rule, one enforceable statement.**
@@ -350,27 +365,37 @@ contains "and" joining two independent requirements, split it
 into two rules. The agent can verify "did I follow R1?" more
 reliably when R1 makes exactly one claim.
 
-**5. Make rules position-resistant.**
+**5. Self-contained.**
 
-Rules in `--context` output are sorted by tier (S→D) and then by
-ADR ID. Higher-tier rules appear first, exploiting primacy bias.
-But don't rely on position alone — each rule must make sense
-regardless of where it appears in the rendered list.
+The rule must make sense if the agent reads only this line with
+no surrounding prose, no ADR title, no other rules. References
+to "option 1" or "the approach above" are invisible to the agent.
 
-**6. Prefer concrete over abstract.**
+**6. Brief rationale (optional).**
 
-A code snippet or type name in a rule is more position-resistant
-than an abstract description. "Use `EventEnvelope::new()`" is
-more robust than "use the validated constructor."
+A short "because X" clause (≤10 words) can help the agent
+generalize to edge cases. This is optional — if the rule is
+self-evidently correct from its concrete content, skip the
+rationale and save tokens. Full rationale belongs in Context.
+
+```markdown
+# Without rationale — clear from the types
+- **R1**: Use NonZeroU64 for EventEnvelope sequence field
+
+# With rationale — helps edge-case generalization
+- **R1**: Use NonZeroU64 for EventEnvelope sequence field so
+  zero sequences are rejected at the type level
+```
 
 #### Prose in Decision
 
 Prose paragraphs, headings (### subsections), and code blocks in
 the Decision section are for humans — they provide implementation
-detail, design sketches, and rationale that doesn't fit in 50
+detail, design sketches, and rationale that doesn't fit in 60
 words. They are NOT extracted by `--context`.
 
 Use prose to:
+
 - Explain implementation details (constructors, error types, etc.)
 - Show code examples of the decided approach
 - Document future work or phasing
@@ -409,9 +434,9 @@ sides must be stated.
 - Identify future work or open questions this decision creates
 
 The Consequences section is where you record the information
-that *would* be in a tagged rule's consequence clause if there
-were room. The rule says "do X because Y breaks otherwise" —
-Consequences elaborates on what Y breaking actually looks like.
+that *would* be in a tagged rule's rationale clause if there
+were room. The rule says "do X because Y" — Consequences
+elaborates on what Y actually looks like.
 
 **Enforced by:** T010, T015 (word count), T014 (section order).
 
@@ -482,17 +507,13 @@ invariants at the type level.
 
 - **R1**: Construct EventEnvelope exclusively through
   EventEnvelope::new(), which validates non-nil event_id and
-  returns Result<Self, EnvelopeError> — struct literal construction
-  is impossible due to private fields
-- **R2**: Use NonZeroU64 for the sequence field so zero sequences
-  are rejected at the type level by both constructor and serde
-  deserialization
-- **R3**: Access envelope fields through accessor methods (event_id(),
-  aggregate_id(), sequence(), timestamp(), payload()) because all
-  fields are private
+  returns Result<Self, EnvelopeError>
+- **R2**: Use NonZeroU64 for the EventEnvelope sequence field so
+  zero sequences are rejected at the type level
+- **R3**: Access EventEnvelope fields through accessor methods
+  (event_id(), aggregate_id(), sequence(), timestamp(), payload())
 - **R4**: Call EventEnvelope::validate() after deserialization in
   EventStore::load implementations to catch corrupt stored data
-  that bypassed constructor validation
 
 ## Consequences
 
@@ -510,39 +531,37 @@ invariants at the type level.
 
 ## Agent-Extracted Output
 
-Running `adr-fmt --context cherry-pit-core` extracts the tagged
-rules from the worked example above as:
+Running `adr-fmt --context cherry-pit-core` produces a tier-grouped
+flat list. The worked example above renders as:
 
 ```
-### CHE-0042 | Cherry Domain | Tier: A | Status: Accepted
-- **CHE-0042:R1**: Construct EventEnvelope exclusively through
-  EventEnvelope::new(), which validates non-nil event_id and
-  returns Result<Self, EnvelopeError> — struct literal construction
-  is impossible due to private fields
-- **CHE-0042:R2**: Use NonZeroU64 for the sequence field so zero
-  sequences are rejected at the type level by both constructor and
-  serde deserialization
-- **CHE-0042:R3**: Access envelope fields through accessor methods
-  (event_id(), aggregate_id(), sequence(), timestamp(), payload())
-  because all fields are private
-- **CHE-0042:R4**: Call EventEnvelope::validate() after
-  deserialization in EventStore::load implementations to catch
-  corrupt stored data that bypassed constructor validation
+# Architecture Rules
+
+These rules are mandatory constraints for all code in crate `cherry-pit-core`.
+Follow every rule without exception.
+
+## A-tier
+- Construct EventEnvelope exclusively through EventEnvelope::new(), which validates non-nil event_id and returns Result<Self, EnvelopeError> [CHE-0042:R1]
+- Use NonZeroU64 for the EventEnvelope sequence field so zero sequences are rejected at the type level [CHE-0042:R2]
+- Access EventEnvelope fields through accessor methods (event_id(), aggregate_id(), sequence(), timestamp(), payload()) [CHE-0042:R3]
+- Call EventEnvelope::validate() after deserialization in EventStore::load implementations to catch corrupt stored data [CHE-0042:R4]
 ```
 
 This is all the agent receives. Notice:
 
-- Each rule makes sense standalone — no reference to "option 1" or
-  surrounding prose
-- Positive imperative voice — "construct through", "use", "access
-  through", "call"
-- Embedded rationale — "which validates...", "so zero sequences
-  are rejected...", "because all fields are private", "to catch
-  corrupt stored data..."
-- Concrete types and method names — `EventEnvelope::new()`,
-  `NonZeroU64`, `validate()`
-- No Pink Elephant — "struct literal construction is impossible"
-  is stated as a fact, not "do not construct via struct literal"
+- **Preamble** — imperative framing tells the agent these are
+  mandatory constraints, not suggestions
+- **Tier-grouped** — rules sorted by architectural significance
+  (S→D), not by ADR. Eliminates per-ADR metadata noise
+- **Rule ID at end** — `[CHE-0042:R1]` anchors traceability
+  without leading the attention. The action comes first.
+- **Positive commission** — "construct through", "use", "access
+  through", "call" — no prohibitions
+- **Unconditional** — no "when X" qualifiers
+- **Concrete** — `EventEnvelope::new()`, `NonZeroU64`,
+  `validate()`, named accessor methods
+- **Self-contained** — each rule makes sense without surrounding
+  prose or other rules
 
 ---
 
@@ -553,12 +572,13 @@ sections. The parser falls back to R0 (entire section as one blob).
 To migrate:
 
 1. Identify the core enforceable statements in the existing
-   Decision prose
-2. Distill each into a tagged rule (`- **R1**: text`)
-3. Keep surrounding prose for human context but ensure the tagged
-   rules are self-contained
-4. Run `cargo run -p adr-fmt -- --lint` — T016 should stop firing
-5. Run `cargo run -p adr-fmt -- --context <CRATE>` to verify the
+   Decision prose — maximum 5 per ADR
+2. Reframe any prohibitions as positive commissions
+3. Eliminate any conditional framing ("when X, do Y")
+4. Ensure every rule names at least one concrete type, method, or file
+5. Distill each into a tagged rule (`- **R1**: text`)
+6. Run `cargo run -p adr-fmt -- --lint` — T016 should stop firing
+7. Run `cargo run -p adr-fmt -- --context <CRATE>` to verify the
    extracted rules read well in isolation
 
 **Prioritize migration by tier:** S-tier ADRs first (they appear
@@ -571,15 +591,15 @@ constraints), then A, B, C, D.
 
 Before submitting a tagged rule, verify:
 
-- [ ] **Positive voice?** Does it say what to do, not what to avoid?
+- [ ] **Positive commission?** Does it state what to do? (No
+      prohibitions — reframe "never X" as "always Y")
+- [ ] **Unconditional?** No "when X" or "if Y" qualifiers?
+- [ ] **Concrete?** Does it name at least one type, method, file,
+      or trait?
 - [ ] **Self-contained?** Would the rule make sense if you saw only
       this line with no surrounding context?
-- [ ] **Consequence embedded?** Does the rule say *why* — even
-      briefly — so the agent can generalize to edge cases?
 - [ ] **One statement?** Does the rule make exactly one enforceable
       claim, not two joined by "and"?
-- [ ] **Concrete?** Does the rule name specific types, methods, or
-      patterns rather than abstract concepts?
-- [ ] **7–50 words?** Within the T016 bounds?
-- [ ] **Named principle?** If a COM/RST principle applies, is it
-      referenced by ID?
+- [ ] **7–60 words?** Within the T016 bounds?
+- [ ] **≤5 rules per ADR?** If you need more, split the ADR or
+      merge related constraints.

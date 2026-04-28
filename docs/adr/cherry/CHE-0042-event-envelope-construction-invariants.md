@@ -63,6 +63,16 @@ Three options were evaluated:
 Option 1: Private fields + validated public constructor + accessor
 methods.
 
+- **R1**: Construct EventEnvelope exclusively through
+  EventEnvelope::new(), which validates non-nil event_id and
+  returns Result<Self, EnvelopeError>
+- **R2**: Use NonZeroU64 for the EventEnvelope sequence field so
+  zero sequences are rejected at the type level
+- **R3**: Access EventEnvelope fields through accessor methods
+  (event_id(), aggregate_id(), sequence(), timestamp(), payload())
+- **R4**: Call EventEnvelope::validate() after deserialization in
+  EventStore::load implementations to catch corrupt stored data
+
 ### Struct definition
 
 ```rust

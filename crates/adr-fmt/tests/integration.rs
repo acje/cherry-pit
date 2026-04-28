@@ -679,6 +679,170 @@ fn context_per_adr_crates_filtering() {
         .stdout(predicate::str::contains("TST-0006"));
 }
 
+// ── context output format (end-to-end) ─────────────────────────────
+
+/// ADR with multi-line tagged rules for end-to-end context output test.
+const MULTILINE_RULES_ADR: &str = "\
+# TST-0008. Multi-line Rules ADR
+
+Date: 2026-04-27
+Last-reviewed: 2026-04-27
+Tier: B
+
+## Status
+
+Accepted
+
+## Related
+
+- Root: TST-0008
+
+## Context
+
+This ADR tests multi-line tagged rule extraction through context mode output.
+
+## Decision
+
+- **R1**: Use explicit versioning on every event payload
+  so that consumers can deserialize historical events
+  without schema ambiguity.
+- **R2**: Single-line rule stays on one line.
+
+## Consequences
+
+Multi-line rules should be joined and rendered correctly in context output.
+";
+
+/// Draft ADR with tagged rules — must NOT appear in context output.
+const DRAFT_WITH_RULES_ADR: &str = "\
+# TST-0009. Draft With Rules
+
+Date: 2026-04-27
+Tier: B
+
+## Status
+
+Draft
+
+## Related
+
+- Root: TST-0009
+
+## Context
+
+Draft ADR with tagged rules that should be excluded from context output.
+
+## Decision
+
+- **R1**: This rule must not leak into context output.
+
+## Consequences
+
+Draft exclusion verified.
+";
+
+#[test]
+fn context_end_to_end_output_format() {
+    // Setup: foundation S-tier + domain B-tier (multi-line rules) + draft (excluded)
+    let dir = setup_multi_corpus(
+        MULTI_DOMAIN_CONFIG,
+        &[
+            (
+                "common",
+                &[("COM-0001-foundation-principle.md", FOUNDATION_ADR)],
+            ),
+            (
+                "test",
+                &[
+                    ("TST-0008-multiline-rules.md", MULTILINE_RULES_ADR),
+                    ("TST-0009-draft-with-rules.md", DRAFT_WITH_RULES_ADR),
+                ],
+            ),
+        ],
+        &[],
+    );
+
+    let output = adr_fmt()
+        .args(["--context", "test-core", &adr_root(&dir)])
+        .output()
+        .expect("run adr-fmt");
+
+    assert!(output.status.success(), "adr-fmt should succeed");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    // ── Preamble ──
+    assert!(
+        stdout.contains("# Architecture Rules"),
+        "missing preamble title:\n{stdout}"
+    );
+    assert!(
+        stdout.contains("crate `test-core`"),
+        "missing crate name in preamble:\n{stdout}"
+    );
+    assert!(
+        stdout.contains("Follow every rule without exception"),
+        "missing mandate in preamble:\n{stdout}"
+    );
+
+    // ── Tier headers in correct order ──
+    let s_pos = stdout
+        .find("## S-tier")
+        .expect("S-tier header missing");
+    let b_pos = stdout
+        .find("## B-tier")
+        .expect("B-tier header missing");
+    assert!(
+        s_pos < b_pos,
+        "S-tier ({s_pos}) must appear before B-tier ({b_pos})"
+    );
+
+    // ── Foundation rule with ID at end ──
+    assert!(
+        stdout.contains("[COM-0001:R1]"),
+        "foundation rule should have ID at end:\n{stdout}"
+    );
+
+    // ── Multi-line rule text joined on single line with ID ──
+    let r1_line = stdout
+        .lines()
+        .find(|l| l.contains("[TST-0008:R1]"))
+        .expect("R1 line with ID missing");
+    assert!(
+        r1_line.contains("Use explicit versioning on every event payload"),
+        "multi-line R1 start text missing on rule line:\n{r1_line}"
+    );
+    assert!(
+        r1_line.contains("without schema ambiguity."),
+        "multi-line R1 continuation text must be on same line as ID:\n{r1_line}"
+    );
+
+    // ── Single-line rule ──
+    assert!(
+        stdout.contains("- Single-line rule stays on one line. [TST-0008:R2]"),
+        "single-line R2 format wrong:\n{stdout}"
+    );
+
+    // ── Draft exclusion ──
+    assert!(
+        !stdout.contains("TST-0009"),
+        "draft ADR ID must not appear in context output:\n{stdout}"
+    );
+    assert!(
+        !stdout.contains("must not leak"),
+        "draft ADR rule text must not appear in context output:\n{stdout}"
+    );
+
+    // ── No old metadata noise ──
+    assert!(
+        !stdout.contains("| Status:"),
+        "old status metadata should not appear:\n{stdout}"
+    );
+    assert!(
+        !stdout.contains("| Domain:"),
+        "old domain metadata should not appear:\n{stdout}"
+    );
+}
+
 // ── tree mode ──────────────────────────────────────────────────────
 
 #[test]

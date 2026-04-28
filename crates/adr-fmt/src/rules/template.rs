@@ -32,13 +32,13 @@ const DEFAULT_MIN_WORDS: u64 = 7;
 const DEFAULT_MAX_WORDS: u64 = 50;
 
 /// Default maximum number of tagged rules per ADR.
-const DEFAULT_MAX_RULES: u64 = 10;
+const DEFAULT_MAX_RULES: u64 = 5;
 
 /// Default minimum words per tagged rule.
 const DEFAULT_MIN_RULE_WORDS: u64 = 7;
 
 /// Default maximum words per tagged rule.
-const DEFAULT_MAX_RULE_WORDS: u64 = 50;
+const DEFAULT_MAX_RULE_WORDS: u64 = 60;
 
 /// Canonical H2 section order for active ADRs.
 const ACTIVE_SECTION_ORDER: &[&str] = &["Status", "Related", "Context", "Decision", "Consequences"];
@@ -517,7 +517,7 @@ params = { min_words = 7, max_words = 50 }
 
 [[rules]]
 id = "T016"
-params = { max_rules = 10, min_rule_words = 7, max_rule_words = 50 }
+params = { max_rules = 5, min_rule_words = 7, max_rule_words = 60 }
 "#,
         )
         .unwrap()
@@ -939,7 +939,7 @@ params = { max_rules = 10, min_rule_words = 7, max_rule_words = 50 }
     fn too_many_rules_produces_t016() {
         use crate::model::TaggedRule;
         let mut record = make_record();
-        record.decision_rules = (1..=11)
+        record.decision_rules = (1..=6)
             .map(|i| TaggedRule {
                 id: format!("R{i}"),
                 text: "This rule has enough words to pass the minimum check here".into(),
@@ -954,7 +954,30 @@ params = { max_rules = 10, min_rule_words = 7, max_rule_words = 50 }
             .find(|d| d.rule == "T016" && d.message.contains("maximum"));
         assert!(
             t016_max.is_some(),
-            "11 rules should trigger T016 max, got: {diags:?}"
+            "6 rules should trigger T016 max (limit 5), got: {diags:?}"
+        );
+    }
+
+    #[test]
+    fn five_rules_within_limit() {
+        use crate::model::TaggedRule;
+        let mut record = make_record();
+        record.decision_rules = (1..=5)
+            .map(|i| TaggedRule {
+                id: format!("R{i}"),
+                text: "This rule has enough words to pass the minimum check here".into(),
+                line: 10 + i,
+            })
+            .collect();
+        let config = make_config();
+        let mut diags = Vec::new();
+        check(&record, &config, &mut diags);
+        let t016_max = diags
+            .iter()
+            .find(|d| d.rule == "T016" && d.message.contains("maximum"));
+        assert!(
+            t016_max.is_none(),
+            "5 rules should not trigger T016 max, got: {diags:?}"
         );
     }
 
@@ -983,7 +1006,7 @@ params = { max_rules = 10, min_rule_words = 7, max_rule_words = 50 }
     fn rule_too_many_words_produces_t016() {
         use crate::model::TaggedRule;
         let mut record = make_record();
-        let long_text = (0..60).map(|_| "word").collect::<Vec<_>>().join(" ");
+        let long_text = (0..61).map(|_| "word").collect::<Vec<_>>().join(" ");
         record.decision_rules = vec![TaggedRule {
             id: "R1".into(),
             text: long_text,
@@ -997,7 +1020,29 @@ params = { max_rules = 10, min_rule_words = 7, max_rule_words = 50 }
             .find(|d| d.rule == "T016" && d.message.contains("maximum"));
         assert!(
             t016.is_some(),
-            "60-word rule should trigger T016 max, got: {diags:?}"
+            "61-word rule should trigger T016 max (limit 60), got: {diags:?}"
+        );
+    }
+
+    #[test]
+    fn sixty_word_rule_within_limit() {
+        use crate::model::TaggedRule;
+        let mut record = make_record();
+        let text = (0..60).map(|_| "word").collect::<Vec<_>>().join(" ");
+        record.decision_rules = vec![TaggedRule {
+            id: "R1".into(),
+            text,
+            line: 10,
+        }];
+        let config = make_config();
+        let mut diags = Vec::new();
+        check(&record, &config, &mut diags);
+        let t016 = diags
+            .iter()
+            .find(|d| d.rule == "T016" && d.message.contains("maximum"));
+        assert!(
+            t016.is_none(),
+            "60-word rule should not trigger T016 max, got: {diags:?}"
         );
     }
 
