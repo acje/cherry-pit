@@ -62,7 +62,7 @@ impl Config {
             .find(|r| r.id == rule_id)
             .and_then(|r| r.params.get(key))
             .and_then(toml::Value::as_integer)
-            .map(i64::cast_unsigned)
+            .and_then(|v| u64::try_from(v).ok())
     }
 }
 

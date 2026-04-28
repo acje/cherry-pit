@@ -54,7 +54,7 @@ pub fn print_setup_guide() {
     println!("     Why this decision exists and what problem it solves.");
     println!();
     println!("     ## Decision");
-    println!("     - **R1**: The specific rule or decision statement");
+    println!("     R1 [5]: The specific rule or decision statement");
     println!();
     println!("     ## Consequences");
     println!("     What changes as a result of this decision being made.");

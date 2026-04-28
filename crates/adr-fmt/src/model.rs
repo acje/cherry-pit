@@ -469,6 +469,9 @@ impl fmt::Display for RelVerb {
 pub fn parse_adr_id_from_str(s: &str) -> Option<AdrId> {
     let s = s.trim();
     let (prefix, num_str) = s.split_once('-')?;
+    if prefix.is_empty() {
+        return None;
+    }
 
     // Take only leading digits (ignore trailing annotations)
     let digits: String = num_str.chars().take_while(char::is_ascii_digit).collect();
@@ -509,6 +512,13 @@ mod tests {
         let id = id.unwrap();
         assert_eq!(id.prefix, "ÄDR");
         assert_eq!(id.number, 1);
+    }
+
+    #[test]
+    fn parse_adr_id_empty_prefix_returns_none() {
+        assert!(parse_adr_id_from_str("-0001").is_none());
+        assert!(parse_adr_id_from_str("").is_none());
+        assert!(parse_adr_id_from_str("-").is_none());
     }
 
     #[test]
