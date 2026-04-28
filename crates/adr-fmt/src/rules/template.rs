@@ -432,10 +432,11 @@ fn check_section_word_counts(
 /// T016: Tagged rules validation in Decision section.
 ///
 /// Checks:
-/// - At least one tagged rule present (unless Draft/Proposed)
+/// - At least one tagged rule present (all statuses)
 /// - Sequential IDs (R1, R2, R3 — no gaps)
 /// - Maximum rule count (default 10)
 /// - Word count per rule (default 7-50)
+/// - Layer range: 1-12 (Meadows leverage points)
 fn check_tagged_rules(
     record: &AdrRecord,
     max_rules: u64,
@@ -443,23 +444,13 @@ fn check_tagged_rules(
     max_rule_words: u64,
     diags: &mut Vec<Diagnostic>,
 ) {
-    // Exempt Draft and Proposed
-    if let Some(ref status) = record.status
-        && matches!(status, Status::Draft | Status::Proposed)
-    {
-        return;
-    }
-
     // Check for missing tagged rules
-    let has_real_rules = !(record.decision_rules.is_empty()
-        || record.decision_rules.len() == 1 && record.decision_rules[0].id == "R0");
-
-    if !has_real_rules {
+    if record.decision_rules.is_empty() {
         diags.push(Diagnostic::warning(
             "T016",
             &record.file_path,
             0,
-            "Decision section lacks tagged rules (- **RN**: pattern)".into(),
+            "Decision section lacks tagged rules (RN [L]: pattern)".into(),
         ));
         return;
     }
@@ -478,11 +469,8 @@ fn check_tagged_rules(
         ));
     }
 
-    // Check per-rule word bounds
+    // Check per-rule word bounds and layer validity
     for rule in &record.decision_rules {
-        if rule.id == "R0" {
-            continue;
-        }
         let word_count = rule.text.split_whitespace().count() as u64;
         if word_count < min_rule_words {
             diags.push(Diagnostic::warning(
@@ -502,6 +490,20 @@ fn check_tagged_rules(
                 format!(
                     "Rule {id} has {word_count} word(s) (maximum {max_rule_words}) — be concise",
                     id = rule.id,
+                ),
+            ));
+        }
+
+        // Layer range validation: must be 1-12
+        if rule.layer == 0 || rule.layer > 12 {
+            diags.push(Diagnostic::warning(
+                "T016",
+                &record.file_path,
+                rule.line,
+                format!(
+                    "Rule {id} has layer {layer} (must be 1-12, Meadows leverage points)",
+                    id = rule.id,
+                    layer = rule.layer,
                 ),
             ));
         }
@@ -618,6 +620,7 @@ params = { max_rules = 5, min_rule_words = 7, max_rule_words = 60 }
             id: "R1".into(),
             text: "All events must be versioned with semantic version numbers".into(),
             line: 10,
+            layer: 5,
         }];
 
         let config = make_config();
@@ -942,11 +945,13 @@ params = { max_rules = 5, min_rule_words = 7, max_rule_words = 60 }
                 id: "R1".into(),
                 text: "All events must be versioned with semantic version numbers always".into(),
                 line: 10,
+                layer: 5,
             },
             TaggedRule {
                 id: "R2".into(),
                 text: "Snapshots are created at one hundred event intervals minimum always".into(),
                 line: 11,
+                layer: 5,
             },
         ];
         let config = make_config();
@@ -972,25 +977,20 @@ params = { max_rules = 5, min_rule_words = 7, max_rule_words = 60 }
     }
 
     #[test]
-    fn r0_fallback_produces_t016() {
-        use crate::model::TaggedRule;
+    fn empty_rules_produces_t016() {
         let mut record = make_record();
-        record.decision_rules = vec![TaggedRule {
-            id: "R0".into(),
-            text: "Full decision text".into(),
-            line: 0,
-        }];
+        record.decision_rules = vec![];
         let config = make_config();
         let mut diags = Vec::new();
         check(&record, &config, &mut diags);
         assert!(
             diags.iter().any(|d| d.rule == "T016"),
-            "R0 fallback should trigger T016, got: {diags:?}"
+            "empty rules should trigger T016, got: {diags:?}"
         );
     }
 
     #[test]
-    fn draft_exempt_from_t016() {
+    fn draft_not_exempt_from_t016() {
         let mut record = make_record();
         record.status = Some(Status::Draft);
         record.status_raw = Some("Draft".into());
@@ -999,8 +999,8 @@ params = { max_rules = 5, min_rule_words = 7, max_rule_words = 60 }
         let mut diags = Vec::new();
         check(&record, &config, &mut diags);
         assert!(
-            !diags.iter().any(|d| d.rule == "T016"),
-            "Draft should be exempt from T016, got: {diags:?}"
+            diags.iter().any(|d| d.rule == "T016"),
+            "Draft should NOT be exempt from T016, got: {diags:?}"
         );
     }
 
@@ -1013,6 +1013,7 @@ params = { max_rules = 5, min_rule_words = 7, max_rule_words = 60 }
                 id: format!("R{i}"),
                 text: "This rule has enough words to pass the minimum check here".into(),
                 line: 10 + i,
+                layer: 5,
             })
             .collect();
         let config = make_config();
@@ -1036,6 +1037,7 @@ params = { max_rules = 5, min_rule_words = 7, max_rule_words = 60 }
                 id: format!("R{i}"),
                 text: "This rule has enough words to pass the minimum check here".into(),
                 line: 10 + i,
+                layer: 5,
             })
             .collect();
         let config = make_config();
@@ -1058,6 +1060,7 @@ params = { max_rules = 5, min_rule_words = 7, max_rule_words = 60 }
             id: "R1".into(),
             text: "Too short".into(), // 2 words
             line: 10,
+            layer: 5,
         }];
         let config = make_config();
         let mut diags = Vec::new();
@@ -1080,6 +1083,7 @@ params = { max_rules = 5, min_rule_words = 7, max_rule_words = 60 }
             id: "R1".into(),
             text: long_text,
             line: 10,
+            layer: 5,
         }];
         let config = make_config();
         let mut diags = Vec::new();
@@ -1102,6 +1106,7 @@ params = { max_rules = 5, min_rule_words = 7, max_rule_words = 60 }
             id: "R1".into(),
             text,
             line: 10,
+            layer: 5,
         }];
         let config = make_config();
         let mut diags = Vec::new();
@@ -1124,11 +1129,13 @@ params = { max_rules = 5, min_rule_words = 7, max_rule_words = 60 }
                 id: "R1".into(),
                 text: "This rule has enough words to pass the minimum check here".into(),
                 line: 10,
+                layer: 5,
             },
             TaggedRule {
                 id: "R3".into(),
                 text: "This rule also has enough words to pass the minimum check".into(),
                 line: 12,
+                layer: 5,
             },
         ];
         let config = make_config();
@@ -1153,6 +1160,7 @@ params = { max_rules = 5, min_rule_words = 7, max_rule_words = 60 }
             id: "R1".into(),
             text: "All events must be versioned with semantic version numbers".into(),
             line: 10,
+            layer: 5,
         }];
         let config = make_config();
         let mut diags = Vec::new();
@@ -1181,6 +1189,7 @@ params = { max_rules = 5, min_rule_words = 7, max_rule_words = 60 }
             id: "R1".into(),
             text: "All events must be versioned with semantic version numbers".into(),
             line: 10,
+            layer: 5,
         }];
         let config = make_config();
         let mut diags = Vec::new();
@@ -1233,6 +1242,7 @@ params = { max_rules = 5, min_rule_words = 7, max_rule_words = 60 }
             id: "R1".into(),
             text: "All events must be versioned with semantic version numbers".into(),
             line: 10,
+            layer: 5,
         }];
         let config = make_config();
         let mut diags = Vec::new();

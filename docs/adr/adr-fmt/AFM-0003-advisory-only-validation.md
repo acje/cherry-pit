@@ -26,12 +26,12 @@ overlooked warnings without process discipline).
 infrastructure errors. All validation rules emit warnings, never
 errors.
 
-- **R1**: Exit 0 means lint completed successfully; exit 1 means
+R1 [5]: Exit 0 means lint completed successfully; exit 1 means
   the tool could not function (missing config, unreadable files,
   invalid configuration)
-- **R2**: All diagnostics use warning severity; no error severity
+R2 [5]: All diagnostics use warning severity; no error severity
   exists for rule violations
-- **R3**: Zero-warning enforcement is a process concern delegated
+R3 [5]: Zero-warning enforcement is a process concern delegated
   to CI wrapper scripts that parse stderr for warning counts
 
 ## Consequences

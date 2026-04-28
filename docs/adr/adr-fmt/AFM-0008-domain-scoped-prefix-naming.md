@@ -26,13 +26,13 @@ Every ADR filename follows `PREFIX-NNNN-kebab-slug.md` where PREFIX
 is a configured domain code and NNNN is a zero-padded sequence
 number.
 
-- **R1**: Filename matches `PREFIX-NNNN-kebab-slug.md` and H1 title
+R1 [5]: Filename matches `PREFIX-NNNN-kebab-slug.md` and H1 title
   contains the same `PREFIX-NNNN` identifier (N001, N002, N003)
-- **R2**: Domain prefixes are registered in `adr-fmt.toml` under
+R2 [5]: Domain prefixes are registered in `adr-fmt.toml` under
   `[[domains]]`; unregistered prefixes trigger a warning (N004)
-- **R3**: Numbers are sequential within each domain, never reused;
+R3 [5]: Numbers are sequential within each domain, never reused;
   gaps from rejected or superseded ADRs are permitted
-- **R4**: Slugs must be lowercase kebab-case: letters, digits,
+R4 [5]: Slugs must be lowercase kebab-case: letters, digits,
   hyphens only, no leading/trailing/consecutive hyphens
 
 ## Consequences

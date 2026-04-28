@@ -14,14 +14,31 @@ pub struct DomainDir {
 
 /// A tagged rule extracted from the Decision section.
 ///
-/// Format in ADR: `- **R1**: Rule text here`
-/// Global identifier: `CHE-0042:R1`
+/// Format in ADR: `R1 [5]: Rule text here`
+/// Global identifier: `CHE-0042:R1:L5`
 #[derive(Debug, Clone)]
 pub struct TaggedRule {
     pub id: String,
     pub text: String,
+    /// Meadows leverage layer (1-12). 0 indicates unparsed/invalid.
+    pub layer: u8,
     #[allow(dead_code)] // Line number for diagnostic context
     pub line: usize,
+}
+
+/// Map a Meadows leverage layer (1-12) to the corresponding tier.
+///
+/// Mapping: S=1-3, A=4, B=5-6, C=7-8, D=9-12.
+/// Returns `None` for layer 0 or >12 (invalid).
+pub fn layer_to_tier(layer: u8) -> Option<Tier> {
+    match layer {
+        1..=3 => Some(Tier::S),
+        4 => Some(Tier::A),
+        5..=6 => Some(Tier::B),
+        7..=8 => Some(Tier::C),
+        9..=12 => Some(Tier::D),
+        _ => None,
+    }
 }
 
 /// Composite ADR identifier: prefix + number (e.g., CHE-0042).
@@ -96,12 +113,8 @@ pub struct AdrRecord {
     /// Crates associated with this ADR via `Crates:` metadata field.
     pub crates: Vec<String>,
     /// Tagged rules extracted from the Decision section
-    /// (`- **RN**: text` pattern). Falls back to R0 with full
-    /// decision content when no tagged rules are found.
+    /// (`RN [L]: text` pattern). Empty when no tagged rules found.
     pub decision_rules: Vec<TaggedRule>,
-    /// Full text of the Decision section (for R0 fallback).
-    #[allow(dead_code)] // Available for context mode R0 extraction
-    pub decision_content: Option<String>,
 }
 
 impl Default for AdrRecord {
@@ -142,7 +155,6 @@ impl Default for AdrRecord {
             section_word_counts: HashMap::new(),
             crates: Vec::new(),
             decision_rules: Vec::new(),
-            decision_content: None,
         }
     }
 }
@@ -762,7 +774,6 @@ mod tests {
         assert_eq!(record.id.number, 0);
         assert!(record.crates.is_empty());
         assert!(record.decision_rules.is_empty());
-        assert!(record.decision_content.is_none());
     }
 
     #[test]
@@ -786,5 +797,41 @@ mod tests {
             .short_display(),
             "Superseded by CHE-0099"
         );
+    }
+
+    #[test]
+    fn layer_to_tier_mapping() {
+        use super::layer_to_tier;
+
+        // S-tier: layers 1-3
+        assert_eq!(layer_to_tier(1), Some(Tier::S));
+        assert_eq!(layer_to_tier(2), Some(Tier::S));
+        assert_eq!(layer_to_tier(3), Some(Tier::S));
+
+        // A-tier: layer 4
+        assert_eq!(layer_to_tier(4), Some(Tier::A));
+
+        // B-tier: layers 5-6
+        assert_eq!(layer_to_tier(5), Some(Tier::B));
+        assert_eq!(layer_to_tier(6), Some(Tier::B));
+
+        // C-tier: layers 7-8
+        assert_eq!(layer_to_tier(7), Some(Tier::C));
+        assert_eq!(layer_to_tier(8), Some(Tier::C));
+
+        // D-tier: layers 9-12
+        assert_eq!(layer_to_tier(9), Some(Tier::D));
+        assert_eq!(layer_to_tier(10), Some(Tier::D));
+        assert_eq!(layer_to_tier(11), Some(Tier::D));
+        assert_eq!(layer_to_tier(12), Some(Tier::D));
+    }
+
+    #[test]
+    fn layer_to_tier_invalid() {
+        use super::layer_to_tier;
+
+        assert_eq!(layer_to_tier(0), None);
+        assert_eq!(layer_to_tier(13), None);
+        assert_eq!(layer_to_tier(255), None);
     }
 }

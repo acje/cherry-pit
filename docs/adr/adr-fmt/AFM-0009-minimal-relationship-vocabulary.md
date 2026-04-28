@@ -26,15 +26,15 @@ References (citation), and Supersedes (replacement).
 Restrict the relationship vocabulary to exactly three verbs. All
 other verbs are legacy and produce a deprecation warning.
 
-- **R1**: Permit only Root, References, and Supersedes as
+R1 [5]: Permit only Root, References, and Supersedes as
   relationship verbs; legacy verbs trigger a warning (L006)
-- **R2**: Root and References are mutually exclusive — an ADR is
+R2 [5]: Root and References are mutually exclusive — an ADR is
   either a tree root or a branch, never both (L009)
-- **R3**: Supersedes requires the target ADR to carry
+R3 [5]: Supersedes requires the target ADR to carry
   `Superseded by PREFIX-NNNN` status (L003)
-- **R4**: Root target must match the ADR's own ID; validated by
+R4 [5]: Root target must match the ADR's own ID; validated by
   L008
-- **R5**: Multiple References are permitted to support
+R5 [5]: Multiple References are permitted to support
   cross-cutting concerns drawing on several prior decisions
 
 ## Consequences

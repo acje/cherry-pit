@@ -195,6 +195,7 @@ description = "test"
                     id: id.into(),
                     text: text.into(),
                     line: 0,
+                    layer: 5,
                 })
                 .collect(),
             ..AdrRecord::default()

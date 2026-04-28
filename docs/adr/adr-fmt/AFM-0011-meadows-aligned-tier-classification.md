@@ -29,12 +29,12 @@ with Meadows' leverage-point hierarchy. Use system-characteristic
 framing ("Does this decision define X?") instead of blast-radius
 framing ("If this changed, would X change?").
 
-- **R1**: Classify ADRs using the first-yes-wins method: start at
+R1 [5]: Classify ADRs using the first-yes-wins method: start at
   S-tier and assign the first tier whose classification question
   yields "yes"
-- **R2**: Frame tier classification questions as "Does this decision
+R2 [5]: Frame tier classification questions as "Does this decision
   define X?" to classify by leverage type rather than blast radius
-- **R3**: Map tiers to Meadows' leverage hierarchy: S=Intent (levels
+R3 [5]: Map tiers to Meadows' leverage hierarchy: S=Intent (levels
   1-3), A=Self-organization (level 4), B=Design (levels 5-6),
   C=Feedbacks (levels 7-8), D=Parameters (levels 9-12)
 

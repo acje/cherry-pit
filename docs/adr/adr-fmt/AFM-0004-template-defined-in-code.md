@@ -24,15 +24,15 @@ generates documentation from the same code that validates.
 Define the MADR template entirely in Rust code. No standalone
 template file exists.
 
-- **R1**: The parser module defines valid ADR structure; required
+R1 [5]: The parser module defines valid ADR structure; required
   metadata, sections, and vocabularies are Rust types validated by
   rule functions
-- **R2**: `--guidelines` generates human-readable documentation
+R2 [5]: `--guidelines` generates human-readable documentation
   from the same code structures that perform validation
-- **R3**: Adding a structural rule requires changes in parser,
+R3 [5]: Adding a structural rule requires changes in parser,
   rules, and guidelines within the same crate — inconsistency
   becomes a compile-time or test-time failure
-- **R4**: The MADR format is customized for this project; original
+R4 [5]: The MADR format is customized for this project; original
   optional sections are omitted where Context and Consequences
   serve the same purpose
 

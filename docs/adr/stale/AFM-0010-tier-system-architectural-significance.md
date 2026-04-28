@@ -25,11 +25,11 @@ internals?" (D).
 Every ADR must be assigned a tier from S/A/B/C/D declared as a
 metadata field and validated by T004.
 
-- **R1**: Assign tiers using the descending question method: start
+R1 [5]: Assign tiers using the descending question method: start
   at S, work down, first "yes" determines the tier
-- **R2**: Higher tiers (S/A) require a superseding ADR for changes;
+R2 [5]: Higher tiers (S/A) require a superseding ADR for changes;
   lower tiers (B/C/D) permit amendment with a dated note
-- **R3**: Tier appears in generated domain README tables and
+R3 [5]: Tier appears in generated domain README tables and
   `--tree` output for significance-based filtering
 
 ## Consequences

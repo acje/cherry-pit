@@ -25,18 +25,18 @@ where the validation tool is the specification.
 Adopt a layered SSOT architecture where the `adr-fmt` binary is
 the authoritative specification for all invariant ADR rules.
 
-- **R1**: The `adr-fmt` binary owns all invariant rules: template
+R1 [5]: The `adr-fmt` binary owns all invariant rules: template
   structure, naming, relationships, lifecycle states, link integrity,
   and section ordering
-- **R2**: `adr-fmt.toml` owns configurable aspects: domain
+R2 [5]: `adr-fmt.toml` owns configurable aspects: domain
   definitions, crate mappings, stale directory path, and rule
   parameter overrides
-- **R3**: `--guidelines` output is the generated reference document
+R3 [5]: `--guidelines` output is the generated reference document
   combining code invariants and configuration into a single
   authoritative output
-- **R4**: `GOVERNANCE.md` contains rationale and judgment guidance
+R4 [5]: `GOVERNANCE.md` contains rationale and judgment guidance
   only; no enforceable rules live in prose
-- **R5**: A rule is invariant if violating it produces an
+R5 [5]: A rule is invariant if violating it produces an
   inconsistent corpus regardless of project context; otherwise it
   is configurable
 

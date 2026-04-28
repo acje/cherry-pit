@@ -40,8 +40,8 @@ code blocks.]
 
 [1–3 sentence summary of the chosen approach.]
 
-- **R1**: [Tagged rule — 7–60 words, positive imperative, unconditional]
-- **R2**: [Tagged rule — 7–60 words, positive imperative, unconditional]
+R1 [N]: [Tagged rule — 7–60 words, positive imperative, unconditional]
+R2 [N]: [Tagged rule — 7–60 words, positive imperative, unconditional]
 
 ## Consequences
 
@@ -248,9 +248,9 @@ words (configurable via T015).
 
 [1–3 sentence summary of what was chosen.]
 
-- **R1**: [Rule text — positive imperative, 7–60 words]
+R1 [N]: [Rule text — positive imperative, 7–60 words]
   [Optional continuation indented ≥2 spaces]
-- **R2**: [Rule text — positive imperative, 7–60 words]
+R2 [N]: [Rule text — positive imperative, 7–60 words]
 ```
 
 **Audience:** Dual. The prose summary is for humans. The tagged
@@ -264,25 +264,26 @@ write effective tagged rules.
 #### Tagged Rules Format
 
 ```
-- **R1**: Rule text here, naming specific types and methods
-- **R2**: Continuation-capable rule that wraps to
+R1 [5]: Rule text here, naming specific types and methods
+R2 [5]: Continuation-capable rule that wraps to
   the next line with two-space indent
 ```
 
-- Pattern: `- **RN**: text` where N is a sequential integer
+- Pattern: `RN [L]: text` where N is a sequential integer and L
+  is the Meadows leverage layer (1–12)
 - Multi-line: indent continuation lines ≥2 spaces. A blank line
-  or next `- **RN**:` terminates the rule. Continuation lines
+  or next `RN [L]:` terminates the rule. Continuation lines
   are joined with a space.
-- Global identifier: `PREFIX-NNNN:RN` (e.g., `CHE-0042:R1`)
+- Global identifier: `PREFIX-NNNN:RN:LN` (e.g., `CHE-0042:R1:L5`)
+- Layer [N]: Meadows leverage point classifying intervention type:
+  - 1–3 → S-tier (paradigm/goals/mindset)
+  - 4 → A-tier (self-organization)
+  - 5–6 → B-tier (rules/information flows)
+  - 7–8 → C-tier (feedback loops/delays)
+  - 9–12 → D-tier (parameters/buffers)
 - Constraints: sequential IDs starting at R1, max 5 per ADR,
-  7–60 words per rule
-- Exempt from T016: Draft and Proposed status (rules crystallize
-  during review)
-
-When no tagged rules are found, the entire Decision text is
-captured as R0 — a fallback that produces suboptimal agent context
-(the agent receives a prose blob instead of scannable rules).
-Every Accepted ADR should have explicit tagged rules.
+  7–60 words per rule, layer 1–12
+- All statuses require tagged rules (no Draft/Proposed exemption)
 
 **Why max 5 rules per ADR:** Research shows P(all rules followed)
 = P(individual)^N. At 90% per-rule compliance, 5 rules yield 59%
@@ -313,7 +314,7 @@ reframed as a positive commission. No exceptions.
 - **R1**: Never construct EventEnvelope via struct literal
 
 # GOOD — states the required action
-- **R1**: Construct EventEnvelope exclusively through
+R1 [5]: Construct EventEnvelope exclusively through
   EventEnvelope::new(), which validates non-nil event_id and
   returns Result<Self, EnvelopeError>
 
@@ -321,7 +322,7 @@ reframed as a positive commission. No exceptions.
 - **R2**: Never bypass the domain layer
 
 # GOOD — names the required path
-- **R2**: Route all domain operations through port traits
+R2 [5]: Route all domain operations through port traits
   defined in cherry-pit-core
 ```
 
@@ -341,7 +342,7 @@ If a rule applies only in specific contexts, scope it via the
   after deserialization
 
 # GOOD — unconditional, scoped via Crates: field
-- **R1**: Call EventEnvelope::validate() after deserialization
+R1 [5]: Call EventEnvelope::validate() after deserialization
   in EventStore::load implementations to catch corrupt data
 ```
 
@@ -357,7 +358,7 @@ middle of the context window. Concrete names anchor attention.
 - **R1**: Use the validated constructor for all envelope creation
 
 # GOOD — concrete types and methods anchor attention
-- **R1**: Construct EventEnvelope exclusively through
+R1 [5]: Construct EventEnvelope exclusively through
   EventEnvelope::new() in cherry-pit-core/src/envelope.rs
 ```
 
@@ -383,10 +384,10 @@ rationale and save tokens. Full rationale belongs in Context.
 
 ```markdown
 # Without rationale — clear from the types
-- **R1**: Use NonZeroU64 for EventEnvelope sequence field
+R1 [5]: Use NonZeroU64 for EventEnvelope sequence field
 
 # With rationale — helps edge-case generalization
-- **R1**: Use NonZeroU64 for EventEnvelope sequence field so
+R1 [5]: Use NonZeroU64 for EventEnvelope sequence field so
   zero sequences are rejected at the type level
 ```
 
@@ -505,14 +506,14 @@ and eliminates a class of bugs permanently.
 Private fields with a validated public constructor that enforces
 invariants at the type level.
 
-- **R1**: Construct EventEnvelope exclusively through
+R1 [5]: Construct EventEnvelope exclusively through
   EventEnvelope::new(), which validates non-nil event_id and
   returns Result<Self, EnvelopeError>
-- **R2**: Use NonZeroU64 for the EventEnvelope sequence field so
+R2 [5]: Use NonZeroU64 for the EventEnvelope sequence field so
   zero sequences are rejected at the type level
-- **R3**: Access EventEnvelope fields through accessor methods
+R3 [5]: Access EventEnvelope fields through accessor methods
   (event_id(), aggregate_id(), sequence(), timestamp(), payload())
-- **R4**: Call EventEnvelope::validate() after deserialization in
+R4 [5]: Call EventEnvelope::validate() after deserialization in
   EventStore::load implementations to catch corrupt stored data
 
 ## Consequences
@@ -541,10 +542,10 @@ These rules are mandatory constraints for all code in crate `cherry-pit-core`.
 Follow every rule without exception.
 
 ## B-tier
-- Construct EventEnvelope exclusively through EventEnvelope::new(), which validates non-nil event_id and returns Result<Self, EnvelopeError> [CHE-0042:R1]
-- Use NonZeroU64 for the EventEnvelope sequence field so zero sequences are rejected at the type level [CHE-0042:R2]
-- Access EventEnvelope fields through accessor methods (event_id(), aggregate_id(), sequence(), timestamp(), payload()) [CHE-0042:R3]
-- Call EventEnvelope::validate() after deserialization in EventStore::load implementations to catch corrupt stored data [CHE-0042:R4]
+- Construct EventEnvelope exclusively through EventEnvelope::new(), which validates non-nil event_id and returns Result<Self, EnvelopeError> [CHE-0042:R1:L5]
+- Use NonZeroU64 for the EventEnvelope sequence field so zero sequences are rejected at the type level [CHE-0042:R2:L5]
+- Access EventEnvelope fields through accessor methods (event_id(), aggregate_id(), sequence(), timestamp(), payload()) [CHE-0042:R3:L5]
+- Call EventEnvelope::validate() after deserialization in EventStore::load implementations to catch corrupt stored data [CHE-0042:R4:L5]
 ```
 
 This is all the agent receives. Notice:
@@ -553,8 +554,9 @@ This is all the agent receives. Notice:
   mandatory constraints, not suggestions
 - **Tier-grouped** — rules sorted by architectural significance
   (S→D), not by ADR. Eliminates per-ADR metadata noise
-- **Rule ID at end** — `[CHE-0042:R1]` anchors traceability
-  without leading the attention. The action comes first.
+- **Rule ID at end** — `[CHE-0042:R1:L5]` anchors traceability
+  without leading the attention. The action comes first. Layer
+  suffix enables tension analysis in `--critique`.
 - **Positive commission** — "construct through", "use", "access
   through", "call" — no prohibitions
 - **Unconditional** — no "when X" qualifiers
@@ -567,18 +569,19 @@ This is all the agent receives. Notice:
 
 ## Migration Checklist for Existing ADRs
 
-Existing ADRs use numbered lists (`1. **Bold.** Text`) in Decision
-sections. The parser falls back to R0 (entire section as one blob).
-To migrate:
+Existing ADRs using old format (`- **R1**: text`) must migrate to
+the layer-annotated format (`R1 [N]: text`). To migrate:
 
 1. Identify the core enforceable statements in the existing
    Decision prose — maximum 5 per ADR
-2. Reframe any prohibitions as positive commissions
-3. Eliminate any conditional framing ("when X, do Y")
-4. Ensure every rule names at least one concrete type, method, or file
-5. Distill each into a tagged rule (`- **R1**: text`)
-6. Run `cargo run -p adr-fmt -- --lint` — T016 should stop firing
-7. Run `cargo run -p adr-fmt -- --context <CRATE>` to verify the
+2. Assign a Meadows leverage layer [1–12] to each rule based on
+   the type of intervention it describes
+3. Reframe any prohibitions as positive commissions
+4. Eliminate any conditional framing ("when X, do Y")
+5. Ensure every rule names at least one concrete type, method, or file
+6. Distill each into a tagged rule (`R1 [N]: text`)
+7. Run `cargo run -p adr-fmt -- --lint` — T016 should stop firing
+8. Run `cargo run -p adr-fmt -- --context <CRATE>` to verify the
    extracted rules read well in isolation
 
 **Prioritize migration by tier:** S-tier ADRs first (they appear

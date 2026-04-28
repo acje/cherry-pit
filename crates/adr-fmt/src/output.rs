@@ -210,7 +210,8 @@ pub fn render_rules(crate_name: &str, rules: &[CrateRule]) -> String {
 
         for cr in &tier_rules {
             for rule in &cr.rules {
-                writeln!(out, "- {} [{}:{}]", rule.text, cr.adr_id, rule.id).unwrap();
+                writeln!(out, "- {} [{}:{}:L{}]", rule.text, cr.adr_id, rule.id, rule.layer)
+                    .unwrap();
             }
         }
     }
@@ -448,6 +449,7 @@ mod tests {
                 id: "R1".into(),
                 text: "All events versioned".into(),
                 line: 10,
+                layer: 5,
             }],
         }];
         let output = render_rules("cherry-pit-core", &rules);
@@ -463,9 +465,9 @@ mod tests {
         );
         // Tier header
         assert!(output.contains("## A-tier"), "output:\n{output}");
-        // Rule with ID at end
+        // Rule with ID and layer at end
         assert!(
-            output.contains("- All events versioned [CHE-0042:R1]"),
+            output.contains("- All events versioned [CHE-0042:R1:L5]"),
             "output:\n{output}"
         );
         // No old metadata separators
@@ -485,6 +487,7 @@ mod tests {
                     id: "R1".into(),
                     text: "A-tier rule".into(),
                     line: 10,
+                    layer: 4,
                 }],
             },
             CrateRule {
@@ -496,6 +499,7 @@ mod tests {
                     id: "R1".into(),
                     text: "S-tier rule".into(),
                     line: 10,
+                    layer: 5,
                 }],
             },
         ];
@@ -516,6 +520,7 @@ mod tests {
                 id: "R1".into(),
                 text: "B-tier only".into(),
                 line: 10,
+                layer: 6,
             }],
         }];
         let output = render_rules("cherry-pit-core", &rules);
@@ -537,6 +542,7 @@ mod tests {
                 id: "R1".into(),
                 text: "Unclassified rule".into(),
                 line: 10,
+                layer: 5,
             }],
         }];
         let output = render_rules("cherry-pit-core", &rules);
@@ -545,7 +551,7 @@ mod tests {
             "tier=None should render under D-tier"
         );
         assert!(
-            output.contains("- Unclassified rule [CHE-0001:R1]"),
+            output.contains("- Unclassified rule [CHE-0001:R1:L5]"),
             "output:\n{output}"
         );
     }

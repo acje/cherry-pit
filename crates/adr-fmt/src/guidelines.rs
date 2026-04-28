@@ -218,7 +218,7 @@ fn print_template() {
     println!("    T011  Code block size limit (max 20 lines)");
     println!("    T014  Section order (Related → Context → Decision → Consequences)");
     println!("    T015  Prose section word count (default 7–50, override via adr-fmt.toml: Context, Consequences, Retirement)");
-    println!("    T016  Tagged rules in Decision (≥1 rule, sequential IDs, max 5, 7–60 words)");
+    println!("    T016  Tagged rules in Decision (≥1 rule, sequential IDs, max 5, 7–60 words, layer 1–12)");
     println!();
 }
 
@@ -228,18 +228,25 @@ fn print_tagged_rules() {
     println!("TAGGED RULES (Decision Section)");
     println!("───────────────────────────────");
     println!();
-    println!("  Format:  - **R1**: Rule statement (7–60 words)");
-    println!("           - **R2**: Next rule statement");
+    println!("  Format:  R1 [N]: Rule statement (7–60 words)");
+    println!("           R2 [N]: Next rule statement");
     println!("           Multi-line rules: indent continuation ≥2 spaces");
     println!();
-    println!("  Global ID: PREFIX-NNNN:R1  (e.g., CHE-0042:R1)");
+    println!("  [N] = Meadows leverage layer (1–12)");
+    println!("    1–3 → S-tier (paradigm/goals/mindset)");
+    println!("    4   → A-tier (self-organization)");
+    println!("    5–6 → B-tier (rules/information flows)");
+    println!("    7–8 → C-tier (feedback loops/delays)");
+    println!("    9–12→ D-tier (parameters/buffers)");
+    println!();
+    println!("  Global ID: PREFIX-NNNN:RN:LN  (e.g., CHE-0042:R1:L5)");
     println!();
     println!("  Constraints:");
-    println!("    • At least 1 tagged rule per Decision section");
+    println!("    • At least 1 tagged rule per Decision section (all statuses)");
     println!("    • Maximum 5 rules per ADR");
     println!("    • IDs must be sequential (R1, R2, R3 — no gaps)");
     println!("    • Each rule: 7–60 words");
-    println!("    • Exempt: Draft and Proposed statuses");
+    println!("    • Layer must be 1–12 (Meadows leverage points)");
     println!();
 }
 

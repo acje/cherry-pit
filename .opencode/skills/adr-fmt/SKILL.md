@@ -46,7 +46,7 @@ Validates all ADRs across every domain. Outputs diagnostics in `severity[RULE_ID
 cargo run -p adr-fmt -- --context <CRATE>
 ```
 
-Extracts tagged decision rules applicable to a specific crate. Foundation domains (COM, RST) are always included. Output is tier-sorted (S first, D last) with rule IDs at end of each line (e.g., `[CHE-0042:R1]`). Exits 1 if the crate is not found in any domain.
+Extracts tagged decision rules applicable to a specific crate. Foundation domains (COM, RST) are always included. Output is tier-sorted (S first, D last) with rule IDs and layer at end of each line (e.g., `[CHE-0042:R1:L5]`). Exits 1 if the crate is not found in any domain.
 
 Use `--context` to retrieve architecture constraints before writing code for a crate.
 
@@ -57,7 +57,7 @@ cargo run -p adr-fmt -- --critique <ADR_ID>
 cargo run -p adr-fmt -- --critique <ADR_ID> --depth 3
 ```
 
-BFS transitive closure around a focal ADR. Follows fan-out (forward relationships) and fan-in (reverse/children). Default depth is 1. Increase `--depth N` for broader neighborhood exploration. Output uses `◆ FOCAL`, `◇ CONNECTED`, `◈ EXCLUDED` markers.
+BFS transitive closure around a focal ADR. Follows fan-out (forward relationships) and fan-in (reverse/children). Default depth is 1. Increase `--depth N` for broader neighborhood exploration. Output uses `◆ FOCAL`, `◇ CONNECTED` markers. Focal block includes tension analysis showing per-rule tier-distance from the ADR's tier.
 
 Use `--critique` when editing an ADR to understand its decision neighborhood and avoid conflicting with related decisions.
 
@@ -94,8 +94,8 @@ References: PREFIX-NNNN, PREFIX-NNNN | Supersedes: PREFIX-NNNN
 
 [1-3 sentence summary of chosen approach]
 
-- **R1**: [Tagged rule text]
-- **R2**: [Tagged rule text]
+R1 [N]: [Tagged rule text — 7-60 words]
+R2 [N]: [Tagged rule text — 7-60 words]
 
 ## Consequences
 
@@ -104,12 +104,22 @@ References: PREFIX-NNNN, PREFIX-NNNN | Supersedes: PREFIX-NNNN
 
 ### Tagged Rules
 
-Format: `- **RN**: text` where N is sequential starting at R1.
+Format: `RN [L]: text` where N is sequential starting at R1 and L
+is the Meadows leverage layer (1–12).
+
+Layer mapping:
+- 1–3 → S-tier (paradigm/goals/mindset)
+- 4 → A-tier (self-organization)
+- 5–6 → B-tier (rules/information flows)
+- 7–8 → C-tier (feedback loops/delays)
+- 9–12 → D-tier (parameters/buffers)
 
 Constraints:
 - Maximum 5 rules per ADR
 - 7-60 words per rule
+- Layer must be 1-12
 - Multi-line: indent continuation lines 2+ spaces
+- All statuses require tagged rules (no exemptions)
 
 Every rule must satisfy all five criteria:
 

@@ -8,7 +8,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::fs;
 
 use crate::config::Config;
-use crate::model::{AdrId, AdrRecord, RelVerb, Tier};
+use crate::model::{layer_to_tier, AdrId, AdrRecord, RelVerb, Tier};
 use crate::nav::{self, ChildEntry};
 use crate::output::{self, OutputBlock};
 
@@ -97,9 +97,18 @@ pub fn critique(
     // Focal block
     let focal_content = read_file_content(&focal.file_path);
     let focal_meta = output::build_header_meta(focal, config, &children);
+
+    // Compute tension summary for focal rules
+    let tension_suffix = compute_tension_summary(focal);
+    let focal_content_with_tension = if tension_suffix.is_empty() {
+        focal_content
+    } else {
+        format!("{focal_content}\n{tension_suffix}")
+    };
+
     blocks.push(OutputBlock::Focal {
         meta: focal_meta,
-        content: focal_content,
+        content: focal_content_with_tension,
     });
 
     // Connected blocks
@@ -115,6 +124,36 @@ pub fn critique(
     }
 
     blocks
+}
+
+/// Compute tension summary for an ADR's rules.
+///
+/// Tension = `abs_diff(adr_tier.rank(), layer_derived_tier.rank())`.
+/// Only rules with non-zero tension are reported.
+/// Returns empty string if no tension or no tier/rules.
+fn compute_tension_summary(record: &AdrRecord) -> String {
+    let Some(adr_tier) = record.tier else {
+        return String::new();
+    };
+
+    let mut lines: Vec<String> = Vec::new();
+    let adr_rank = adr_tier.rank();
+
+    for rule in &record.decision_rules {
+        let Some(rule_tier) = layer_to_tier(rule.layer) else {
+            continue;
+        };
+        let rule_rank = rule_tier.rank();
+        let distance = adr_rank.abs_diff(rule_rank);
+        if distance > 0 {
+            lines.push(format!(
+                "Tension: {} (+{distance} from {adr_tier:?}→{rule_tier:?})",
+                rule.id,
+            ));
+        }
+    }
+
+    lines.join("\n")
 }
 
 /// Read file content, returning empty string on failure.
@@ -156,7 +195,7 @@ fn build_relationship_path(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::{AdrId, AdrRecord, RelVerb, Relationship, Status, Tier};
+    use crate::model::{AdrId, AdrRecord, RelVerb, Relationship, Status, TaggedRule, Tier};
     use std::path::PathBuf;
 
     fn make_id(prefix: &str, num: u16) -> AdrId {
@@ -302,5 +341,91 @@ crates = []
         let config = make_config();
         let blocks = critique(&make_id("CHE", 1), &records, &config, 0);
         assert_eq!(blocks.len(), 1, "depth=0 should return focal only");
+    }
+
+    #[test]
+    fn tension_summary_no_tier() {
+        let mut record = make_record("CHE", 1, vec![(RelVerb::Root, make_id("CHE", 1))]);
+        record.tier = None;
+        record.decision_rules = vec![TaggedRule {
+            id: "R1".into(),
+            text: "Some rule".into(),
+            line: 10,
+            layer: 5,
+        }];
+        let summary = compute_tension_summary(&record);
+        assert!(summary.is_empty(), "no tier means no tension");
+    }
+
+    #[test]
+    fn tension_summary_no_tension() {
+        // B-tier ADR with layer 5 rules (layer 5 → B-tier) → no tension
+        let mut record = make_record("CHE", 1, vec![(RelVerb::Root, make_id("CHE", 1))]);
+        record.tier = Some(Tier::B);
+        record.decision_rules = vec![TaggedRule {
+            id: "R1".into(),
+            text: "Some rule".into(),
+            line: 10,
+            layer: 5,
+        }];
+        let summary = compute_tension_summary(&record);
+        assert!(summary.is_empty(), "same tier means no tension");
+    }
+
+    #[test]
+    fn tension_summary_with_distance() {
+        // S-tier ADR (rank=0) with layer 5 rules (→ B-tier, rank=2) → distance=2
+        let mut record = make_record("CHE", 1, vec![(RelVerb::Root, make_id("CHE", 1))]);
+        record.tier = Some(Tier::S);
+        record.decision_rules = vec![
+            TaggedRule {
+                id: "R1".into(),
+                text: "Rule one".into(),
+                line: 10,
+                layer: 5,
+            },
+            TaggedRule {
+                id: "R2".into(),
+                text: "Rule two".into(),
+                line: 11,
+                layer: 9,
+            },
+        ];
+        let summary = compute_tension_summary(&record);
+        assert!(
+            summary.contains("Tension: R1 (+2 from S→B)"),
+            "expected S→B tension:\n{summary}"
+        );
+        assert!(
+            summary.contains("Tension: R2 (+4 from S→D)"),
+            "expected S→D tension:\n{summary}"
+        );
+    }
+
+    #[test]
+    fn tension_summary_skips_zero_distance() {
+        // A-tier ADR (rank=1) with layer 4 rules (→ A-tier, rank=1) → distance=0
+        let mut record = make_record("CHE", 1, vec![(RelVerb::Root, make_id("CHE", 1))]);
+        record.tier = Some(Tier::A);
+        record.decision_rules = vec![
+            TaggedRule {
+                id: "R1".into(),
+                text: "Aligned rule".into(),
+                line: 10,
+                layer: 4,
+            },
+            TaggedRule {
+                id: "R2".into(),
+                text: "Misaligned rule".into(),
+                line: 11,
+                layer: 9,
+            },
+        ];
+        let summary = compute_tension_summary(&record);
+        assert!(!summary.contains("R1"), "R1 has zero tension, should be skipped");
+        assert!(
+            summary.contains("Tension: R2 (+3 from A→D)"),
+            "expected A→D tension:\n{summary}"
+        );
     }
 }

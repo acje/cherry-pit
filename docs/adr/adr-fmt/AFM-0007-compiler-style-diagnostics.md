@@ -25,12 +25,12 @@ output.
 Format all diagnostics in compiler-style on stderr with file path,
 rule ID, and actionable description.
 
-- **R1**: Each diagnostic follows the format
+R1 [5]: Each diagnostic follows the format
   `path: warning[RULE]: description` on stderr, matching Rust
   compiler conventions
-- **R2**: Diagnostics are sorted by file path then by rule ID for
+R2 [5]: Diagnostics are sorted by file path then by rule ID for
   stable deterministic output regardless of traversal order
-- **R3**: Stdout is reserved exclusively for `--guidelines` and
+R3 [5]: Stdout is reserved exclusively for `--guidelines` and
   `--tree` output; diagnostics never appear on stdout
 
 ## Consequences

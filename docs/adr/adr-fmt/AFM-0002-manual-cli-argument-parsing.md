@@ -23,13 +23,13 @@ lines of match logic against this fixed surface.
 Parse CLI arguments manually using `std::env::args()`. Do not
 depend on `clap` or any argument parsing crate.
 
-- **R1**: All CLI parsing lives in a single `resolve_args()`
+R1 [5]: All CLI parsing lives in a single `resolve_args()`
   function returning a Mode enum and an optional PathBuf
-- **R2**: Mutually exclusive flags produce an explicit error with
+R2 [5]: Mutually exclusive flags produce an explicit error with
   no implicit precedence rules
-- **R3**: Unknown arguments starting with `--` trigger an error
+R3 [5]: Unknown arguments starting with `--` trigger an error
   message and non-zero exit; no silent ignoring
-- **R4**: Reassess if the argument surface grows beyond five flags
+R4 [12]: Reassess if the argument surface grows beyond five flags
   or introduces subcommands
 
 ## Consequences

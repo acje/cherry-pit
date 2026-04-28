@@ -73,7 +73,7 @@ This ADR documents a valid test case for the integration test suite to verify.
 
 ## Decision
 
-- **R1**: We decided to create a minimal but complete ADR that satisfies all template rules.
+R1 [5]: We decided to create a minimal but complete ADR that satisfies all template rules.
 
 ## Consequences
 
@@ -99,7 +99,7 @@ This ADR references TST-0001 to test transitive closure in critique mode.
 
 ## Decision
 
-- **R1**: We reference another ADR to verify critique mode connectivity.
+R1 [5]: We reference another ADR to verify critique mode connectivity.
 
 ## Consequences
 
@@ -125,7 +125,7 @@ This ADR has a dangling link that should trigger the L001 validation rule.
 
 ## Decision
 
-- **R1**: We reference a non-existent ADR to verify that dangling link detection works.
+R1 [5]: We reference a non-existent ADR to verify that dangling link detection works.
 
 ## Consequences
 
@@ -158,7 +158,7 @@ We decided to use plain prose without the required tagged rule format.
 The linter should report a T016 warning for missing tagged rules.
 ";
 
-/// Draft ADR without tagged rules (exempt from T016).
+/// Draft ADR without tagged rules (no longer exempt from T016).
 const DRAFT_ADR: &str = "\
 # TST-0005. Draft ADR
 
@@ -172,7 +172,7 @@ Root: TST-0005
 
 ## Context
 
-This is a draft ADR that is exempt from the tagged rules requirement.
+This is a draft ADR that is no longer exempt from the tagged rules requirement.
 
 ## Decision
 
@@ -180,7 +180,7 @@ We are still drafting this decision and have not formalized rules yet.
 
 ## Consequences
 
-Draft status exempts this ADR from T016 checks.
+Draft status no longer exempts this ADR from T016 checks.
 ";
 
 /// ADR with per-ADR Crates field.
@@ -203,7 +203,7 @@ This ADR specifies crate applicability via the Crates metadata field.
 
 ## Decision
 
-- **R1**: Crate-specific decisions are scoped to test-core and test-api.
+R1 [5]: Crate-specific decisions are scoped to test-core and test-api.
 
 ## Consequences
 
@@ -229,7 +229,7 @@ This is a foundation domain ADR that applies to all crates in the workspace.
 
 ## Decision
 
-- **R1**: Foundation rules apply universally across all domains and crates.
+R1 [5]: Foundation rules apply universally across all domains and crates.
 
 ## Consequences
 
@@ -255,7 +255,7 @@ This ADR was superseded and moved to the stale directory.
 
 ## Decision
 
-- **R1**: This decision has been superseded by TST-0001.
+R1 [5]: This decision has been superseded by TST-0001.
 
 ## Consequences
 
@@ -285,8 +285,8 @@ This ADR has tagged rules with a gap in numbering.
 
 ## Decision
 
-- **R1**: First rule is present.
-- **R3**: Third rule skips R2.
+R1 [5]: First rule is present.
+R3 [5]: Third rule skips R2.
 
 ## Consequences
 
@@ -315,7 +315,7 @@ This ADR uses the legacy section format for status instead of the preamble field
 
 ## Decision
 
-- **R1**: Legacy status section format should produce a T005c migration warning.
+R1 [5]: Legacy status section format should produce a T005c migration warning.
 
 ## Consequences
 
@@ -479,15 +479,15 @@ fn t016_missing_tagged_rules() {
 }
 
 #[test]
-fn t016_draft_exempt() {
+fn t016_draft_not_exempt() {
     let dir = setup_corpus(MINIMAL_CONFIG, &[("TST-0005-draft-adr.md", DRAFT_ADR)]);
 
-    // Draft ADRs are exempt from T016 — should not appear in lint output
+    // Draft ADRs are no longer exempt from T016 — should appear in lint output
     adr_fmt()
         .args(["--lint", &adr_root(&dir)])
         .assert()
         .success()
-        .stdout(predicate::str::contains("T016").not());
+        .stdout(predicate::str::contains("T016"));
 }
 
 #[test]
@@ -730,10 +730,10 @@ This ADR tests multi-line tagged rule extraction through context mode output.
 
 ## Decision
 
-- **R1**: Use explicit versioning on every event payload
+R1 [5]: Use explicit versioning on every event payload
   so that consumers can deserialize historical events
   without schema ambiguity.
-- **R2**: Single-line rule stays on one line.
+R2 [5]: Single-line rule stays on one line.
 
 ## Consequences
 
@@ -758,7 +758,7 @@ Draft ADR with tagged rules that should be excluded from context output.
 
 ## Decision
 
-- **R1**: This rule must not leak into context output.
+R1 [5]: This rule must not leak into context output.
 
 ## Consequences
 
@@ -820,16 +820,16 @@ fn context_end_to_end_output_format() {
         "S-tier ({s_pos}) must appear before B-tier ({b_pos})"
     );
 
-    // ── Foundation rule with ID at end ──
+    // ── Foundation rule with ID and layer at end ──
     assert!(
-        stdout.contains("[COM-0001:R1]"),
-        "foundation rule should have ID at end:\n{stdout}"
+        stdout.contains("[COM-0001:R1:L5]"),
+        "foundation rule should have ID:layer at end:\n{stdout}"
     );
 
     // ── Multi-line rule text joined on single line with ID ──
     let r1_line = stdout
         .lines()
-        .find(|l| l.contains("[TST-0008:R1]"))
+        .find(|l| l.contains("[TST-0008:R1:L5]"))
         .expect("R1 line with ID missing");
     assert!(
         r1_line.contains("Use explicit versioning on every event payload"),
@@ -842,7 +842,7 @@ fn context_end_to_end_output_format() {
 
     // ── Single-line rule ──
     assert!(
-        stdout.contains("- Single-line rule stays on one line. [TST-0008:R2]"),
+        stdout.contains("- Single-line rule stays on one line. [TST-0008:R2:L5]"),
         "single-line R2 format wrong:\n{stdout}"
     );
 

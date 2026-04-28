@@ -24,13 +24,13 @@ never exercised while adding dependency weight and API complexity.
 Parse ADR markdown using line-by-line iteration with compiled regex
 patterns. Do not depend on any markdown AST parser.
 
-- **R1**: Single-pass line iteration with compiled regex patterns
+R1 [5]: Single-pass line iteration with compiled regex patterns
   tracks current section context via an enum state machine
-- **R2**: Word counting accumulates per-section, excluding lines
+R2 [5]: Word counting accumulates per-section, excluding lines
   inside fenced code blocks by tracking fence open/close state
-- **R3**: Only ATX headings and fenced code blocks are supported;
+R3 [5]: Only ATX headings and fenced code blocks are supported;
   setext headings and indented code blocks are not recognized
-- **R4**: Reassess if ADRs require tables or structure complex
+R4 [12]: Reassess if ADRs require tables or structure complex
   enough that line-oriented parsing produces ambiguous results
 
 ## Consequences

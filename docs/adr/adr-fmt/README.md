@@ -19,7 +19,9 @@ Governed by [GOVERNANCE.md](../GOVERNANCE.md).
 | [AFM-0007](AFM-0007-compiler-style-diagnostics.md) | Compiler-Style Diagnostics on Stderr | B | Accepted | AFM-0003 |
 | [AFM-0008](AFM-0008-domain-scoped-prefix-naming.md) | Domain-Scoped Prefix Naming Convention | S | Accepted | AFM-0001 |
 | [AFM-0009](AFM-0009-minimal-relationship-vocabulary.md) | Minimal Relationship Vocabulary With Three Verbs | S | Accepted | AFM-0001 |
-| [AFM-0010](AFM-0010-tier-system-architectural-significance.md) | Tier System for Architectural Significance Classification | A | Accepted | AFM-0001 |
+| [AFM-0010](../stale/AFM-0010-tier-system-architectural-significance.md) | Tier System for Architectural Significance Classification | A | Superseded by AFM-0011 | AFM-0001 |
+| [AFM-0011](AFM-0011-meadows-aligned-tier-classification.md) | Meadows-Aligned Tier Classification | S | Accepted | AFM-0001 |
+| [AFM-0012](AFM-0012-per-rule-meadows-layer-annotation.md) | Per-Rule Meadows Layer Annotation | S | Accepted | AFM-0011 |
 
 ## Dependency Tree
 
@@ -33,5 +35,7 @@ AFM-0001 Single Source of Truth Architecture for ADR Governance
 ├── AFM-0005 Marker-Protected Safe-Write for Generated Files
 ├── AFM-0008 Domain-Scoped Prefix Naming Convention
 ├── AFM-0009 Minimal Relationship Vocabulary With Three Verbs
-└── AFM-0010 Tier System for Architectural Significance Classification
+└── AFM-0011 Meadows-Aligned Tier Classification
+    ├── AFM-0012 Per-Rule Meadows Layer Annotation
+    └── (Supersedes AFM-0010)
 ```

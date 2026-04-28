@@ -146,8 +146,7 @@ pub fn parse_adr_file(path: &Path, expected_prefix: &str, is_stale: bool) -> Opt
     let crates = find_crates_field(&lines);
 
     // --- Decision section content and tagged rules ---
-    let decision_content = extract_decision_content(&lines);
-    let decision_rules = extract_tagged_rules(&lines, decision_content.as_ref());
+    let decision_rules = extract_tagged_rules(&lines);
 
     // --- Code block metrics ---
     let (max_code_block_lines, code_block_count, max_code_block_line) = measure_code_blocks(&lines);
@@ -185,7 +184,6 @@ pub fn parse_adr_file(path: &Path, expected_prefix: &str, is_stale: bool) -> Opt
         section_word_counts,
         crates,
         decision_rules,
-        decision_content,
     })
 }
 
@@ -404,44 +402,17 @@ fn find_crates_field(lines: &[&str]) -> Vec<String> {
     Vec::new()
 }
 
-/// Extract the full text of the Decision section (for R0 fallback).
-fn extract_decision_content(lines: &[&str]) -> Option<String> {
-    let mut in_decision = false;
-    let mut content = Vec::new();
-
-    for line in lines {
-        if *line == "## Decision" {
-            in_decision = true;
-            continue;
-        }
-        if in_decision {
-            if line.starts_with("## ") {
-                break;
-            }
-            content.push(*line);
-        }
-    }
-
-    if content.is_empty() {
-        return None;
-    }
-
-    // Trim leading/trailing blank lines
-    let text = content.join("\n").trim().to_owned();
-    if text.is_empty() { None } else { Some(text) }
-}
-
 /// Extract tagged rules from the Decision section.
 ///
-/// Matches `- **RN**: text` pattern within the Decision section.
-/// Continuation lines (indented ≥2 spaces, not a new tagged rule
-/// or untagged bullet) are joined to the current rule with a space.
+/// Matches `RN [L]: text` pattern within the Decision section where
+/// N is the sequential rule number and L is the Meadows layer (1-12).
+/// Continuation lines (indented ≥2 spaces, not a new tagged rule)
+/// are joined to the current rule with a space.
 /// A blank line terminates continuation.
 ///
-/// When no tagged rules are found, produces a single R0 fallback
-/// with the full decision content.
-fn extract_tagged_rules(lines: &[&str], decision_content: Option<&String>) -> Vec<TaggedRule> {
-    let rule_re = Regex::new(r"^\s*-\s*\*\*R(\d+)\*\*:\s*(.+)").expect("valid regex");
+/// Returns an empty vec when no tagged rules are found.
+fn extract_tagged_rules(lines: &[&str]) -> Vec<TaggedRule> {
+    let rule_re = Regex::new(r"^R(\d+)\s*\[(\d+)\]:\s*(.+)").expect("valid regex");
     let mut rules = Vec::new();
     let mut in_decision = false;
 
@@ -462,7 +433,9 @@ fn extract_tagged_rules(lines: &[&str], decision_content: Option<&String>) -> Ve
         }
         if let Some(caps) = rule_re.captures(line) {
             let num = caps.get(1).unwrap().as_str();
-            let mut text = caps.get(2).unwrap().as_str().trim().to_owned();
+            let layer_str = caps.get(2).unwrap().as_str();
+            let layer: u8 = layer_str.parse().unwrap_or(0);
+            let mut text = caps.get(3).unwrap().as_str().trim().to_owned();
             let rule_line = i + 1;
 
             // Collect continuation lines
@@ -481,10 +454,6 @@ fn extract_tagged_rules(lines: &[&str], decision_content: Option<&String>) -> Ve
                 if rule_re.is_match(next) {
                     break;
                 }
-                // Untagged bullet terminates (e.g., `- some text`)
-                if next.trim_start().starts_with("- ") {
-                    break;
-                }
                 // Must be indented ≥2 spaces to be continuation
                 if next.len() >= 2 && next.starts_with("  ") {
                     text.push(' ');
@@ -498,22 +467,12 @@ fn extract_tagged_rules(lines: &[&str], decision_content: Option<&String>) -> Ve
             rules.push(TaggedRule {
                 id: format!("R{num}"),
                 text,
+                layer,
                 line: rule_line,
             });
         } else {
             i += 1;
         }
-    }
-
-    // R0 fallback: when no tagged rules found, use full decision text
-    if rules.is_empty()
-        && let Some(content) = decision_content
-    {
-        rules.push(TaggedRule {
-            id: "R0".into(),
-            text: content.clone(),
-            line: 0,
-        });
     }
 
     rules
@@ -918,50 +877,27 @@ mod tests {
     }
 
     #[test]
-    fn extract_decision_content_basic() {
-        let lines = vec![
-            "## Decision",
-            "",
-            "We decided to use event sourcing.",
-            "This provides full auditability.",
-            "",
-            "## Consequences",
-        ];
-        let content = extract_decision_content(&lines);
-        assert_eq!(
-            content.as_deref(),
-            Some("We decided to use event sourcing.\nThis provides full auditability.")
-        );
-    }
-
-    #[test]
-    fn extract_decision_content_absent() {
-        let lines = vec!["## Context", "", "Some context.", "", "## Consequences"];
-        let content = extract_decision_content(&lines);
-        assert!(content.is_none());
-    }
-
-    #[test]
     fn extract_tagged_rules_normal() {
         let lines = vec![
             "## Decision",
             "",
-            "- **R1**: All events must be versioned",
-            "- **R2**: Snapshots at 100-event intervals",
+            "R1 [5]: All events must be versioned",
+            "R2 [5]: Snapshots at 100-event intervals",
             "",
             "## Consequences",
         ];
-        let decision_content = extract_decision_content(&lines);
-        let rules = extract_tagged_rules(&lines, decision_content.as_ref());
+        let rules = extract_tagged_rules(&lines);
         assert_eq!(rules.len(), 2);
         assert_eq!(rules[0].id, "R1");
         assert_eq!(rules[0].text, "All events must be versioned");
+        assert_eq!(rules[0].layer, 5);
         assert_eq!(rules[1].id, "R2");
         assert_eq!(rules[1].text, "Snapshots at 100-event intervals");
+        assert_eq!(rules[1].layer, 5);
     }
 
     #[test]
-    fn extract_tagged_rules_r0_fallback() {
+    fn extract_tagged_rules_no_rules_returns_empty() {
         let lines = vec![
             "## Decision",
             "",
@@ -969,11 +905,8 @@ mod tests {
             "",
             "## Consequences",
         ];
-        let decision_content = extract_decision_content(&lines);
-        let rules = extract_tagged_rules(&lines, decision_content.as_ref());
-        assert_eq!(rules.len(), 1);
-        assert_eq!(rules[0].id, "R0");
-        assert_eq!(rules[0].text, "We use event sourcing for persistence.");
+        let rules = extract_tagged_rules(&lines);
+        assert!(rules.is_empty());
     }
 
     #[test]
@@ -983,14 +916,13 @@ mod tests {
             "",
             "We adopt the following rules:",
             "",
-            "- **R1**: Events are append-only",
+            "R1 [6]: Events are append-only",
             "Some prose between rules.",
-            "- **R2**: Snapshots are optional",
+            "R2 [6]: Snapshots are optional",
             "",
             "## Consequences",
         ];
-        let decision_content = extract_decision_content(&lines);
-        let rules = extract_tagged_rules(&lines, decision_content.as_ref());
+        let rules = extract_tagged_rules(&lines);
         assert_eq!(rules.len(), 2);
         assert_eq!(rules[0].id, "R1");
         assert_eq!(rules[1].id, "R2");
@@ -1001,13 +933,12 @@ mod tests {
         let lines = vec![
             "## Decision",
             "",
-            "- **Rfoo**: Not a valid rule tag",
-            "- **R1**: Valid rule",
+            "Rfoo [5]: Not a valid rule tag",
+            "R1 [5]: Valid rule",
             "",
             "## Consequences",
         ];
-        let decision_content = extract_decision_content(&lines);
-        let rules = extract_tagged_rules(&lines, decision_content.as_ref());
+        let rules = extract_tagged_rules(&lines);
         assert_eq!(rules.len(), 1);
         assert_eq!(rules[0].id, "R1");
     }
@@ -1017,15 +948,14 @@ mod tests {
         let lines = vec![
             "## Decision",
             "",
-            "- **R1**: Construct EventEnvelope exclusively through",
+            "R1 [5]: Construct EventEnvelope exclusively through",
             "  EventEnvelope::new(), which validates non-nil event_id",
             "  and returns Result<Self, EnvelopeError>",
-            "- **R2**: Use NonZeroU64 for the sequence field",
+            "R2 [5]: Use NonZeroU64 for the sequence field",
             "",
             "## Consequences",
         ];
-        let decision_content = extract_decision_content(&lines);
-        let rules = extract_tagged_rules(&lines, decision_content.as_ref());
+        let rules = extract_tagged_rules(&lines);
         assert_eq!(rules.len(), 2);
         assert_eq!(rules[0].id, "R1");
         assert_eq!(
@@ -1043,36 +973,17 @@ mod tests {
         let lines = vec![
             "## Decision",
             "",
-            "- **R1**: First part of rule",
+            "R1 [5]: First part of rule",
             "",
             "  This should NOT be continuation (after blank line)",
-            "- **R2**: Second rule",
+            "R2 [5]: Second rule",
             "",
             "## Consequences",
         ];
-        let decision_content = extract_decision_content(&lines);
-        let rules = extract_tagged_rules(&lines, decision_content.as_ref());
+        let rules = extract_tagged_rules(&lines);
         assert_eq!(rules.len(), 2);
         assert_eq!(rules[0].text, "First part of rule");
         assert_eq!(rules[1].text, "Second rule");
-    }
-
-    #[test]
-    fn extract_tagged_rules_untagged_bullet_not_continuation() {
-        let lines = vec![
-            "## Decision",
-            "",
-            "- **R1**: Tagged rule text",
-            "- Some untagged bullet point",
-            "- **R2**: Another tagged rule",
-            "",
-            "## Consequences",
-        ];
-        let decision_content = extract_decision_content(&lines);
-        let rules = extract_tagged_rules(&lines, decision_content.as_ref());
-        assert_eq!(rules.len(), 2);
-        assert_eq!(rules[0].text, "Tagged rule text");
-        assert_eq!(rules[1].text, "Another tagged rule");
     }
 
     #[test]
@@ -1080,19 +991,48 @@ mod tests {
         let lines = vec![
             "## Decision",
             "",
-            "- **R1**: Construct via `EventEnvelope::new()` which",
+            "R1 [5]: Construct via `EventEnvelope::new()` which",
             "  returns `Result<Self, EnvelopeError>`",
             "",
             "## Consequences",
         ];
-        let decision_content = extract_decision_content(&lines);
-        let rules = extract_tagged_rules(&lines, decision_content.as_ref());
+        let rules = extract_tagged_rules(&lines);
         assert_eq!(rules.len(), 1);
         assert_eq!(
             rules[0].text,
             "Construct via `EventEnvelope::new()` which \
              returns `Result<Self, EnvelopeError>`"
         );
+    }
+
+    #[test]
+    fn extract_tagged_rules_layer_parsed() {
+        let lines = vec![
+            "## Decision",
+            "",
+            "R1 [1]: Paradigm-level rule",
+            "R2 [12]: Parameter-level rule",
+            "",
+            "## Consequences",
+        ];
+        let rules = extract_tagged_rules(&lines);
+        assert_eq!(rules.len(), 2);
+        assert_eq!(rules[0].layer, 1);
+        assert_eq!(rules[1].layer, 12);
+    }
+
+    #[test]
+    fn extract_tagged_rules_old_format_not_matched() {
+        let lines = vec![
+            "## Decision",
+            "",
+            "- **R1**: Old format rule",
+            "- **R2**: Another old format rule",
+            "",
+            "## Consequences",
+        ];
+        let rules = extract_tagged_rules(&lines);
+        assert!(rules.is_empty(), "old format should not be parsed");
     }
 
     // ── Status metadata field tests ────────────────────────────────────
