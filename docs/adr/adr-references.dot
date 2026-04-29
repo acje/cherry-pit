@@ -97,6 +97,8 @@ digraph adr_references {
     "CHE-0043" [label="CHE-0043\nProcess-Level File Fencing", color="#1d4ed8", penwidth=2, fillcolor="white"];
     "CHE-0044" [label="CHE-0044\nObject Store Backend (Planned)", color="#1d4ed8", penwidth=2, fillcolor="white"];
     "CHE-0045" [label="CHE-0045\nSerialization Scope Per Crate", color="#a16207", penwidth=2, fillcolor="white"];
+    "CHE-0046" [label="CHE-0046\nRetry, Timeout, and Cancellation Semantics", color="#a16207", penwidth=2, fillcolor="white"];
+    "CHE-0047" [label="CHE-0047\nOperational Recovery Runbooks", color="#a16207", penwidth=2, fillcolor="white"];
   }
 
   subgraph "cluster_PAR" {
@@ -198,6 +200,7 @@ digraph adr_references {
     "SEC-0008" [label="SEC-0008\nNon-Repudiation via Append-Only Event Log", color="#a16207", penwidth=2, fillcolor="white"];
     "SEC-0009" [label="SEC-0009\nSupply Chain Security via Dependency Auditing", color="#a16207", penwidth=2, fillcolor="white"];
     "SEC-0010" [label="SEC-0010\nTransport Security via Mandatory Channel Encryption", color="#a16207", penwidth=2, fillcolor="white"];
+    "SEC-0011" [label="SEC-0011\nTamper-Evident Event Logs", color="#a16207", penwidth=2, fillcolor="white"];
   }
 
   subgraph "cluster_AFM" {
@@ -306,10 +309,10 @@ digraph adr_references {
   "CHE-0023" -> "CHE-0001";
   "CHE-0023" -> "CHE-0009";
   "CHE-0023" -> "CHE-0013";
-  "CHE-0024" -> "CHE-0001";
   "CHE-0024" -> "CHE-0004";
   "CHE-0024" -> "CHE-0017";
   "CHE-0024" -> "CHE-0041";
+  "CHE-0024" -> "COM-0025";
   "CHE-0025" -> "CHE-0001";
   "CHE-0025" -> "CHE-0018";
   "CHE-0026" -> "CHE-0001";
@@ -362,10 +365,10 @@ digraph adr_references {
   "CHE-0039" -> "CHE-0004";
   "CHE-0039" -> "CHE-0016";
   "CHE-0039" -> "CHE-0017";
-  "CHE-0040" -> "CHE-0001";
   "CHE-0040" -> "CHE-0039";
   "CHE-0040" -> "CHE-0017";
   "CHE-0040" -> "CHE-0024";
+  "CHE-0040" -> "COM-0025";
   "CHE-0041" -> "CHE-0001";
   "CHE-0041" -> "CHE-0006";
   "CHE-0041" -> "CHE-0008";
@@ -381,15 +384,23 @@ digraph adr_references {
   "CHE-0043" -> "CHE-0032";
   "CHE-0043" -> "CHE-0035";
   "CHE-0043" -> "COM-0025";
-  "CHE-0044" -> "CHE-0001";
   "CHE-0044" -> "CHE-0006";
   "CHE-0044" -> "CHE-0031";
   "CHE-0044" -> "CHE-0032";
   "CHE-0044" -> "CHE-0043";
+  "CHE-0044" -> "COM-0025";
   "CHE-0045" -> "CHE-0001";
   "CHE-0045" -> "CHE-0004";
   "CHE-0045" -> "CHE-0022";
   "CHE-0045" -> "CHE-0029";
+  "CHE-0046" -> "CHE-0021";
+  "CHE-0046" -> "CHE-0024";
+  "CHE-0046" -> "CHE-0041";
+  "CHE-0046" -> "COM-0025";
+  "CHE-0047" -> "CHE-0032";
+  "CHE-0047" -> "CHE-0042";
+  "CHE-0047" -> "CHE-0043";
+  "CHE-0047" -> "COM-0025";
   "COM-0002" -> "COM-0001";
   "COM-0003" -> "COM-0001";
   "COM-0003" -> "COM-0002";
@@ -532,7 +543,6 @@ digraph adr_references {
   "GEN-0033" -> "GEN-0001";
   "GEN-0033" -> "GEN-0032";
   "GEN-0033" -> "GEN-0004";
-  "GEN-0034" -> "GEN-0001";
   "GEN-0034" -> "GEN-0032";
   "GEN-0034" -> "GEN-0006";
   "GEN-0034" -> "GEN-0011";
@@ -565,10 +575,10 @@ digraph adr_references {
   "PAR-0013" -> "PAR-0007";
   "PAR-0014" -> "PAR-0004";
   "PAR-0014" -> "PAR-0008";
-  "PAR-0015" -> "PAR-0004";
   "PAR-0015" -> "PAR-0008";
   "PAR-0015" -> "PAR-0007";
   "PAR-0015" -> "PAR-0013";
+  "PAR-0015" -> "COM-0025";
   "PAR-0016" -> "PAR-0004";
   "PAR-0016" -> "PAR-0008";
   "PAR-0016" -> "PAR-0007";
@@ -603,6 +613,10 @@ digraph adr_references {
   "SEC-0010" -> "SEC-0002";
   "SEC-0010" -> "SEC-0005";
   "SEC-0010" -> "SEC-0007";
+  "SEC-0011" -> "SEC-0002";
+  "SEC-0011" -> "SEC-0005";
+  "SEC-0011" -> "SEC-0008";
+  "SEC-0011" -> "COM-0025";
 
   // Legend
   subgraph "cluster_legend" {
