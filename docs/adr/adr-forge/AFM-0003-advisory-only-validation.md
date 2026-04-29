@@ -22,7 +22,7 @@ overlooked warnings without process discipline).
 
 ## Decision
 
-`adr-fmt` exits 0 for all lint findings and exits 1 only for
+`adr-forge` exits 0 for all lint findings and exits 1 only for
 infrastructure errors. All validation rules emit warnings, never
 errors.
 

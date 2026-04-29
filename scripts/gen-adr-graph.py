@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Generate Graphviz DOT graph of ADRs and their `References:` edges.
 
-Source of truth: docs/adr/adr-fmt.toml (configured domains).
+Source of truth: docs/adr/adr-forge.toml (configured domains).
 Excludes: docs/adr/stale, generated READMEs, TEMPLATE.md, GOVERNANCE.md.
 Visual layout: explicit `Root:` ADRs at bottom; reference trees grow upward.
 Within each domain, ADRs are stacked in rows of at most five nodes.
@@ -22,7 +22,7 @@ except ModuleNotFoundError:  # pragma: no cover — fallback for Python <3.11
 
 ROOT = Path(__file__).resolve().parents[1]
 ADR_DIR = ROOT / "docs" / "adr"
-CFG = ADR_DIR / "adr-fmt.toml"
+CFG = ADR_DIR / "adr-forge.toml"
 OUT = ADR_DIR / "adr-references.dot"
 
 ADR_ID_RE = re.compile(r"^[A-Z]{3}-\d{4}$")
@@ -55,7 +55,7 @@ def load_domains() -> list[dict]:
         with CFG.open("rb") as fh:
             cfg = tomllib.load(fh)
         return cfg["domains"]
-    # Minimal TOML fallback for adr-fmt.toml's `[[domains]]` array of tables.
+    # Minimal TOML fallback for adr-forge.toml's `[[domains]]` array of tables.
     # Supports keys: prefix, name, directory (string scalars). Other keys ignored.
     text = CFG.read_text(encoding="utf-8")
     domains: list[dict] = []
@@ -196,7 +196,7 @@ def collect(domains: list[dict]) -> tuple[dict[str, dict], dict[str, list[str]]]
     for d in domains:
         prefix = d["prefix"]
         if not prefix_re.match(prefix):
-            print(f"error: invalid domain prefix '{prefix}' in adr-fmt.toml", file=sys.stderr)
+            print(f"error: invalid domain prefix '{prefix}' in adr-forge.toml", file=sys.stderr)
             sys.exit(1)
         directory = ADR_DIR / d["directory"]
         by_domain[prefix] = []
@@ -224,12 +224,24 @@ def chunked(items: list[str], size: int) -> list[list[str]]:
     return [items[i : i + size] for i in range(0, len(items), size)]
 
 
+def dot_attrs(attrs: dict[str, str | int | float | bool]) -> str:
+    rendered: list[str] = []
+    for key, value in attrs.items():
+        if isinstance(value, bool):
+            rendered.append(f"{key}={'true' if value else 'false'}")
+        elif isinstance(value, (int, float)):
+            rendered.append(f"{key}={value}")
+        else:
+            rendered.append(f"{key}=\"{dot_escape(value)}\"")
+    return ", ".join(rendered)
+
+
 def domain_layout_rows(ids: list[str], adrs: dict[str, dict]) -> list[tuple[str, list[str]]]:
     """Return bottom-to-top layout rows for one domain.
 
     Rows are capped at MAX_DOMAIN_ROW_WIDTH so a single domain never becomes
-    wider than five ADR nodes. Root rows come first because rankdir=BT makes
-    earlier constrained rows sit lower; non-root ADRs then follow tier order.
+    wider than five ADR nodes. Root rows come first, then non-root ADRs follow
+    tier order so the bottom-up render reads Root, S, A, B, C, D.
     """
     rows: list[tuple[str, list[str]]] = []
 
@@ -252,32 +264,117 @@ def domain_layout_rows(ids: list[str], adrs: dict[str, dict]) -> list[tuple[str,
     return rows
 
 
+def reference_edge_attrs(
+    ref: str,
+    adr_id: str,
+    adrs: dict[str, dict],
+    layout_by_id: dict[str, tuple[int, int]],
+    domain_index: dict[str, int],
+) -> dict[str, str | int | float | bool]:
+    """Return geometry-aware rendering attributes for one References edge."""
+    refs = adrs[adr_id]["refs"]
+    primary = bool(refs) and refs[0] == ref
+    attrs: dict[str, str | int | float | bool] = {
+        "constraint": False,
+        "weight": 0,
+        "penwidth": 1.1 if primary else 0.75,
+        "arrowsize": 0.55 if primary else 0.2,
+        "color": "#334155b3" if primary else "#47556999",
+        "style": "solid" if primary else "dashed",
+        "arrowhead": "normal" if primary else "none",
+    }
+
+    if ref not in adrs or ref not in layout_by_id or adr_id not in layout_by_id:
+        attrs.update({"tailport": "n", "headport": "s", "style": "dotted"})
+        return attrs
+
+    source_domain = adrs[ref]["domain"]
+    target_domain = adrs[adr_id]["domain"]
+    source_row, source_slot = layout_by_id[ref]
+    target_row, target_slot = layout_by_id[adr_id]
+
+    if source_domain != target_domain:
+        left_to_right = domain_index[source_domain] < domain_index[target_domain]
+        attrs.update(
+            {
+                "tailport": "e" if left_to_right else "w",
+                "headport": "w" if left_to_right else "e",
+                "style": "dashed" if primary else "dotted",
+                "color": "#33415566" if primary else "#47556980",
+            }
+        )
+        return attrs
+
+    if target_row > source_row:
+        if primary:
+            attrs.update({"tailport": "n", "headport": "s"})
+        else:
+            left_to_right = source_slot <= target_slot
+            attrs.update(
+                {
+                    "tailport": "e" if left_to_right else "w",
+                    "headport": "w" if left_to_right else "e",
+                }
+            )
+        return attrs
+
+    if target_row < source_row:
+        attrs.update(
+            {
+                "tailport": "s",
+                "headport": "n",
+                "style": "dotted",
+                "color": "#b4530966" if primary else "#b4530980",
+            }
+        )
+        return attrs
+
+    left_to_right = source_slot <= target_slot
+    attrs.update(
+        {
+            "tailport": "e" if left_to_right else "w",
+            "headport": "w" if left_to_right else "e",
+            "style": "dotted" if not primary else "solid",
+        }
+    )
+    return attrs
+
+
 def render(adrs: dict[str, dict], by_domain: dict[str, list[str]], domains: list[dict]) -> str:
     lines: list[str] = []
     lines.append("// Generated by scripts/gen-adr-graph.py — do not edit by hand.")
-    lines.append("// Source: docs/adr/adr-fmt.toml configured domains.")
+    lines.append("// Source: docs/adr/adr-forge.toml configured domains.")
     lines.append("// Corpus: active ADRs only (docs/adr/stale excluded).")
     lines.append("// Layout: explicit `Root:` ADRs are anchored at the bottom; trees grow upward.")
     lines.append("// Layout: domain rows are capped at 5 ADRs wide and ordered Root, S, A, B, C, D.")
-    lines.append("// Edges: `References:` relationships, rendered from referenced ADR to referencing ADR.")
+    lines.append("// Edges: `References:` relationships, geometry-routed from referenced ADR to referencing ADR.")
     lines.append("// Regenerate: python3 scripts/gen-adr-graph.py")
     lines.append("// Render:    dot -Tsvg docs/adr/adr-references.dot -o docs/adr/adr-references.svg")
     lines.append("")
     lines.append("digraph adr_references {")
     lines.append("  rankdir=BT;")
     lines.append(
-        "  graph [splines=polyline, overlap=false, nodesep=0.18, ranksep=0.75, "
-        "newrank=true, concentrate=true, outputorder=edgesfirst, fontname=\"Helvetica\"];"
+        "  graph [splines=ortho, overlap=false, nodesep=0.18, ranksep=0.75, "
+        "newrank=true, concentrate=false, outputorder=edgesfirst, fontname=\"Helvetica\"];"
     )
     lines.append("  node  [shape=box, style=\"rounded,filled\", fontname=\"Helvetica\", fontsize=10];")
-    lines.append("  edge  [color=\"#64748b\", arrowsize=0.7];")
+    lines.append("  edge  [color=\"#64748b66\", arrowsize=0.5, penwidth=0.7];")
     lines.append("")
+
+    domain_index = {d["prefix"]: index for index, d in enumerate(domains)}
+    rows_by_domain = {d["prefix"]: domain_layout_rows(by_domain.get(d["prefix"], []), adrs) for d in domains}
+    layout_by_id = {
+        adr_id: (row_index, slot)
+        for rows in rows_by_domain.values()
+        for row_index, (_, row_ids) in enumerate(rows)
+        for slot, adr_id in enumerate(row_ids)
+    }
 
     # Clusters per configured domain.
     for d in domains:
         prefix = d["prefix"]
         ids = by_domain.get(prefix, [])
-        rows = domain_layout_rows(ids, adrs)
+        rows = rows_by_domain[prefix]
         slot_by_id = {
             adr_id: slot
             for _, row_ids in rows
@@ -306,7 +403,7 @@ def render(adrs: dict[str, dict], by_domain: dict[str, list[str]], domains: list
                 f"penwidth=2, fillcolor=\"white\", group=\"{prefix}_col_{slot}\"{root_attrs}];"
             )
         if rows:
-            lines.append("    // Layout rows: bottom-to-top Root, S, A, B, C, D; max 5 ADRs per row.")
+            lines.append("    // Layout rows render bottom-to-top as Root, S, A, B, C, D; max 5 ADRs per row.")
         for row_index, (row_name, row_ids) in enumerate(rows):
             lines.append(f"    subgraph \"rank_{prefix}_{row_index:02d}_{row_name}\" {{")
             lines.append("      rank=same;")
@@ -358,7 +455,8 @@ def render(adrs: dict[str, dict], by_domain: dict[str, list[str]], domains: list
     edge_count = 0
     for adr_id in sorted(adrs):
         for ref in adrs[adr_id]["refs"]:
-            lines.append(f"  \"{ref}\" -> \"{adr_id}\" [constraint=false];")
+            attrs = reference_edge_attrs(ref, adr_id, adrs, layout_by_id, domain_index)
+            lines.append(f"  \"{ref}\" -> \"{adr_id}\" [{dot_attrs(attrs)}];")
             edge_count += 1
     lines.append("")
 

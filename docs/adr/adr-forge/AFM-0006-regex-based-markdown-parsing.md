@@ -11,7 +11,7 @@ References: AFM-0001, AFM-0004
 
 ## Context
 
-`adr-fmt` must extract structural information from markdown: titles, metadata, section headings, relationships, and prose content. ADR files follow a constrained subset — ATX headings, fenced code blocks, `Key: Value` metadata. For this subset, a full AST parser provides unused capabilities while adding dependency weight.
+`adr-forge` must extract structural information from markdown: titles, metadata, section headings, relationships, and prose content. ADR files follow a constrained subset — ATX headings, fenced code blocks, `Key: Value` metadata. For this subset, a full AST parser provides unused capabilities while adding dependency weight.
 
 ## Decision
 

@@ -4,7 +4,7 @@ Date: 2026-04-29
 
 Perspective: professor of distributed systems design, focusing on correctness under partial failure, explicit consistency semantics, fault tolerance, interoperability, security, and operational recovery.
 
-Corpus checked with `cargo run -p adr-fmt -- --tree` and `cargo run -p adr-fmt -- --lint`: 149 ADRs, 0 lint errors, 22 warnings. The warnings are tier/layer tension warnings concentrated in governance ADRs, especially S-tier `adr-fmt` decisions with B/C-tier enforcement rules.
+Corpus checked with `cargo run -p adr-forge -- --tree` and `cargo run -p adr-forge -- --lint`: 149 ADRs, 0 lint errors, 22 warnings. The warnings are tier/layer tension warnings concentrated in governance ADRs, especially S-tier `adr-forge` decisions with B/C-tier enforcement rules.
 
 ## Corpus-level highest-impact improvements
 
@@ -168,7 +168,7 @@ Corpus checked with `cargo run -p adr-fmt -- --tree` and `cargo run -p adr-fmt -
 - **SEC-0009. Supply Chain Security via Dependency Auditing** *(Proposed)*: Promote cargo-vet or equivalent provenance review before dependency count becomes large. Known-advisory scanning misses targeted compromise and malicious-but-not-yet-reported packages.
 - **SEC-0010. Transport Security via Mandatory Channel Encryption** *(Proposed)*: Add certificate lifecycle automation, expiry monitoring, and rotation testing as required controls. TLS improves confidentiality/integrity, but certificate failure can become a correlated availability failure.
 
-## adr-fmt Domain (AFM)
+## adr-forge Domain (AFM)
 
 - **AFM-0001. Single Source of Truth Architecture for ADR Governance**: Add explicit traceability from each invariant rule to validator code, tests, and generated guideline output. A governance control plane needs auditable consistency between specification, enforcement, and observation.
 - **AFM-0002. Manual CLI Argument Parsing Over Clap** *(Superseded; stale)*: Record the precise migration compatibility expectations for users and scripts. Terminal decisions should preserve causality so future operators understand what changed at the interface boundary.

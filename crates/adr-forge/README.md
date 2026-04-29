@@ -1,4 +1,4 @@
-# adr-fmt
+# adr-forge
 
 Read-only ADR analysis tool for cherry-pit. SSOT for all invariant ADR
 governance rules. Never modifies files. stdout = output, stderr = errors.
@@ -8,15 +8,15 @@ Part of the [cherry-pit](../../README.md) workspace.
 ## Usage
 
 ```text
-adr-fmt [ADR_DIR]                     # lint all ADRs
-adr-fmt --critique <ADR_ID> [ADR_DIR] # focal ADR + transitive closure
-adr-fmt --context <CRATE> [ADR_DIR]   # decision rules for a crate
-adr-fmt --index [DOMAIN] [ADR_DIR]    # domain dependency tree
-adr-fmt --report [ADR_DIR]            # computed children (reverse-link index)
-adr-fmt --guidelines [ADR_DIR]        # generated governance reference
+adr-forge [ADR_DIR]                     # lint all ADRs
+adr-forge --critique <ADR_ID> [ADR_DIR] # focal ADR + transitive closure
+adr-forge --context <CRATE> [ADR_DIR]   # decision rules for a crate
+adr-forge --index [DOMAIN] [ADR_DIR]    # domain dependency tree
+adr-forge --report [ADR_DIR]            # computed children (reverse-link index)
+adr-forge --guidelines [ADR_DIR]        # generated governance reference
 ```
 
-Run via `cargo run -p adr-fmt` or `cargo run -p adr-fmt -- <args>`.
+Run via `cargo run -p adr-forge` or `cargo run -p adr-forge -- <args>`.
 
 Auto-discovers `docs/adr/` by walking up from CWD looking for
 `docs/adr/GOVERNANCE.md`. Pass explicit `ADR_DIR` to override.
@@ -77,14 +77,14 @@ sections of GOVERNANCE.md.
 
 | Source | Scope |
 |--------|-------|
-| `adr-fmt` (code) | Invariant rules: template, naming, vocabulary, lifecycle, links |
-| `adr-fmt.toml` | Configurable: domains, crate mappings, rule params, stale directory |
+| `adr-forge` (code) | Invariant rules: template, naming, vocabulary, lifecycle, links |
+| `adr-forge.toml` | Configurable: domains, crate mappings, rule params, stale directory |
 | `--guidelines` output | Generated complete reference |
 | `GOVERNANCE.md` | Rationale, process, judgment only |
 
 ## Rule Catalog
 
-All rules currently emit warnings. `adr-fmt` is advisory.
+All rules currently emit warnings. `adr-forge` is advisory.
 
 ### Template (T001–T016)
 
@@ -190,7 +190,7 @@ Placed after Date/Tier, before `## Status`. Used by `--context` mode.
 
 ## Configuration
 
-`docs/adr/adr-fmt.toml` — required. Config errors are hard failures (exit 1).
+`docs/adr/adr-forge.toml` — required. Config errors are hard failures (exit 1).
 
 ```toml
 [stale]
@@ -217,7 +217,7 @@ min_words = 10
 
 After creating or editing any ADR:
 
-1. `cargo run -p adr-fmt` — parse stdout for warnings
+1. `cargo run -p adr-forge` — parse stdout for warnings
 2. Fix reported issues
 3. Re-run to confirm clean output
 4. Commit

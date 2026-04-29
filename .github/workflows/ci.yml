@@ -40,7 +40,7 @@ jobs:
         run: cargo test --workspace --all-targets
 
       - name: Verify ADR corpus
-        run: cargo run -p adr-fmt -- --lint
+        run: cargo run -p adr-forge -- --lint
 
       - name: Verify release profile invariants
         run: |

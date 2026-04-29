@@ -9,7 +9,7 @@ members = [
     # "crates/cherry-pit-web",
     # "crates/cherry-pit-projection",
     # "crates/cherry-pit-agent",
-    "crates/adr-fmt",
+    "crates/adr-forge",
 ]
 
 [workspace.package]

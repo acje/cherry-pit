@@ -6,11 +6,11 @@
 //! # Modes
 //!
 //! ```text
-//! adr-fmt [<ADR_DIR>]                     # default: print governance guidelines
-//! adr-fmt --lint [<ADR_DIR>]              # lint all ADRs
-//! adr-fmt --critique <ADR_ID> [<ADR_DIR>] # focal ADR + direct neighbors
-//! adr-fmt --context <CRATE> [<ADR_DIR>]   # decision rules for a crate
-//! adr-fmt --tree [DOMAIN] [<ADR_DIR>]     # domain tree overview
+//! adr-forge [<ADR_DIR>]                     # default: print governance guidelines
+//! adr-forge --lint [<ADR_DIR>]              # lint all ADRs
+//! adr-forge --critique <ADR_ID> [<ADR_DIR>] # focal ADR + direct neighbors
+//! adr-forge --context <CRATE> [<ADR_DIR>]   # decision rules for a crate
+//! adr-forge --tree [DOMAIN] [<ADR_DIR>]     # domain tree overview
 //! ```
 //!
 //! Exit codes:
@@ -40,7 +40,7 @@ use model::{DomainDir, parse_adr_id_from_str};
 
 /// ADR template and link-integrity validator for cherry-pit.
 #[derive(Parser)]
-#[command(name = "adr-fmt", version)]
+#[command(name = "adr-forge", version)]
 struct Cli {
     /// Lint all ADRs, report diagnostics to stdout
     #[arg(long, group = "mode")]

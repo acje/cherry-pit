@@ -13,7 +13,7 @@ References: AFM-0001, AFM-0003
 ## Context
 
 AFM-0007 specified compiler-style diagnostics on stderr with stdout
-reserved for guidelines and tree output. As adr-fmt grew to six
+reserved for guidelines and tree output. As adr-forge grew to six
 output modes (lint, guidelines, tree, critique, context, default),
 maintaining two output formats created inconsistency. All modes now
 produce markdown-formatted output on stdout, enabling uniform
@@ -37,7 +37,7 @@ R4 [5]: Stderr is reserved for fatal errors and panics only; no
 
 ## Consequences
 
-All adr-fmt output is uniformly piped and redirected with standard
+All adr-forge output is uniformly piped and redirected with standard
 shell tools. Markdown formatting enables richer presentation (bold
 severity tags, structured headers) compared to compiler-style plain
 text. Rule IDs remain greppable within the markdown format. The

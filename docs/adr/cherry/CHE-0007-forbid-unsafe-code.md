@@ -18,7 +18,7 @@ Cherry-pit's P1 correctness and P2 security priorities (CHE-0001) demand memory 
 Every cherry-pit crate uses `#![forbid(unsafe_code)]` at the crate
 root. No `unsafe` blocks, no `unsafe impl`, no `unsafe fn`. This
 applies to all current crates (`cherry-pit-core`, `cherry-pit-gateway`,
-`pardosa`, `pardosa-genome`, `pardosa-genome-derive`, `adr-fmt`) and all
+`pardosa`, `pardosa-genome`, `pardosa-genome-derive`, `adr-forge`) and all
 future crates in the workspace.
 
 Dependencies may use `unsafe` internally — that is their

@@ -1,8 +1,8 @@
-# adr-fmt Redesign — Pure Analysis Tool with Critique and Context
+# adr-forge Redesign — Pure Analysis Tool with Critique and Context
 
 ## Overview
 
-Transform adr-fmt from a lint-and-generate tool into a read-only, agent-first
+Transform adr-forge from a lint-and-generate tool into a read-only, agent-first
 analysis tool. Add `--critique` and `--context` modes, remove all file-writing
 side effects, unify output into token-efficient Alternative 4 markdown format.
 
@@ -84,7 +84,7 @@ efficiency.
 - Add `decision_content: Option<String>` to `AdrRecord` (full Decision section
   text, needed for R0 fallback)
 
-### Step 3 · `docs/adr/adr-fmt.toml` — rule catalog update ✅
+### Step 3 · `docs/adr/adr-forge.toml` — rule catalog update ✅
 
 - Add `[[rules]] id = "T016"`, `category = "template"`,
   `description = "Decision section lacks tagged rules or has non-sequential
@@ -229,7 +229,7 @@ Add:
   without → no warning; ADR with gap (R1, R3) → warning
 - Default lint mode: output on stdout in Alternative 4 format
 
-### Step 14 · `.opencode/skills/adr-fmt/SKILL.md` — update skill definition ✅
+### Step 14 · `.opencode/skills/adr-forge/SKILL.md` — update skill definition ✅
 
 - Update invocation examples for new flags
 - Remove README side-effect documentation
@@ -245,7 +245,7 @@ Add:
 | `generate.rs` removal breaks `main.rs` | High | Step 7 restructures control flow with mutual exclusion |
 | `rules/index.rs` removal requires `mod.rs` update | High | Step 9 removes `mod index` and call site |
 | `AdrRecord` struct expansion bloats helpers | Medium | `Default` impl in Step 2 |
-| T016 missing from `adr-fmt.toml` | Medium | Added in Step 3 |
+| T016 missing from `adr-forge.toml` | Medium | Added in Step 3 |
 | `guidelines.rs` not in change list | Medium | Added as Step 10 |
 | `DomainConfig.crates` has `dead_code` | Low | Removed in Step 12 |
 | T016 on Draft ADRs | Low | Exempt Draft and Proposed |

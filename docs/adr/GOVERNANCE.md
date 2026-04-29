@@ -4,18 +4,18 @@ Last-updated: 2026-04-27
 
 This document is the root of authority for Architecture Decision Record
 management across the cherry-pit workspace. It covers rationale, process,
-and judgment-based guidance. All invariant rules are enforced by `adr-fmt`
-and documented via `cargo run -p adr-fmt -- --guidelines`.
+and judgment-based guidance. All invariant rules are enforced by `adr-forge`
+and documented via `cargo run -p adr-forge -- --guidelines`.
 
 **Single source of truth architecture:**
 
-- **`adr-fmt` (code)** — invariant rules: template requirements, naming
+- **`adr-forge` (code)** — invariant rules: template requirements, naming
   conventions, relationship vocabulary, lifecycle states, link integrity
-- **`adr-fmt.toml`** — configurable aspects: domain definitions, crate
+- **`adr-forge.toml`** — configurable aspects: domain definitions, crate
   mappings, rule parameters, stale directory path
 - **`--guidelines` output** — generated complete reference combining
   code invariants and configuration
-- **ADRs** — architectural decisions, validated by `adr-fmt`
+- **ADRs** — architectural decisions, validated by `adr-forge`
 - **This document** — rationale, process, judgment
 
 Changes to this document require a pull request with explicit review.
@@ -25,10 +25,10 @@ Changes to this document require a pull request with explicit review.
 ## 1. Domain Taxonomy
 
 Every ADR belongs to exactly one domain. Domain definitions, prefixes,
-directories, and crate mappings are configured in `adr-fmt.toml`.
-Canonical domain list: `cargo run -p adr-fmt`.
+directories, and crate mappings are configured in `adr-forge.toml`.
+Canonical domain list: `cargo run -p adr-forge`.
 
-Foundation domains (marked in `adr-fmt.toml`) are included when
+Foundation domains (marked in `adr-forge.toml`) are included when
 querying any non-foundation domain via `--context`. When querying a
 foundation domain directly, only that domain's ADRs are returned.
 
@@ -54,7 +54,7 @@ cross-references.
 
 Tiers classify ADRs by systemic leverage, derived from Donella
 Meadows' twelve leverage points. Canonical tier table:
-`cargo run -p adr-fmt`.
+`cargo run -p adr-forge`.
 
 ### Theoretical Foundation
 
@@ -102,7 +102,7 @@ changed. **First-yes-wins:** Start at S and work down.
 
 ## 3. Lifecycle
 
-Lifecycle states and terminal requirements: `cargo run -p adr-fmt`.
+Lifecycle states and terminal requirements: `cargo run -p adr-forge`.
 
 ### Format Migration (2026-04-28)
 
@@ -156,5 +156,5 @@ the older one.
 ## 5. Reference Ordering and Root Assignment
 
 Reference ordering mechanics and root assignment algorithm:
-`cargo run -p adr-fmt` — see RELATIONSHIPS section.
+`cargo run -p adr-forge` — see RELATIONSHIPS section.
 

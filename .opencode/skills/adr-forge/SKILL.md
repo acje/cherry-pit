@@ -1,9 +1,9 @@
 ---
-name: adr-fmt
-description: Run adr-fmt to lint ADRs, extract crate-scoped architecture rules via --context, critique decision neighborhoods, view domain trees, and author new ADRs conforming to the cherry-pit MADR template. Use when working with architecture decision records, writing or editing ADRs, or needing architecture constraints for a specific crate.
+name: adr-forge
+description: Run adr-forge to lint ADRs, extract crate-scoped architecture rules via --context, critique decision neighborhoods, view domain trees, and author new ADRs conforming to the cherry-pit MADR template. Use when working with architecture decision records, writing or editing ADRs, or needing architecture constraints for a specific crate.
 ---
 
-# adr-fmt
+# adr-forge
 
 Read-only ADR governance tool for cherry-pit. Never modifies files.
 
@@ -12,7 +12,7 @@ Read-only ADR governance tool for cherry-pit. Never modifies files.
 Run from the **workspace root** (where `Cargo.toml` lives):
 
 ```bash
-cargo run -p adr-fmt -- <args>
+cargo run -p adr-forge -- <args>
 ```
 
 Auto-discovers `docs/adr/` by walking up from CWD looking for `docs/adr/GOVERNANCE.md`. No path argument needed when running from workspace root.
@@ -27,7 +27,7 @@ Auto-discovers `docs/adr/` by walking up from CWD looking for `docs/adr/GOVERNAN
 ### Guidelines (default — no flags)
 
 ```bash
-cargo run -p adr-fmt
+cargo run -p adr-forge
 ```
 
 Prints the complete generated ADR governance reference combining code invariants and configuration. Use this to understand all enforced rules and their parameters.
@@ -35,7 +35,7 @@ Prints the complete generated ADR governance reference combining code invariants
 ### Lint
 
 ```bash
-cargo run -p adr-fmt -- --lint
+cargo run -p adr-forge -- --lint
 ```
 
 Validates all ADRs across every domain. Outputs diagnostics in `severity[RULE_ID] file:line: message` format. Exit 0 does not mean clean — always parse stdout for warnings/errors.
@@ -43,7 +43,7 @@ Validates all ADRs across every domain. Outputs diagnostics in `severity[RULE_ID
 ### Context
 
 ```bash
-cargo run -p adr-fmt -- --context <CRATE>
+cargo run -p adr-forge -- --context <CRATE>
 ```
 
 Extracts tagged decision rules applicable to a specific crate. Foundation domains (COM, RST) are always included. Output is tier-sorted (S first, D last) with rule IDs and layer at end of each line (e.g., `[CHE-0042:R1:L5]`). Exits 1 if the crate is not found in any domain.
@@ -53,8 +53,8 @@ Use `--context` to retrieve architecture constraints before writing code for a c
 ### Critique
 
 ```bash
-cargo run -p adr-fmt -- --critique <ADR_ID>
-cargo run -p adr-fmt -- --critique <ADR_ID> --depth 3
+cargo run -p adr-forge -- --critique <ADR_ID>
+cargo run -p adr-forge -- --critique <ADR_ID> --depth 3
 ```
 
 BFS transitive closure around a focal ADR. Follows fan-out (forward relationships) and fan-in (reverse/children). Default depth is 1. Increase `--depth N` for broader neighborhood exploration. Output uses `◆ FOCAL`, `◇ CONNECTED` markers. Focal block includes tension analysis showing per-rule tier-distance from the ADR's tier.
@@ -64,8 +64,8 @@ Use `--critique` when editing an ADR to understand its decision neighborhood and
 ### Tree
 
 ```bash
-cargo run -p adr-fmt -- --tree
-cargo run -p adr-fmt -- --tree CHE
+cargo run -p adr-forge -- --tree
+cargo run -p adr-forge -- --tree CHE
 ```
 
 Domain dependency tree with ADR listings. Optional domain prefix filter. Shows stale counts per domain.
@@ -177,21 +177,21 @@ Place after Tier, before Status. Used by `--context` to filter rules per crate. 
 PREFIX-NNNN-kebab-slug.md
 ```
 
-Prefix must match a domain in `adr-fmt.toml`. Number is zero-padded 4 digits. Slug is lowercase kebab-case.
+Prefix must match a domain in `adr-forge.toml`. Number is zero-padded 4 digits. Slug is lowercase kebab-case.
 
 ## Workflow
 
 After creating or editing any ADR:
 
-1. Run `cargo run -p adr-fmt -- --lint` — parse stdout for diagnostics
+1. Run `cargo run -p adr-forge -- --lint` — parse stdout for diagnostics
 2. Fix reported issues
 3. Re-run to confirm clean output
-4. Run `cargo run -p adr-fmt -- --context <CRATE>` to verify extracted rules read well in isolation
+4. Run `cargo run -p adr-forge -- --context <CRATE>` to verify extracted rules read well in isolation
 5. Commit
 
 ## Configuration
 
-`docs/adr/adr-fmt.toml` defines:
+`docs/adr/adr-forge.toml` defines:
 
 - **Domains** — prefix, name, directory, description, crate mappings, foundation flag
 - **Rule parameters** — overrides for configurable rule thresholds (e.g., T015 word counts)
