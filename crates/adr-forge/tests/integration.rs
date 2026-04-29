@@ -132,6 +132,32 @@ R1 [5]: We reference a non-existent ADR to verify that dangling link detection w
 The linter should report a dangling link warning for TST-9999 in the output.
 ";
 
+/// ADR using a legacy relationship verb (triggers L006 per AFM-0009).
+const LEGACY_VERB_ADR: &str = "\
+# TST-0005. Legacy Verb ADR
+
+Date: 2026-04-27
+Last-reviewed: 2026-04-27
+Tier: B
+Status: Accepted
+
+## Related
+
+Depends on: TST-0001
+
+## Context
+
+This ADR uses the legacy `Depends on` verb which is deprecated by AFM-0009.
+
+## Decision
+
+R1 [5]: Trigger L006 by using a legacy relationship verb.
+
+## Consequences
+
+The linter should report L006 with migration guidance to use References.
+";
+
 /// ADR without tagged rules (triggers T016).
 const NO_TAGGED_RULES_ADR: &str = "\
 # TST-0004. No Tagged Rules
@@ -430,6 +456,25 @@ fn dangling_link_produces_l001() {
         .assert()
         .success()
         .stdout(predicate::str::contains("L001"));
+}
+
+#[test]
+fn legacy_verb_produces_l006() {
+    let dir = setup_corpus(
+        MINIMAL_CONFIG,
+        &[
+            ("TST-0001-valid-test-adr.md", VALID_ADR),
+            ("TST-0005-legacy-verb-adr.md", LEGACY_VERB_ADR),
+        ],
+    );
+
+    adr_forge()
+        .args(["--lint", &adr_root(&dir)])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("warning[L006]"))
+        .stdout(predicate::str::contains("Depends on"))
+        .stdout(predicate::str::contains("AFM-0009"));
 }
 
 #[test]
