@@ -24,36 +24,12 @@ Changes to this document require a pull request with explicit review.
 
 ## 1. Domain Taxonomy
 
-Every ADR belongs to exactly one domain. Domains are mutually exclusive
-and collectively exhaustive (MECE) across the architectural decision
-space of the cherry-pit workspace.
+Every ADR belongs to exactly one domain. Domain definitions, prefixes,
+directories, and crate mappings are configured in `adr-fmt.toml`.
+Canonical domain list: `cargo run -p adr-fmt`.
 
-Domain definitions, prefixes, directories, and crate mappings are
-configured in `adr-fmt.toml`.
-
-### Foundation Domains
-
-The workspace has two **foundation domains**:
-
-1. **Common (COM)** contains cross-cutting software design principles
-   informed by Ousterhout's "A Philosophy of Software Design" and
-   complementary works on software architecture, evolutionary design,
-   and organizational alignment (Martin, Ford, Evans, Skelton, Read,
-   et al.). All COM principles are technology-agnostic.
-
-2. **Rust (RST)** contains Rust language and toolchain governance
-   decisions: toolchain pinning, MSRV policy, lint configuration,
-   dependency management, and platform evolution strategy. RST
-   decisions are Rust-specific but cross-cutting — they apply to all
-   Rust crates in the workspace. The separation from COM preserves
-   COM's technology-agnostic property while acknowledging that
-   platform-specific decisions deserve their own domain. If the
-   workspace ever includes non-Rust codebases, RST applies only to
-   Rust crates.
-
-When querying ADRs for a specific domain (e.g., Cherry), both
-foundation domains' ADRs are included — COM provides design
-principles, RST provides platform governance. When querying a
+Foundation domains (marked in `adr-fmt.toml`) are included when
+querying any non-foundation domain via `--context`. When querying a
 foundation domain directly, only that domain's ADRs are returned.
 
 ### MECE Rationale
@@ -77,12 +53,8 @@ cross-references.
 ## 2. Tier System
 
 Tiers classify ADRs by systemic leverage, derived from Donella
-Meadows' twelve leverage points. Higher tiers represent deeper
-intervention in the system — changing them reshapes everything below.
-Every ADR must be assigned a tier.
-
-Canonical tier metadata (name, description, stability) is output by
-`cargo run -p adr-fmt -- --guidelines`.
+Meadows' twelve leverage points. Canonical tier table:
+`cargo run -p adr-fmt`.
 
 ### Theoretical Foundation
 
@@ -96,27 +68,11 @@ governing existing structures). In software: "EventStore is a trait"
 "EventStore::load returns `Result<Vec<EventEnvelope>, StoreError>`"
 (constrains the contract — level 5).
 
-### Tier Table
-
-| Tier | System characteristic | Meadows levels | Classification question |
-|------|----------------------|----------------|------------------------|
-| S | **Intent** — paradigm, goals, governance | 1–3 | Does this decision define the system's paradigm, system-wide architectural pattern, or decision governance? |
-| A | **Self-organization** — capacity to evolve structure | 4 | Does this decision introduce or remove trait definitions, generic type parameters, or plugin boundaries that enable new implementations? |
-| B | **Design** — rules, information flows | 5–6 | Does this decision prescribe a structural rule or establish an information flow — a type contract, API boundary, visibility constraint, enforcement gate, or observability requirement? |
-| C | **Feedbacks** — reinforcing and balancing loops | 7–8 | Does this decision define how components observe, notify, retry, or react to each other at runtime? |
-| D | **Parameters** — constants, stocks, flows, delays | 9–12 | Is this only a crate-internal implementation detail or tooling configuration value? |
-
 ### Tree Metaphor
 
 The tiers form a tree: S-tier decisions are roots — few in number,
 deepest leverage, most abstract. D-tier decisions are leaves — many
 in number, most concrete, greatest surface area with real-world code.
-
-Each deeper tier constrains everything shallower: Intent defines what
-the system is for, Self-organization determines how it can evolve,
-Design sets the rules and feedback structures it must follow,
-Feedbacks govern runtime dynamics, Parameters fill in the remaining
-degrees of freedom.
 
 Higher tiers appear first in `--context` output — the agent sees
 foundational constraints before implementation details. This exploits
@@ -127,57 +83,39 @@ context.
 
 Questions use **system-characteristic framing** — they classify by
 what the decision *is*, not by what would change if the decision
-changed. This aligns with Meadows' leverage hierarchy: a parameter
-change can have large blast radius, but it is still a parameter.
-
-**First-yes-wins:** Start at S and work down. The first question
-answered "Yes" determines the tier.
+changed. **First-yes-wins:** Start at S and work down.
 
 ### Tier-Assignment Guidance
 
 - **Self-organization vs. Design (A vs. B):** A-tier is about *what
   can be extended* — trait definitions, generic type parameters, plugin
   boundaries. B-tier is about *how existing things must behave* —
-  specific trait signatures, type bounds, public API contracts. Example:
-  "EventStore is a trait" → A. "EventStore::load returns
-  `Result<Vec<EventEnvelope>, StoreError>`" → B.
+  specific trait signatures, type bounds, public API contracts.
 
-- **CI, lints, and tests:** B-tier (Design) when they enforce
-  architectural boundaries or encode structural invariants — module-
-  boundary lints, property-based test suites, architectural CI gates.
-  D-tier (Parameters) when they configure tooling internals — cache
-  paths, lint versions, timeout values.
+- **CI, lints, and tests:** B-tier when they enforce architectural
+  boundaries. D-tier when they configure tooling internals.
 
-- **Meta-decisions** about the decision process itself (TEMPLATE.md,
-  GOVERNANCE.md, ADR workflow) are S-tier: Meadows level 1 (power to
-  transcend paradigms).
+- **Meta-decisions** about the decision process itself are S-tier:
+  Meadows level 1.
 
 ---
 
 ## 3. Lifecycle
 
-ADR lifecycle states and their meanings are documented in
-`cargo run -p adr-fmt -- --guidelines`.
-
-Terminal states (Rejected, Deprecated, Superseded) require moving the
-ADR to the stale directory and adding a `## Retirement` section
-explaining why the ADR left active service.
+Lifecycle states and terminal requirements: `cargo run -p adr-fmt`.
 
 ### Format Migration (2026-04-28)
 
 The template format has two changes:
 
 1. **Status as metadata field.** Status moves from a `## Status`
-   section to a preamble field (`Status: Accepted`) alongside Date,
-   Last-reviewed, and Tier. The legacy `## Status` section is still
-   recognized as a fallback — both formats parse correctly — but new
-   ADRs should use the metadata field. If both are present, the
-   metadata field takes precedence and a T005b warning is emitted.
+   section to a preamble field (`Status: Accepted`). Legacy `## Status`
+   is still recognized as fallback. If both are present, the metadata
+   field takes precedence (T005b warning).
 
 2. **Pipe-separated Related.** The `## Related` section uses
    pipe-separated format: `Verb: targets | Verb: targets`.
-   The old bullet format (`- Verb: target`) is no longer parsed.
-   Existing ADRs will fire T007 until migrated.
+   The old bullet format is no longer parsed.
 
 Migrate existing ADRs by tier (S first) when touching them for
 other reasons — no urgent batch conversion required.
@@ -217,44 +155,6 @@ the older one.
 
 ## 5. Reference Ordering and Root Assignment
 
-### Reference Order = Significance Order
+Reference ordering mechanics and root assignment algorithm:
+`cargo run -p adr-fmt` — see RELATIONSHIPS section.
 
-Within an ADR's `## Related` section, references are listed in order
-of significance — the most significant reference appears first.
-This convention is semantic: it communicates which relationships are
-primary constraints vs. secondary context.
-
-Example: An ADR that primarily implements a Cherry architecture decision
-and secondarily relates to an EDA pattern should list:
-
-```
-References: CHE-0001 | References: CHE-0004
-```
-
-Not the reverse. The first reference carries the strongest semantic
-relationship.
-
-### Root Assignment Rule
-
-`adr-fmt --context` assigns each ADR to exactly one root ADR subtree
-using a **first-root-referenced** rule: scan the ADR's references in
-document order; the first target that is a root ADR wins assignment.
-
-This means reference ordering directly controls which subtree an ADR
-appears under in context output. Authors govern root assignment by
-ordering their references intentionally.
-
-ADRs that don't directly reference any root ADR are assigned via BFS
-proximity — they inherit the root of their nearest assigned ancestor
-in the reference graph.
-
-### Root ADRs
-
-A root ADR declares itself via `Root: OWN-ID` in the Related section.
-Root ADRs serve as organizational anchors for `--context` output.
-Each root defines a subtree of ADRs reachable through the reference
-graph.
-
-Foundation roots (from foundation domains like COM, RST) appear before
-domain roots in context output. Within each category, roots are sorted
-by their minimum layer (ascending), then by ADR number.

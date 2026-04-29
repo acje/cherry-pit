@@ -197,7 +197,7 @@ Three permitted verbs:
 root subtree using the **first root referenced** in document order.
 Reference ordering governs subtree assignment and communicates which
 relationships are primary constraints vs. secondary context. See
-[GOVERNANCE.md § 5](GOVERNANCE.md#5-reference-ordering-and-root-assignment).
+RELATIONSHIPS section in `cargo run -p adr-fmt` output.
 
 **Constraints:** Root and References cannot coexist (L009). Every
 ADR must have at least one relationship — no orphans (T007).

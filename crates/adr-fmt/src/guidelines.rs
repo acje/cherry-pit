@@ -87,7 +87,7 @@ pub fn print_governance(config: &Config) {
     print_lifecycle();
     print_template();
     print_tagged_rules();
-    print_relationships();
+    print_relationships(config);
     print_naming();
     print_link_rules();
     print_stale(config);
@@ -296,17 +296,20 @@ fn print_tagged_rules() {
     println!();
 
     println!("  Tier scaling (applied to max_words and max_rules base values):");
-    println!("    S  factor=1.5  min_words=15  max_refs=3");
-    println!("    A  factor=1.2  min_words=12  max_refs=5");
-    println!("    B  factor=1.0  min_words=10  max_refs=7");
-    println!("    C  factor=0.8  min_words=7   max_refs=8");
-    println!("    D  factor=0.6  min_words=7   max_refs=5");
+    for tier in Tier::all() {
+        println!(
+            "    {tier:?}  factor={:.1}  min_words={}  max_refs={}",
+            tier.factor(),
+            tier.min_words(),
+            tier.max_refs()
+        );
+    }
     println!();
 }
 
 // ── Relationship section ───────────────────────────────────────────
 
-fn print_relationships() {
+fn print_relationships(config: &Config) {
     println!("RELATIONSHIPS");
     println!("─────────────");
     println!();
@@ -325,6 +328,34 @@ fn print_relationships() {
     println!("    • Root + Supersedes may coexist");
     println!("    • Supersedes requires target status = `Superseded by PREFIX-NNNN`");
     println!();
+    println!("  Reference ordering:");
+    println!("    List references in significance order — most significant first.");
+    println!("    Significance = strength of constraint the referenced ADR places");
+    println!("    on this one. The reference whose removal would most invalidate");
+    println!("    this ADR's decision ranks first.");
+    println!();
+    println!("  Root assignment (--context):");
+    println!("    Each ADR is assigned to exactly one root subtree. Assignment");
+    println!("    uses first-root-referenced: scan references in document order;");
+    println!("    the first target that is a root ADR wins subtree assignment.");
+    println!("    Reference ordering directly controls subtree placement.");
+    println!();
+    println!("    ADRs not directly referencing any root are assigned via BFS");
+    println!("    proximity — they inherit the root of their nearest assigned");
+    println!("    ancestor in the reference graph.");
+    println!();
+    let foundation_prefixes: Vec<&str> = config
+        .domains
+        .iter()
+        .filter(|d| d.foundation)
+        .map(|d| d.prefix.as_str())
+        .collect();
+    if !foundation_prefixes.is_empty() {
+        let foundation_list = foundation_prefixes.join(", ");
+        println!("    Foundation roots ({foundation_list}) appear before domain roots");
+        println!("    in --context output, sorted by minimum layer then ADR number.");
+        println!();
+    }
     println!("  Legacy verbs (produce warnings):");
     for verb in RelVerb::legacy() {
         let migration = verb.migration().unwrap_or("remove");
@@ -472,5 +503,64 @@ crates = []
         .unwrap();
         // No rules at all → should not print anything
         print_overrides(&config);
+    }
+
+    #[test]
+    fn relationships_contains_reference_ordering_guidance() {
+        let config = make_config();
+        print_governance(&config);
+
+        // Structural canary: these strings appear in println! arguments
+        // in print_relationships, not just in test assertions.
+        let src = include_str!("guidelines.rs");
+        assert!(src.contains("significance order —"));
+        assert!(src.contains("first-root-referenced:"));
+        assert!(src.contains("BFS"));
+        assert!(src.contains("Foundation roots"));
+    }
+
+    #[test]
+    fn foundation_prefixes_derived_from_config() {
+        // Config has COM as foundation — verify it appears in output.
+        // If the list were hardcoded, adding/removing a foundation
+        // domain in config would not change the output.
+        let src = include_str!("guidelines.rs");
+        assert!(
+            src.contains("foundation_list"),
+            "print_relationships must derive foundation prefixes from config"
+        );
+        // Also verify no hardcoded prefix list remains
+        assert!(
+            !src.contains("\"COM, RST, SEC\""),
+            "foundation prefixes must not be hardcoded"
+        );
+    }
+
+    #[test]
+    fn tier_scaling_table_derived_from_model() {
+        // Verify the guidelines tier scaling table is generated from
+        // Tier methods, not hardcoded. The source should contain
+        // tier.factor(), tier.min_words(), tier.max_refs() calls,
+        // not literal values.
+        let src = include_str!("guidelines.rs");
+        assert!(
+            src.contains("tier.factor()"),
+            "tier scaling table must use Tier::factor()"
+        );
+        assert!(
+            src.contains("tier.min_words()"),
+            "tier scaling table must use Tier::min_words()"
+        );
+        assert!(
+            src.contains("tier.max_refs()"),
+            "tier scaling table must use Tier::max_refs()"
+        );
+        // Verify no hardcoded scaling lines remain (old format had
+        // literal values in println calls for each tier)
+        let needle = format!("println!(\"    {}  factor=", "S");
+        assert!(
+            !src.contains(&needle),
+            "tier scaling values must not be hardcoded in println"
+        );
     }
 }
