@@ -7,7 +7,7 @@ Status: Proposed
 
 ## Related
 
-References: PAR-0004, PAR-0007, PAR-0008, PAR-0013
+References: PAR-0004, PAR-0008, PAR-0007, PAR-0013
 
 ## Context
 

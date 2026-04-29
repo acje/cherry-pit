@@ -8,7 +8,7 @@ Status: Accepted
 ## Related
 
 Supersedes: AFM-0007
-References: AFM-0003
+References: AFM-0001, AFM-0003
 
 ## Context
 

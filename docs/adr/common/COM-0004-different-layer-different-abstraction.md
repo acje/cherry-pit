@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-References: COM-0001, COM-0002, COM-0003, COM-0012
+References: COM-0001, COM-0002, COM-0012, COM-0003
 
 ## Context
 

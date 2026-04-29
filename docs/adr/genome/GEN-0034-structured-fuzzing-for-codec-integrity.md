@@ -7,7 +7,7 @@ Status: Proposed
 
 ## Related
 
-References: GEN-0006, GEN-0011, GEN-0013, GEN-0032
+References: GEN-0001, GEN-0032, GEN-0006, GEN-0011, GEN-0013
 
 ## Context
 

@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-References: CHE-0001, CHE-0017, CHE-0024, CHE-0037, CHE-0039
+References: CHE-0001, CHE-0039, CHE-0017, CHE-0024
 
 ## Context
 

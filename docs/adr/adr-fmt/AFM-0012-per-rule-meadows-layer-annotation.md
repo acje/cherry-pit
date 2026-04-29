@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-References: AFM-0011
+References: AFM-0001, AFM-0011
 
 ## Context
 
