@@ -12,7 +12,7 @@ References: AFM-0001
 
 ## Context
 
-AFM-0002 chose manual `std::env::args()` parsing when adr-forge had three flags. The argument surface has grown to six modes with additional parameters (`--depth`, crate name, domain filter). Manual parsing duplicates clap concerns: mutual exclusivity, help text, version display, error formatting. The reassessment trigger in AFM-0002 has been reached.
+AFM-0002 chose manual `std::env::args()` parsing when adr-fmt had three flags. The argument surface has grown to six modes with additional parameters (`--depth`, crate name, domain filter). Manual parsing duplicates clap concerns: mutual exclusivity, help text, version display, error formatting. The reassessment trigger in AFM-0002 has been reached.
 
 ## Decision
 

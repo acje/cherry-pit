@@ -22,13 +22,13 @@ where the validation tool is the specification.
 
 ## Decision
 
-Adopt a layered SSOT architecture where the `adr-forge` binary is
+Adopt a layered SSOT architecture where the `adr-fmt` binary is
 the authoritative specification for all invariant ADR rules.
 
-R1 [5]: The `adr-forge` binary owns all invariant rules: template
+R1 [5]: The `adr-fmt` binary owns all invariant rules: template
   structure, naming, relationships, lifecycle states, link integrity,
   and section ordering
-R2 [5]: `adr-forge.toml` owns configurable aspects: domain
+R2 [5]: `adr-fmt.toml` owns configurable aspects: domain
   definitions, crate mappings, stale directory path, and rule
   parameter overrides
 R3 [5]: `--guidelines` output is the generated reference document
@@ -46,5 +46,5 @@ No rule exists in prose alone — if it cannot be a validation check,
 it belongs in the judgment layer. The `--guidelines` flag eliminates
 a separate writing guide that would drift. Adding invariant rules
 requires code changes, a rule catalog entry, and an AFM-domain ADR.
-The architecture is self-referential: `adr-forge` validates its own
+The architecture is self-referential: `adr-fmt` validates its own
 domain's ADRs.

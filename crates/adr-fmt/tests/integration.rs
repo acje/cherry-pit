@@ -1,7 +1,7 @@
-//! Integration tests for the adr-forge binary.
+//! Integration tests for the adr-fmt binary.
 //!
 //! Each test creates a self-contained tempdir with the necessary file
-//! structure (adr-forge.toml, domain directories, ADR files) and runs the
+//! structure (adr-fmt.toml, domain directories, ADR files) and runs the
 //! binary against it.
 
 use std::fs;
@@ -12,7 +12,7 @@ use tempfile::TempDir;
 
 // ── helpers ─────────────────────────────────────────────────────────
 
-/// Minimal adr-forge.toml for a single-domain test corpus (override-only format).
+/// Minimal adr-fmt.toml for a single-domain test corpus (override-only format).
 const MINIMAL_CONFIG: &str = r#"
 [stale]
 directory = "stale"
@@ -362,7 +362,7 @@ fn setup_multi_corpus(
 
     fs::create_dir_all(&adr_root).expect("create adr root");
     fs::write(adr_root.join("GOVERNANCE.md"), "# Governance\n").expect("write governance");
-    fs::write(adr_root.join("adr-forge.toml"), config).expect("write config");
+    fs::write(adr_root.join("adr-fmt.toml"), config).expect("write config");
 
     for (domain_dir_name, adrs) in domains {
         let domain_dir = adr_root.join(domain_dir_name);
@@ -388,8 +388,8 @@ fn setup_corpus(config: &str, adrs: &[(&str, &str)]) -> TempDir {
     setup_multi_corpus(config, &[("test", adrs)], &[])
 }
 
-fn adr_forge() -> Command {
-    Command::cargo_bin("adr-forge").expect("binary exists")
+fn adr_fmt() -> Command {
+    Command::cargo_bin("adr-fmt").expect("binary exists")
 }
 
 fn adr_root(dir: &TempDir) -> String {
@@ -406,7 +406,7 @@ fn adr_root(dir: &TempDir) -> String {
 fn default_mode_with_config_shows_governance() {
     let dir = setup_corpus(MINIMAL_CONFIG, &[("TST-0001-valid-test-adr.md", VALID_ADR)]);
 
-    adr_forge().arg(adr_root(&dir)).assert().success().stdout(
+    adr_fmt().arg(adr_root(&dir)).assert().success().stdout(
         predicate::str::contains("ADR Governance Reference")
             .and(predicate::str::contains("MODES"))
             .and(predicate::str::contains("TAGGED RULES")),
@@ -419,13 +419,13 @@ fn default_mode_without_config_shows_setup_guide() {
     let root = dir.path().join("docs/adr");
     fs::create_dir_all(&root).expect("create dir");
     fs::write(root.join("GOVERNANCE.md"), "# Governance\n").expect("write governance");
-    // No adr-forge.toml
+    // No adr-fmt.toml
 
-    adr_forge()
+    adr_fmt()
         .arg(root.to_str().unwrap())
         .assert()
         .success()
-        .stdout(predicate::str::contains("adr-forge").and(predicate::str::contains("QUICK START")));
+        .stdout(predicate::str::contains("adr-fmt").and(predicate::str::contains("QUICK START")));
 }
 
 // ── lint mode ──────────────────────────────────────────────────────
@@ -434,7 +434,7 @@ fn default_mode_without_config_shows_setup_guide() {
 fn valid_corpus_clean_output() {
     let dir = setup_corpus(MINIMAL_CONFIG, &[("TST-0001-valid-test-adr.md", VALID_ADR)]);
 
-    adr_forge()
+    adr_fmt()
         .args(["--lint", &adr_root(&dir)])
         .assert()
         .success()
@@ -451,7 +451,7 @@ fn dangling_link_produces_l001() {
         ],
     );
 
-    adr_forge()
+    adr_fmt()
         .args(["--lint", &adr_root(&dir)])
         .assert()
         .success()
@@ -468,7 +468,7 @@ fn legacy_verb_produces_l006() {
         ],
     );
 
-    adr_forge()
+    adr_fmt()
         .args(["--lint", &adr_root(&dir)])
         .assert()
         .success()
@@ -481,7 +481,7 @@ fn legacy_verb_produces_l006() {
 fn empty_domain_directory_graceful() {
     let dir = setup_corpus(MINIMAL_CONFIG, &[]);
 
-    adr_forge()
+    adr_fmt()
         .args(["--lint", &adr_root(&dir)])
         .assert()
         .success()
@@ -493,7 +493,7 @@ fn lint_output_on_stdout() {
     let dir = setup_corpus(MINIMAL_CONFIG, &[("TST-0001-valid-test-adr.md", VALID_ADR)]);
 
     // Verify diagnostics go to stdout
-    adr_forge()
+    adr_fmt()
         .args(["--lint", &adr_root(&dir)])
         .assert()
         .success()
@@ -509,7 +509,7 @@ fn t016_missing_tagged_rules() {
         &[("TST-0004-no-tagged-rules.md", NO_TAGGED_RULES_ADR)],
     );
 
-    adr_forge()
+    adr_fmt()
         .args(["--lint", &adr_root(&dir)])
         .assert()
         .success()
@@ -521,7 +521,7 @@ fn t016_draft_not_exempt() {
     let dir = setup_corpus(MINIMAL_CONFIG, &[("TST-0005-draft-adr.md", DRAFT_ADR)]);
 
     // Draft ADRs are no longer exempt from T016 — should appear in lint output
-    adr_forge()
+    adr_fmt()
         .args(["--lint", &adr_root(&dir)])
         .assert()
         .success()
@@ -535,7 +535,7 @@ fn t016_gap_in_rule_ids() {
         &[("TST-0007-gap-rules-adr.md", GAP_RULES_ADR)],
     );
 
-    adr_forge()
+    adr_fmt()
         .args(["--lint", &adr_root(&dir)])
         .assert()
         .success()
@@ -547,7 +547,7 @@ fn t016_tagged_rules_present_no_warning() {
     let dir = setup_corpus(MINIMAL_CONFIG, &[("TST-0001-valid-test-adr.md", VALID_ADR)]);
 
     // VALID_ADR has tagged rules — no T016
-    adr_forge()
+    adr_fmt()
         .args(["--lint", &adr_root(&dir)])
         .assert()
         .success()
@@ -563,7 +563,7 @@ fn t005c_legacy_status_section() {
         &[("TST-0011-legacy-status-format.md", LEGACY_STATUS_ADR)],
     );
 
-    adr_forge()
+    adr_fmt()
         .args(["--lint", &adr_root(&dir)])
         .assert()
         .success()
@@ -575,7 +575,7 @@ fn t005c_preamble_status_field_no_warning() {
     let dir = setup_corpus(MINIMAL_CONFIG, &[("TST-0001-valid-test-adr.md", VALID_ADR)]);
 
     // VALID_ADR uses `Status: Accepted` preamble field — no T005c
-    adr_forge()
+    adr_fmt()
         .args(["--lint", &adr_root(&dir)])
         .assert()
         .success()
@@ -621,7 +621,7 @@ fn lint_warns_on_invalid_layer() {
         ],
     );
 
-    adr_forge()
+    adr_fmt()
         .args(["--lint", &adr_root(&dir)])
         .assert()
         .success()
@@ -669,7 +669,7 @@ fn lint_multiple_warnings_exits_zero() {
         ],
     );
 
-    adr_forge()
+    adr_fmt()
         .args(["--lint", &adr_root(&dir)])
         .assert()
         .success()
@@ -693,7 +693,7 @@ fn critique_focal_with_connected() {
         ],
     );
 
-    adr_forge()
+    adr_fmt()
         .args(["--critique", "TST-0001", &adr_root(&dir)])
         .assert()
         .success()
@@ -710,7 +710,7 @@ fn critique_isolated_adr() {
     let dir = setup_corpus(MINIMAL_CONFIG, &[("TST-0001-valid-test-adr.md", VALID_ADR)]);
 
     // Isolated ADR: focal only, no connected blocks
-    adr_forge()
+    adr_fmt()
         .args(["--critique", "TST-0001", &adr_root(&dir)])
         .assert()
         .success()
@@ -723,7 +723,7 @@ fn critique_isolated_adr() {
 fn critique_invalid_id_exits_nonzero() {
     let dir = setup_corpus(MINIMAL_CONFIG, &[("TST-0001-valid-test-adr.md", VALID_ADR)]);
 
-    adr_forge()
+    adr_fmt()
         .args(["--critique", "INVALID", &adr_root(&dir)])
         .assert()
         .failure()
@@ -734,7 +734,7 @@ fn critique_invalid_id_exits_nonzero() {
 fn critique_unknown_adr_exits_nonzero() {
     let dir = setup_corpus(MINIMAL_CONFIG, &[("TST-0001-valid-test-adr.md", VALID_ADR)]);
 
-    adr_forge()
+    adr_fmt()
         .args(["--critique", "TST-9999", &adr_root(&dir)])
         .assert()
         .failure()
@@ -751,7 +751,7 @@ fn critique_includes_stale() {
 
     // Critique TST-0001 which is referenced by stale TST-0010
     // Stale ADRs are now included (no filtering)
-    adr_forge()
+    adr_fmt()
         .args(["--critique", "TST-0001", &adr_root(&dir)])
         .assert()
         .success()
@@ -769,7 +769,7 @@ fn critique_depth_limits_traversal() {
     );
 
     // Depth 0: focal only
-    adr_forge()
+    adr_fmt()
         .args(["--critique", "TST-0001", "--depth", "0", &adr_root(&dir)])
         .assert()
         .success()
@@ -784,7 +784,7 @@ fn critique_depth_limits_traversal() {
 fn context_shows_crate_rules() {
     let dir = setup_corpus(MINIMAL_CONFIG, &[("TST-0001-valid-test-adr.md", VALID_ADR)]);
 
-    adr_forge()
+    adr_fmt()
         .args(["--context", "test-core", &adr_root(&dir)])
         .assert()
         .success()
@@ -795,7 +795,7 @@ fn context_shows_crate_rules() {
 fn context_unknown_crate_exits_nonzero() {
     let dir = setup_corpus(MINIMAL_CONFIG, &[("TST-0001-valid-test-adr.md", VALID_ADR)]);
 
-    adr_forge()
+    adr_fmt()
         .args(["--context", "unknown-crate", &adr_root(&dir)])
         .assert()
         .failure()
@@ -817,7 +817,7 @@ fn context_includes_foundation() {
     );
 
     // Foundation domain ADRs should always be included
-    adr_forge()
+    adr_fmt()
         .args(["--context", "test-core", &adr_root(&dir)])
         .assert()
         .success()
@@ -835,7 +835,7 @@ fn context_per_adr_crates_filtering() {
     );
 
     // TST-0006 has Crates: test-core, test-api — should be included
-    adr_forge()
+    adr_fmt()
         .args(["--context", "test-core", &adr_root(&dir)])
         .assert()
         .success()
@@ -919,12 +919,12 @@ fn context_end_to_end_output_format() {
         &[],
     );
 
-    let output = adr_forge()
+    let output = adr_fmt()
         .args(["--context", "test-core", &adr_root(&dir)])
         .output()
-        .expect("run adr-forge");
+        .expect("run adr-fmt");
 
-    assert!(output.status.success(), "adr-forge should succeed");
+    assert!(output.status.success(), "adr-fmt should succeed");
     let stdout = String::from_utf8_lossy(&output.stdout);
 
     // ── Preamble ──
@@ -1007,7 +1007,7 @@ fn tree_produces_output() {
     let dir = setup_corpus(MINIMAL_CONFIG, &[("TST-0001-valid-test-adr.md", VALID_ADR)]);
 
     // Use -- to separate --tree (no domain filter) from positional ADR_DIR
-    adr_forge()
+    adr_fmt()
         .args(["--tree", "--", &adr_root(&dir)])
         .assert()
         .success()
@@ -1029,7 +1029,7 @@ fn tree_filtered_by_domain() {
     );
 
     // Filter to TST domain only
-    adr_forge()
+    adr_fmt()
         .args(["--tree", "TST", &adr_root(&dir)])
         .assert()
         .success()
@@ -1042,7 +1042,7 @@ fn tree_filtered_by_domain() {
 fn tree_unknown_domain_graceful() {
     let dir = setup_corpus(MINIMAL_CONFIG, &[("TST-0001-valid-test-adr.md", VALID_ADR)]);
 
-    adr_forge()
+    adr_fmt()
         .args(["--tree", "NONEXISTENT", &adr_root(&dir)])
         .assert()
         .success()
@@ -1053,7 +1053,7 @@ fn tree_unknown_domain_graceful() {
 
 #[test]
 fn critique_and_context_mutually_exclusive() {
-    adr_forge()
+    adr_fmt()
         .args(["--critique", "TST-0001", "--context", "test-core"])
         .assert()
         .failure()
@@ -1062,7 +1062,7 @@ fn critique_and_context_mutually_exclusive() {
 
 #[test]
 fn lint_and_critique_mutually_exclusive() {
-    adr_forge()
+    adr_fmt()
         .args(["--lint", "--critique", "TST-0001"])
         .assert()
         .failure()
@@ -1071,7 +1071,7 @@ fn lint_and_critique_mutually_exclusive() {
 
 #[test]
 fn critique_and_tree_mutually_exclusive() {
-    adr_forge()
+    adr_fmt()
         .args(["--critique", "TST-0001", "--tree"])
         .assert()
         .failure()
@@ -1086,7 +1086,7 @@ fn lint_missing_config_exits_nonzero() {
     let root = dir.path().join("docs/adr");
     fs::create_dir_all(&root).expect("create dir");
 
-    adr_forge()
+    adr_fmt()
         .args(["--lint", root.to_str().unwrap()])
         .assert()
         .failure()
@@ -1095,25 +1095,25 @@ fn lint_missing_config_exits_nonzero() {
 
 #[test]
 fn help_flag_shows_usage() {
-    adr_forge()
+    adr_fmt()
         .arg("--help")
         .assert()
         .success()
-        .stdout(predicate::str::contains("adr-forge"));
+        .stdout(predicate::str::contains("adr-fmt"));
 }
 
 #[test]
 fn version_flag_shows_version() {
-    adr_forge()
+    adr_fmt()
         .arg("--version")
         .assert()
         .success()
-        .stdout(predicate::str::contains("adr-forge"));
+        .stdout(predicate::str::contains("adr-fmt"));
 }
 
 #[test]
 fn invalid_path_exits_nonzero() {
-    adr_forge()
+    adr_fmt()
         .arg("/nonexistent/path/to/adr")
         .assert()
         .failure()
@@ -1130,7 +1130,7 @@ fn no_files_modified_after_lint() {
     let adr_dir = dir.path().join("docs/adr");
     let before: Vec<_> = walkdir(&adr_dir);
 
-    adr_forge()
+    adr_fmt()
         .args(["--lint", &adr_root(&dir)])
         .assert()
         .success();
@@ -1147,7 +1147,7 @@ fn no_files_modified_after_critique() {
     let adr_dir = dir.path().join("docs/adr");
     let before: Vec<_> = walkdir(&adr_dir);
 
-    adr_forge()
+    adr_fmt()
         .args(["--critique", "TST-0001", &adr_root(&dir)])
         .assert()
         .success();
@@ -1229,7 +1229,7 @@ fn containment_rejects_absolute_domain_directory() {
         &[("TST-0001-valid-test-adr.md", VALID_ADR)],
     );
 
-    adr_forge()
+    adr_fmt()
         .args(["--lint", &adr_root(&dir)])
         .assert()
         .failure()
@@ -1262,7 +1262,7 @@ fn containment_lexical_check_fires_before_canonicalize() {
         &[("TST-0001-valid-test-adr.md", VALID_ADR)],
     );
 
-    adr_forge()
+    adr_fmt()
         .args(["--lint", &adr_root(&dir)])
         .assert()
         .failure()
@@ -1278,7 +1278,7 @@ fn containment_rejects_parent_traversal_domain_directory() {
         &[("TST-0001-valid-test-adr.md", VALID_ADR)],
     );
 
-    adr_forge()
+    adr_fmt()
         .args(["--lint", &adr_root(&dir)])
         .assert()
         .failure()
@@ -1294,7 +1294,7 @@ fn containment_rejects_parent_traversal_stale_directory() {
         &[("TST-0001-valid-test-adr.md", VALID_ADR)],
     );
 
-    adr_forge()
+    adr_fmt()
         .args(["--lint", &adr_root(&dir)])
         .assert()
         .failure()
@@ -1317,7 +1317,7 @@ fn containment_rejects_symlink_escape_in_domain_directory() {
     fs::create_dir_all(&adr_root_path).expect("create adr root");
     fs::write(adr_root_path.join("GOVERNANCE.md"), "# Governance\n").expect("write governance");
     fs::write(
-        adr_root_path.join("adr-forge.toml"),
+        adr_root_path.join("adr-fmt.toml"),
         r#"
 [stale]
 directory = "stale"
@@ -1333,7 +1333,7 @@ crates = []
     .expect("write config");
     symlink(&outside, adr_root_path.join("test")).expect("create symlink");
 
-    adr_forge()
+    adr_fmt()
         .args(["--lint", adr_root_path.to_str().expect("path utf8")])
         .assert()
         .failure()
@@ -1355,7 +1355,7 @@ fn containment_accepts_symlink_inside_root() {
     let adr_root_path = dir.path().join("docs/adr");
     fs::create_dir_all(&adr_root_path).expect("create adr root");
     fs::write(adr_root_path.join("GOVERNANCE.md"), "# Governance\n").expect("write governance");
-    fs::write(adr_root_path.join("adr-forge.toml"), MINIMAL_CONFIG).expect("write config");
+    fs::write(adr_root_path.join("adr-fmt.toml"), MINIMAL_CONFIG).expect("write config");
 
     // Real `test/` directory at adr_root/real-test, then symlink test → real-test.
     let real = adr_root_path.join("real-test");
@@ -1363,7 +1363,7 @@ fn containment_accepts_symlink_inside_root() {
     fs::write(real.join("TST-0001-valid-test-adr.md"), VALID_ADR).expect("write ADR");
     symlink(&real, adr_root_path.join("test")).expect("create symlink");
 
-    adr_forge()
+    adr_fmt()
         .args(["--lint", adr_root_path.to_str().expect("path utf8")])
         .assert()
         .success()
@@ -1389,7 +1389,7 @@ fn parser_p002_missing_title_emits_warning() {
         ],
     );
 
-    adr_forge()
+    adr_fmt()
         .args(["--lint", &adr_root(&dir)])
         .assert()
         .success()
@@ -1410,7 +1410,7 @@ fn parser_p002_empty_file_emits_warning() {
         ],
     );
 
-    adr_forge()
+    adr_fmt()
         .args(["--lint", &adr_root(&dir)])
         .assert()
         .success()
@@ -1433,7 +1433,7 @@ fn parser_p001_unreadable_file_emits_warning() {
         .join("TST-0004-actually-a-dir.md");
     fs::create_dir(&test_subdir).expect("create masquerading dir");
 
-    adr_forge()
+    adr_fmt()
         .args(["--lint", &adr_root(&dir)])
         .assert()
         .success()
@@ -1449,7 +1449,7 @@ fn parser_p001_unreadable_file_emits_warning() {
 fn parser_no_p_codes_for_valid_corpus() {
     let dir = setup_corpus(MINIMAL_CONFIG, &[("TST-0001-valid-test-adr.md", VALID_ADR)]);
 
-    adr_forge()
+    adr_fmt()
         .args(["--lint", &adr_root(&dir)])
         .assert()
         .success()

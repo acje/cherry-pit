@@ -1,4 +1,4 @@
-# adr-forge configuration
+# adr-fmt configuration
 #
 # Domain definitions, crate mappings, and stale directory config.
 # Rules are hardcoded in the binary — only parameter overrides go here.
@@ -89,15 +89,15 @@ foundation = true
 
 [[domains]]
 prefix = "AFM"
-name = "adr-forge Domain"
-directory = "adr-forge"
+name = "adr-fmt Domain"
+directory = "adr-fmt"
 description = """\
     ADR governance tooling: CLI design, MADR template enforcement, \
     markdown parsing strategy, diagnostic output, safe-write \
     semantics, naming conventions, relationship vocabulary, tier \
-    classification, and domain management. Covers the adr-forge \
+    classification, and domain management. Covers the adr-fmt \
     binary's own architectural decisions as a Rust CLI tool."""
-crates = ["adr-forge"]
+crates = ["adr-fmt"]
 
 # ── Rule parameter overrides ────────────────────────────────────────
 #

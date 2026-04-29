@@ -24,7 +24,7 @@ drift was corrected on re-review.
 
 ## Decision
 
-`adr-forge` exits 0 for all lint findings and exits 1 only for
+`adr-fmt` exits 0 for all lint findings and exits 1 only for
 infrastructure errors. All advisory diagnostics — both rule
 findings and parser-stage findings (AFM-0017) — emit warnings,
 never errors.
@@ -35,7 +35,7 @@ R1 [5]: Exit 0 when lint completes; exit 1 only for infrastructure
   diagnostic channel
 R2 [5]: Emit every advisory finding (rule findings and parser-stage
   findings per AFM-0017) as Severity::Warning via
-  Diagnostic::warning in adr-forge/src/report.rs; the Severity enum
+  Diagnostic::warning in adr-fmt/src/report.rs; the Severity enum
   exposes only the Warning variant for the advisory diagnostic stream
 R3 [5]: Delegate zero-warning enforcement to CI wrapper scripts that
   parse the `## Diagnostics: N warning(s)` header on stdout and fail

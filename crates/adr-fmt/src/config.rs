@@ -1,4 +1,4 @@
-//! Configuration loading from `adr-forge.toml`.
+//! Configuration loading from `adr-fmt.toml`.
 //!
 //! The config file defines domain mappings, stale directory, and optional
 //! rule parameter overrides. Rules themselves are hardcoded in the binary.
@@ -66,15 +66,15 @@ impl Config {
     }
 }
 
-/// Load configuration from `adr-forge.toml` in the ADR root directory.
+/// Load configuration from `adr-fmt.toml` in the ADR root directory.
 ///
 /// Returns an error string if the file is missing or malformed.
 pub fn load(adr_root: &Path) -> Result<Config, String> {
-    let config_path = adr_root.join("adr-forge.toml");
+    let config_path = adr_root.join("adr-fmt.toml");
 
     let content = std::fs::read_to_string(&config_path).map_err(|e| {
         format!(
-            "cannot read {}: {e}\n       adr-forge.toml is required",
+            "cannot read {}: {e}\n       adr-fmt.toml is required",
             config_path.display()
         )
     })?;
@@ -91,7 +91,7 @@ pub fn load(adr_root: &Path) -> Result<Config, String> {
 /// Try to load configuration, returning None if the file does not exist.
 /// Used by guidelines mode to distinguish "no config" from "bad config".
 pub fn try_load(adr_root: &Path) -> Result<Option<Config>, String> {
-    let config_path = adr_root.join("adr-forge.toml");
+    let config_path = adr_root.join("adr-fmt.toml");
 
     if !config_path.is_file() {
         return Ok(None);
@@ -112,7 +112,7 @@ fn emit_legacy_rule_warnings(config: &Config) {
         .count();
 
     if legacy_count > 0 {
-        eprintln!("warning: adr-forge.toml contains {legacy_count} legacy rule declaration(s)");
+        eprintln!("warning: adr-fmt.toml contains {legacy_count} legacy rule declaration(s)");
         eprintln!("         Rules are now hardcoded in the binary. Only parameter overrides");
         eprintln!("         are needed in config. Remove `category` and `description` fields.");
         eprintln!("         Example override: [[rules]]");

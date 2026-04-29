@@ -6,11 +6,11 @@
 //! # Modes
 //!
 //! ```text
-//! adr-forge [<ADR_DIR>]                     # default: print governance guidelines
-//! adr-forge --lint [<ADR_DIR>]              # lint all ADRs
-//! adr-forge --critique <ADR_ID> [<ADR_DIR>] # focal ADR + direct neighbors
-//! adr-forge --context <CRATE> [<ADR_DIR>]   # decision rules for a crate
-//! adr-forge --tree [DOMAIN] [<ADR_DIR>]     # domain tree overview
+//! adr-fmt [<ADR_DIR>]                     # default: print governance guidelines
+//! adr-fmt --lint [<ADR_DIR>]              # lint all ADRs
+//! adr-fmt --critique <ADR_ID> [<ADR_DIR>] # focal ADR + direct neighbors
+//! adr-fmt --context <CRATE> [<ADR_DIR>]   # decision rules for a crate
+//! adr-fmt --tree [DOMAIN] [<ADR_DIR>]     # domain tree overview
 //! ```
 //!
 //! Exit codes:
@@ -41,7 +41,7 @@ use model::{DomainDir, parse_adr_id};
 
 /// ADR template and link-integrity validator for cherry-pit.
 #[derive(Parser)]
-#[command(name = "adr-forge", version)]
+#[command(name = "adr-fmt", version)]
 struct Cli {
     /// Lint all ADRs, report diagnostics to stdout
     #[arg(long, group = "mode")]
@@ -177,7 +177,7 @@ fn main() {
     {
         Ok(opt) => opt,
         Err(e) => {
-            eprintln!("error: stale directory in adr-forge.toml: {e}");
+            eprintln!("error: stale directory in adr-fmt.toml: {e}");
             process::exit(1);
         }
     };
@@ -283,7 +283,7 @@ fn resolve_adr_root_optional() -> Result<Option<PathBuf>, String> {
 
 /// Build domain directories from config, applying strict containment.
 ///
-/// Each `domain.directory` from `adr-forge.toml` is joined to `root`
+/// Each `domain.directory` from `adr-fmt.toml` is joined to `root`
 /// via [`containment::contained_join_optional`]: absolute paths and
 /// `..` components are rejected, and the canonical target must be a
 /// descendant of the canonical ADR root. Containment failures abort

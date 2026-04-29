@@ -12,7 +12,7 @@ References: AFM-0001
 
 ## Context
 
-`adr-forge` has an exceptionally narrow argument surface: one optional
+`adr-fmt` has an exceptionally narrow argument surface: one optional
 positional path and three mutually exclusive flags. Clap's dependency
 tree (clap_builder, clap_lex, strsim, anstream, plus optional
 proc-macro deps) provides no proportional benefit for three flags.

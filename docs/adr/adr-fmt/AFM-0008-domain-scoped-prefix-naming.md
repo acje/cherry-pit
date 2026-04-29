@@ -28,7 +28,7 @@ number.
 
 R1 [5]: Filename matches `PREFIX-NNNN-kebab-slug.md` and H1 title
   contains the same `PREFIX-NNNN` identifier (N001, N002, N003)
-R2 [5]: Domain prefixes are registered in `adr-forge.toml` under
+R2 [5]: Domain prefixes are registered in `adr-fmt.toml` under
   `[[domains]]`; unregistered prefixes trigger a warning (N004)
 R3 [5]: Numbers are sequential within each domain, never reused;
   gaps from rejected or superseded ADRs are permitted

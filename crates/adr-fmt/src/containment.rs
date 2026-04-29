@@ -1,6 +1,6 @@
 //! Path containment for config-supplied directory strings.
 //!
-//! `adr-forge` joins relative paths from `adr-forge.toml` (domain
+//! `adr-fmt` joins relative paths from `adr-fmt.toml` (domain
 //! directories, stale directory) to the ADR root before reading
 //! files. A malicious or buggy config with an absolute path, a
 //! parent traversal (`..`), or a symlink escape could induce the

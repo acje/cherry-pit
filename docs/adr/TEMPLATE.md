@@ -1,6 +1,6 @@
 # ADR Template — Golden Reference
 
-Last-updated: 2026-04-28
+Last-updated: 2026-04-29
 
 This template defines the canonical structure for Architecture Decision
 Records in the cherry-pit workspace. It serves two audiences
@@ -9,7 +9,7 @@ simultaneously:
 1. **Humans** — Context, Related, and Consequences sections provide
    narrative rationale, rejected alternatives, and trade-off analysis.
 2. **Agents** — Tagged rules in the Decision section are extracted
-   verbatim by `adr-forge --context <CRATE>` and delivered as a skill
+   verbatim by `adr-fmt --context <CRATE>` and delivered as a skill
    to the coding agent. The rule text is all the agent sees.
 
 The dual-audience design means: write Context and Consequences for
@@ -29,7 +29,7 @@ Status: Draft | Proposed | Accepted | Rejected | Deprecated | Superseded by PREF
 
 ## Related
 
-Root: OWN-ID | References: PREFIX-NNNN, PREFIX-NNNN | Supersedes: PREFIX-NNNN
+References: PREFIX-NNNN, PREFIX-NNNN | Supersedes: PREFIX-NNNN
 
 ## Context
 
@@ -61,7 +61,7 @@ of prose, excluding code blocks.]
 
 **Format:** H1 with domain prefix, zero-padded 4-digit number, dot,
 space, title text. The prefix must match one configured in
-`adr-forge.toml`. The number must match the filename.
+`adr-fmt.toml`. The number must match the filename.
 
 **Guidance:** Title should name the *decision*, not the problem.
 "EventEnvelope Construction Invariants" names the solution space.
@@ -193,11 +193,11 @@ Three permitted verbs:
 | Supersedes | Replaces target entirely | This ADR obsoletes a previous decision |
 
 **Reference order matters.** List references in order of significance
-— most significant first. `adr-forge --context` assigns each ADR to a
+— most significant first. `adr-fmt --context` assigns each ADR to a
 root subtree using the **first root referenced** in document order.
 Reference ordering governs subtree assignment and communicates which
 relationships are primary constraints vs. secondary context. See
-RELATIONSHIPS section in `cargo run -p adr-forge` output.
+RELATIONSHIPS section in `cargo run -p adr-fmt` output.
 
 **Constraints:** Root and References cannot coexist (L009). Every
 ADR must have at least one relationship — no orphans (T007).
@@ -549,7 +549,7 @@ R4 [5]: Call EventEnvelope::validate() after deserialization in
 
 ## Agent-Extracted Output
 
-Running `adr-forge --context cherry-pit-core` produces a root-grouped
+Running `adr-fmt --context cherry-pit-core` produces a root-grouped
 list organized by root ADR subtrees. The worked example above renders
 under its root's group:
 
@@ -603,8 +603,8 @@ the layer-annotated format (`R1 [N]: text`). To migrate:
 4. Eliminate any conditional framing ("when X, do Y")
 5. Ensure every rule names at least one concrete type, method, or file
 6. Distill each into a tagged rule (`R1 [N]: text`)
-7. Run `cargo run -p adr-forge -- --lint` — T016 should stop firing
-8. Run `cargo run -p adr-forge -- --context <CRATE>` to verify the
+7. Run `cargo run -p adr-fmt -- --lint` — T016 should stop firing
+8. Run `cargo run -p adr-fmt -- --context <CRATE>` to verify the
    extracted rules read well in isolation
 
 **Prioritize migration by tier:** S-tier ADRs first (they appear

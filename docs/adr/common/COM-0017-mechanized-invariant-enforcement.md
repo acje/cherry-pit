@@ -13,7 +13,7 @@ References: COM-0001, COM-0009
 
 COM-0009 rule 3 frames mechanical enforcement as a fallback from convention. In practice, cherry-pit inverts this: mechanical enforcement is the *primary* strategy. Human-enforced rules degrade — reviewers are inconsistent and fatigued. Machine-enforced rules are deterministic, catching every violation on every commit.
 
-Cherry-pit's enforcement hierarchy: type system (`AggregateId(NonZeroU64)`), compiler lints (`#[non_exhaustive]` per CHE-0021), static analysis (`clippy::pedantic` per CHE-0026), compile-fail tests (`trybuild` per CHE-0028), custom tooling (`adr-forge`), and code review as fallback for invariants not yet mechanized.
+Cherry-pit's enforcement hierarchy: type system (`AggregateId(NonZeroU64)`), compiler lints (`#[non_exhaustive]` per CHE-0021), static analysis (`clippy::pedantic` per CHE-0026), compile-fail tests (`trybuild` per CHE-0028), custom tooling (`adr-fmt`), and code review as fallback for invariants not yet mechanized.
 
 ## Decision
 
@@ -40,4 +40,4 @@ R5 [6]: Enforcement escalation ladder from strongest to weakest:
 
 ## Consequences
 
-ADRs establishing rules without enforcement mechanisms are incomplete under COM-0017. Compile-fail tests (CHE-0028) are a first-class enforcement mechanism between "compiler lint" and "CI gate" on the escalation ladder. `adr-forge` mechanizes template conformance, link integrity, and naming conventions. Clippy pedantic (CHE-0026) is an enforcement strategy. New invariants must identify their enforcement mechanism — "we'll catch it in review" signals a mechanization opportunity. For distributed invariants (wire format compatibility, ordering guarantees), property-based tests and golden-file comparisons (CHE-0038) extend mechanization into runtime verification. Not every guideline benefits from rigid enforcement; taste and judgment resist mechanization, so code review remains valid for subjective invariants.
+ADRs establishing rules without enforcement mechanisms are incomplete under COM-0017. Compile-fail tests (CHE-0028) are a first-class enforcement mechanism between "compiler lint" and "CI gate" on the escalation ladder. `adr-fmt` mechanizes template conformance, link integrity, and naming conventions. Clippy pedantic (CHE-0026) is an enforcement strategy. New invariants must identify their enforcement mechanism — "we'll catch it in review" signals a mechanization opportunity. For distributed invariants (wire format compatibility, ordering guarantees), property-based tests and golden-file comparisons (CHE-0038) extend mechanization into runtime verification. Not every guideline benefits from rigid enforcement; taste and judgment resist mechanization, so code review remains valid for subjective invariants.

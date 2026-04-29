@@ -1,8 +1,8 @@
-# adr-forge Refactor Plan — Idiomatic Rust & ADR Alignment
+# adr-fmt Refactor Plan — Idiomatic Rust & ADR Alignment
 
 ## Summary
 
-Analysis of the `adr-forge` crate against idiomatic Rust practices and the ADR corpus
+Analysis of the `adr-fmt` crate against idiomatic Rust practices and the ADR corpus
 (123 ADRs across 6 domains). Two high-risk ADR compliance violations, nine medium/low
 idiomatic Rust deviations, and five test coverage gaps identified.
 
@@ -186,7 +186,7 @@ Arguments for amend (stdout):
 
 Arguments for revert (stderr):
 - Unix convention: diagnostics/warnings to stderr
-- Enables `adr-forge 2>/dev/null` to suppress warnings
+- Enables `adr-fmt 2>/dev/null` to suppress warnings
 - Consistent with clippy/rustc output model
 
 ### Q3. Error type scope

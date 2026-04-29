@@ -1,5 +1,5 @@
 [package]
-name = "adr-forge"
+name = "adr-fmt"
 version = "0.1.0"
 description = "ADR template and link-integrity validator for cherry-pit"
 edition.workspace = true

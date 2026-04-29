@@ -11,7 +11,7 @@ References: AFM-0003, AFM-0006
 
 ## Context
 
-`adr-forge` previously swallowed parser-stage failures: a file
+`adr-fmt` previously swallowed parser-stage failures: a file
 matching the prefix filename pattern but failing to parse
 (unreadable, or missing/malformed `# PREFIX-NNNN. Title`) dropped
 silently from the corpus. The user saw a clean lint while the ADR
@@ -33,11 +33,11 @@ R1 [5]: Define parser-stage diagnostic codes in the `P###`
   and `I###` (integrity), to signal that the file failed to
   parse rather than violated a rule
 R2 [5]: Emit `P001` via `Diagnostic::warning("P001", path, 0, msg)`
-  in `crates/adr-forge/src/parser.rs` when a file matches the
+  in `crates/adr-fmt/src/parser.rs` when a file matches the
   domain prefix filename pattern but `fs::read_to_string` fails;
   the ADR is excluded from rule checks for that run
 R3 [5]: Emit `P002` via `Diagnostic::warning("P002", path, 0, msg)`
-  in `crates/adr-forge/src/parser.rs` when a file is readable but
+  in `crates/adr-fmt/src/parser.rs` when a file is readable but
   contains no `# PREFIX-NNNN. Title` H1 header recognized by
   `parse_title`; the ADR is excluded from rule checks for that run
 R4 [5]: Return `Result<ParseOutcome, String>` from `parse_domain`
@@ -45,7 +45,7 @@ R4 [5]: Return `Result<ParseOutcome, String>` from `parse_domain`
   entries that route through the AFM-0003 R1 infrastructure-error
   channel via `eprintln!` plus `process::exit(1)`
 R5 [6]: Merge parser diagnostics with rule diagnostics in
-  `crates/adr-forge/src/main.rs` before calling
+  `crates/adr-fmt/src/main.rs` before calling
   `output::render_diagnostics` so the AFM-0003 R3 stdout
   contract surfaces a single combined `## Diagnostics` block
 

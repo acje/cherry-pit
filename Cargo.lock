@@ -3,7 +3,7 @@
 version = 4
 
 [[package]]
-name = "adr-forge"
+name = "adr-fmt"
 version = "0.1.0"
 dependencies = [
  "assert_cmd",

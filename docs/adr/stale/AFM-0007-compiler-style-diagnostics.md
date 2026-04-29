@@ -37,7 +37,7 @@ R3 [5]: Stdout is reserved exclusively for `--guidelines` and
 ## Consequences
 
 Developers accustomed to `cargo clippy` immediately understand
-`adr-forge` output. Rule IDs enable targeted discussions ("address
+`adr-fmt` output. Rule IDs enable targeted discussions ("address
 all T015 warnings"). The stderr/stdout split enables clean piping
 (`--guidelines > file.md`). Future `--format json` is compatible
 as an alternative mode. The `Diagnostic` struct is intentionally
@@ -48,7 +48,7 @@ simple (~30 lines, no diagnostic rendering dependencies).
 Superseded-by: AFM-0014
 Moved-to-stale: 2026-04-28
 Reason: All six output modes now produce unified markdown on stdout.
-The compiler-style stderr format was abandoned as adr-forge expanded
+The compiler-style stderr format was abandoned as adr-fmt expanded
 beyond lint-only usage. The print_diagnostic function in report.rs
 is dead code. Markdown formatting provides richer presentation
 while maintaining greppable rule IDs.
