@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-References: AFM-0001
+References: AFM-0001, AFM-0017
 
 ## Context
 
@@ -25,15 +25,18 @@ drift was corrected on re-review.
 ## Decision
 
 `adr-forge` exits 0 for all lint findings and exits 1 only for
-infrastructure errors. All validation rules emit warnings, never
-errors.
+infrastructure errors. All advisory diagnostics — both rule
+findings and parser-stage findings (AFM-0017) — emit warnings,
+never errors.
 
 R1 [5]: Exit 0 when lint completes; exit 1 only for infrastructure
-  failures (missing config, unreadable files, invalid configuration)
-  signalled via stderr in main, never through the diagnostic channel
-R2 [5]: Emit every rule finding as Severity::Warning via
+  failures (missing config, unreadable directories, invalid
+  configuration) signalled via stderr in main, never through the
+  diagnostic channel
+R2 [5]: Emit every advisory finding (rule findings and parser-stage
+  findings per AFM-0017) as Severity::Warning via
   Diagnostic::warning in adr-forge/src/report.rs; the Severity enum
-  exposes only the Warning variant for rule-driven diagnostics
+  exposes only the Warning variant for the advisory diagnostic stream
 R3 [5]: Delegate zero-warning enforcement to CI wrapper scripts that
   parse the `## Diagnostics: N warning(s)` header on stdout and fail
   the job when N exceeds the project threshold

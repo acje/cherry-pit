@@ -1,4 +1,17 @@
 //! ADR file parser — extracts metadata from markdown files.
+//!
+//! Per AFM-0017, parser-stage failures are surfaced through the
+//! `P###` diagnostic namespace:
+//! - `P001` — unreadable file (filename matches the prefix pattern
+//!   but `fs::read_to_string` fails for a non-infrastructure reason
+//!   such as transient I/O). The ADR is excluded from rule checks.
+//! - `P002` — missing or malformed H1 title (filename matches but
+//!   no `# PREFIX-NNNN. Title` header is found). Excluded from rules.
+//!
+//! Infrastructure failures (unreadable domain directory after
+//! containment passes, e.g. permission denied on a canonicalized
+//! path) bubble as `Err(String)` for `eprintln!` + `process::exit(1)`
+//! per AFM-0003 R1.
 
 use std::collections::HashMap;
 use std::fs;
@@ -12,14 +25,36 @@ use crate::model::{
     AdrId, AdrRecord, DomainDir, RelVerb, Relationship, Status, TaggedRule, Tier,
     parse_adr_id_from_str,
 };
+use crate::report::Diagnostic;
+
+/// Records and diagnostics produced by parsing a directory of ADRs.
+///
+/// `records` contains successfully parsed ADRs ready for rule evaluation.
+/// `diagnostics` carries per-file `P###` warnings (per AFM-0017) for
+/// files whose filenames matched the prefix pattern but whose contents
+/// could not be parsed. Infrastructure failures (unreadable directory)
+/// surface as `Err(String)` from the calling parser entrypoints.
+#[derive(Debug, Default)]
+pub struct ParseOutcome {
+    pub records: Vec<AdrRecord>,
+    pub diagnostics: Vec<Diagnostic>,
+}
 
 /// Parse all ADR files in a domain directory.
-pub fn parse_domain(dir: &DomainDir) -> Vec<AdrRecord> {
-    let mut records = Vec::new();
+///
+/// Returns `Err` only when the domain directory itself cannot be
+/// read; per-file failures are reported as `P###` diagnostics on
+/// the returned `ParseOutcome`.
+pub fn parse_domain(dir: &DomainDir) -> Result<ParseOutcome, String> {
+    let mut outcome = ParseOutcome::default();
 
-    let Ok(entries) = fs::read_dir(&dir.path) else {
-        return records;
-    };
+    let entries = fs::read_dir(&dir.path).map_err(|e| {
+        format!(
+            "cannot read domain directory {}: {}",
+            dir.path.display().to_string().escape_debug(),
+            e.to_string().escape_debug()
+        )
+    })?;
 
     let filename_re = Regex::new(&format!(
         r"^{}-(\d{{4}})-[a-z0-9]+(?:-[a-z0-9]+)*\.md$",
@@ -27,6 +62,9 @@ pub fn parse_domain(dir: &DomainDir) -> Vec<AdrRecord> {
     ))
     .expect("valid regex");
 
+    // `entries.flatten()` discards per-entry `io::Error`s (file
+    // vanished mid-iter, transient FS errors). These are rare and
+    // accepted as silent skips per Phase 4 design.
     for entry in entries.flatten() {
         let file_name = entry.file_name();
         let name = file_name.to_string_lossy();
@@ -35,25 +73,45 @@ pub fn parse_domain(dir: &DomainDir) -> Vec<AdrRecord> {
             continue;
         }
 
-        if let Some(record) = parse_adr_file(&entry.path(), &dir.prefix, false) {
-            records.push(record);
+        match parse_adr_file(&entry.path(), &dir.prefix, false) {
+            Ok(file_outcome) => {
+                if let Some(record) = file_outcome.record {
+                    outcome.records.push(record);
+                }
+                outcome.diagnostics.extend(file_outcome.diagnostics);
+            }
+            Err(e) => {
+                // Read failure on a file that matched the filename
+                // pattern. Surface as P001 (advisory-only per AFM-0003).
+                outcome.diagnostics.push(Diagnostic::warning(
+                    "P001",
+                    &entry.path(),
+                    0,
+                    format!("cannot read ADR file: {}", e.escape_debug()),
+                ));
+            }
         }
     }
 
-    records.sort_by_key(|r| r.id.number);
-    records
+    outcome.records.sort_by_key(|r| r.id.number);
+    Ok(outcome)
 }
 
 /// Parse all ADR files in the stale directory.
 ///
 /// Stale files may belong to any domain, so we try all configured
-/// domain prefixes.
-pub fn parse_stale(stale_dir: &Path, config: &Config) -> Vec<AdrRecord> {
-    let mut records = Vec::new();
+/// domain prefixes. Returns `Err` only when the stale directory
+/// cannot be read.
+pub fn parse_stale(stale_dir: &Path, config: &Config) -> Result<ParseOutcome, String> {
+    let mut outcome = ParseOutcome::default();
 
-    let Ok(entries) = fs::read_dir(stale_dir) else {
-        return records;
-    };
+    let entries = fs::read_dir(stale_dir).map_err(|e| {
+        format!(
+            "cannot read stale directory {}: {}",
+            stale_dir.display().to_string().escape_debug(),
+            e.to_string().escape_debug()
+        )
+    })?;
 
     let prefixes: Vec<(&str, Regex)> = config
         .domains
@@ -81,29 +139,82 @@ pub fn parse_stale(stale_dir: &Path, config: &Config) -> Vec<AdrRecord> {
         // Try each prefix to find which domain this stale ADR belongs to
         for (prefix, re) in &prefixes {
             if re.is_match(&name) {
-                if let Some(record) = parse_adr_file(&entry.path(), prefix, true) {
-                    records.push(record);
+                match parse_adr_file(&entry.path(), prefix, true) {
+                    Ok(file_outcome) => {
+                        if let Some(record) = file_outcome.record {
+                            outcome.records.push(record);
+                        }
+                        outcome.diagnostics.extend(file_outcome.diagnostics);
+                    }
+                    Err(e) => {
+                        outcome.diagnostics.push(Diagnostic::warning(
+                            "P001",
+                            &entry.path(),
+                            0,
+                            format!("cannot read ADR file: {}", e.escape_debug()),
+                        ));
+                    }
                 }
                 break;
             }
         }
     }
 
-    records.sort_by_key(|r| r.id.number);
-    records
+    outcome.records.sort_by_key(|r| r.id.number);
+    Ok(outcome)
 }
 
-/// Parse a single ADR file into an `AdrRecord`.
-pub fn parse_adr_file(path: &Path, expected_prefix: &str, is_stale: bool) -> Option<AdrRecord> {
-    let content = fs::read_to_string(path).ok()?;
+/// Records and diagnostics produced by parsing a single ADR file.
+///
+/// `record` is `None` when the file could be read but the H1 title
+/// is missing or malformed (a P002 diagnostic accompanies it).
+#[derive(Debug, Default)]
+pub struct ParseFileOutcome {
+    pub record: Option<AdrRecord>,
+    pub diagnostics: Vec<Diagnostic>,
+}
+
+/// Parse a single ADR file.
+///
+/// Returns `Err` when the file cannot be read (caller maps to P001).
+/// Returns `Ok` with an empty `record` and a P002 diagnostic when the
+/// H1 title is missing or malformed.
+pub fn parse_adr_file(
+    path: &Path,
+    expected_prefix: &str,
+    is_stale: bool,
+) -> Result<ParseFileOutcome, String> {
+    let content = fs::read_to_string(path).map_err(|e| e.to_string())?;
     let lines: Vec<&str> = content.lines().collect();
 
+    let mut outcome = ParseFileOutcome::default();
+
     if lines.is_empty() {
-        return None;
+        outcome.diagnostics.push(Diagnostic::warning(
+            "P002",
+            path,
+            0,
+            format!(
+                "ADR file is empty; expected `# {}-NNNN. Title` H1",
+                expected_prefix.escape_debug()
+            ),
+        ));
+        return Ok(outcome);
     }
 
     // --- H1: title and ID ---
-    let (id, title, title_line) = parse_title(&lines, expected_prefix)?;
+    let Some((id, title, title_line)) = parse_title(&lines, expected_prefix) else {
+        outcome.diagnostics.push(Diagnostic::warning(
+            "P002",
+            path,
+            0,
+            format!(
+                "missing or malformed H1 title; expected `# {}-NNNN. Title text`",
+                expected_prefix.escape_debug()
+            ),
+        ));
+        return Ok(outcome);
+    };
 
     // --- Metadata fields ---
     let (date, _) = find_field(&lines, "Date:");
@@ -147,7 +258,7 @@ pub fn parse_adr_file(path: &Path, expected_prefix: &str, is_stale: bool) -> Opt
     let (max_code_block_lines, _code_block_count, max_code_block_line) =
         measure_code_blocks(&lines);
 
-    Some(AdrRecord {
+    outcome.record = Some(AdrRecord {
         id,
         file_path: path.to_owned(),
         title: Some(title),
@@ -173,7 +284,8 @@ pub fn parse_adr_file(path: &Path, expected_prefix: &str, is_stale: bool) -> Opt
         section_word_counts,
         crates,
         decision_rules,
-    })
+    });
+    Ok(outcome)
 }
 
 /// Parse the H1 title line: `# PREFIX-NNNN. Title text`.
@@ -1033,7 +1145,7 @@ mod tests {
     // ── Status metadata field tests ────────────────────────────────────
 
     #[test]
-    fn find_status_field_parses_accepted() {
+    fn preamble_status_field_clears_status_from_section() {
         let lines = vec![
             "# CHE-0001. Title",
             "Date: 2026-04-27",
@@ -1042,10 +1154,190 @@ mod tests {
             "",
             "## Related",
         ];
-        let (status, line, raw) = find_status_field(&lines);
-        assert_eq!(status, Some(Status::Accepted));
-        assert_eq!(line, 4); // 1-indexed
-        assert_eq!(raw.as_deref(), Some("Accepted"));
+        let (field, _, _) = find_status_field(&lines);
+        let (section, _, _) = find_status_section(&lines);
+
+        let from_section = field.is_none() && section.is_some();
+        assert!(!from_section, "status_from_section should be false");
+    }
+
+    // ── Parser-stage diagnostic emission (AFM-0017) ─────────────────
+
+    #[test]
+    fn parse_adr_file_empty_file_emits_p002() {
+        // Write a 0-byte file and verify P002 is emitted with no record
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("CHE-0001-empty.md");
+        fs::write(&path, "").expect("write empty file");
+
+        let outcome = parse_adr_file(&path, "CHE", false).expect("read should succeed");
+        assert!(outcome.record.is_none(), "no record from empty file");
+        assert_eq!(outcome.diagnostics.len(), 1);
+        assert_eq!(outcome.diagnostics[0].rule, "P002");
+        assert!(
+            outcome.diagnostics[0].message.contains("empty"),
+            "message should mention empty"
+        );
+    }
+
+    #[test]
+    fn parse_adr_file_missing_h1_emits_p002() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("CHE-0001-no-h1.md");
+        fs::write(
+            &path,
+            "Some prose without an H1 title.\n\n## Status\n\nAccepted\n",
+        )
+        .expect("write file");
+
+        let outcome = parse_adr_file(&path, "CHE", false).expect("read should succeed");
+        assert!(outcome.record.is_none(), "no record without H1");
+        assert_eq!(outcome.diagnostics.len(), 1);
+        assert_eq!(outcome.diagnostics[0].rule, "P002");
+        assert!(
+            outcome.diagnostics[0].message.contains("missing or malformed"),
+            "message should mention malformed title"
+        );
+    }
+
+    #[test]
+    fn parse_adr_file_wrong_prefix_h1_emits_p002() {
+        // H1 has a valid format but the prefix doesn't match the expected one
+        // (the file is in the CHE domain dir but its H1 says PAR-0001)
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("CHE-0001-wrong-prefix.md");
+        fs::write(&path, "# PAR-0001. Wrong prefix\n").expect("write file");
+
+        let outcome = parse_adr_file(&path, "CHE", false).expect("read should succeed");
+        assert!(
+            outcome.record.is_none(),
+            "no record when prefix doesn't match expected"
+        );
+        assert_eq!(outcome.diagnostics.len(), 1);
+        assert_eq!(outcome.diagnostics[0].rule, "P002");
+    }
+
+    #[test]
+    fn parse_adr_file_valid_h1_emits_no_diagnostics() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("CHE-0001-valid.md");
+        fs::write(
+            &path,
+            "# CHE-0001. Valid Title\n\nDate: 2026-04-29\nTier: B\nStatus: Accepted\n\n## Related\n\nRoot: CHE-0001\n\n## Context\n\nProse.\n",
+        )
+        .expect("write file");
+
+        let outcome = parse_adr_file(&path, "CHE", false).expect("read should succeed");
+        assert!(outcome.record.is_some(), "record should be parsed");
+        assert!(
+            outcome.diagnostics.is_empty(),
+            "valid file should emit no diagnostics"
+        );
+    }
+
+    #[test]
+    fn parse_adr_file_unreadable_returns_err() {
+        // Point at a path that does not exist — fs::read_to_string fails
+        let outcome = parse_adr_file(
+            Path::new("/nonexistent/path/that/should/never/exist/CHE-0001.md"),
+            "CHE",
+            false,
+        );
+        assert!(outcome.is_err(), "missing file should bubble as Err");
+    }
+
+    #[test]
+    fn parse_domain_unreadable_dir_returns_err() {
+        // Build a DomainDir pointing at a non-existent path
+        let domain_dir = DomainDir {
+            prefix: "CHE".to_string(),
+            name: "Cherry-pit Test".to_string(),
+            path: std::path::PathBuf::from(
+                "/nonexistent/path/that/should/never/exist/for/parse-domain-test",
+            ),
+        };
+        let outcome = parse_domain(&domain_dir);
+        assert!(
+            outcome.is_err(),
+            "unreadable domain directory should bubble as Err per AFM-0017 R4"
+        );
+        let msg = outcome.unwrap_err();
+        assert!(
+            msg.contains("cannot read domain directory"),
+            "error should describe the failure: {msg}"
+        );
+    }
+
+    #[test]
+    fn parse_domain_with_unreadable_file_emits_p001() {
+        // Set up a real domain directory with one valid file and one
+        // file that matches the prefix pattern but is a directory
+        // (fs::read_to_string on a directory returns Err on Unix and Windows)
+        let dir = tempfile::tempdir().expect("tempdir");
+        let valid_path = dir.path().join("CHE-0001-valid.md");
+        fs::write(
+            &valid_path,
+            "# CHE-0001. Valid\n\nDate: 2026-04-29\nTier: B\nStatus: Accepted\n\n## Related\n\nRoot: CHE-0001\n\n## Context\n\nProse.\n",
+        )
+        .expect("write valid");
+
+        // Create a *directory* whose name matches the ADR filename pattern;
+        // read_to_string will fail with EISDIR.
+        fs::create_dir(dir.path().join("CHE-0002-actually-a-dir.md"))
+            .expect("create masquerading dir");
+
+        let domain_dir = DomainDir {
+            prefix: "CHE".to_string(),
+            name: "Cherry-pit Test".to_string(),
+            path: dir.path().to_owned(),
+        };
+        let outcome = parse_domain(&domain_dir).expect("read_dir should succeed");
+        assert_eq!(outcome.records.len(), 1, "one valid record");
+        assert_eq!(outcome.diagnostics.len(), 1, "one P001 diagnostic");
+        assert_eq!(outcome.diagnostics[0].rule, "P001");
+        assert!(
+            outcome.diagnostics[0]
+                .message
+                .contains("cannot read ADR file"),
+            "P001 message should describe failure"
+        );
+    }
+
+    #[test]
+    fn parse_stale_with_unreadable_file_emits_p001() {
+        // Mirror parse_domain test but for stale: a file matching a configured
+        // domain prefix that fails read_to_string surfaces as P001.
+        let dir = tempfile::tempdir().expect("tempdir");
+
+        // Create a directory whose name matches the CHE-NNNN-* pattern
+        // — read_to_string returns EISDIR.
+        fs::create_dir(dir.path().join("CHE-0099-actually-a-dir.md"))
+            .expect("create masquerading dir");
+
+        // Build a Config in-memory (skipping TOML round-trip).
+        let config_toml = r#"
+[stale]
+directory = "stale"
+
+[[domains]]
+prefix = "CHE"
+name = "Cherry-pit"
+directory = "cherry-pit"
+description = "Test domain"
+crates = []
+"#;
+        let config: Config = toml::from_str(config_toml).expect("parse config");
+
+        let outcome = parse_stale(dir.path(), &config).expect("read_dir should succeed");
+        assert!(outcome.records.is_empty(), "no valid records");
+        assert_eq!(outcome.diagnostics.len(), 1, "one P001 diagnostic");
+        assert_eq!(outcome.diagnostics[0].rule, "P001");
+        assert!(
+            outcome.diagnostics[0]
+                .message
+                .contains("cannot read ADR file"),
+            "P001 message should describe failure"
+        );
     }
 
     #[test]
@@ -1259,23 +1551,5 @@ mod tests {
             !dual,
             "has_dual_status must be false when status_from_section is true"
         );
-    }
-
-    #[test]
-    fn preamble_status_field_clears_status_from_section() {
-        let lines = vec![
-            "# CHE-0001. Title",
-            "",
-            "Date: 2026-04-27",
-            "Tier: B",
-            "Status: Accepted",
-            "",
-            "## Related",
-        ];
-        let (field, _, _) = find_status_field(&lines);
-        let (section, _, _) = find_status_section(&lines);
-
-        let from_section = field.is_none() && section.is_some();
-        assert!(!from_section, "status_from_section should be false");
     }
 }

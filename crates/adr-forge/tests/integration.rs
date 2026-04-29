@@ -1324,3 +1324,89 @@ fn containment_accepts_symlink_inside_root() {
         .success()
         .stdout(predicate::str::contains("warning(s)"));
 }
+
+// ── Parser-stage diagnostics (AFM-0017) ─────────────────────────────
+
+/// A file matching the prefix filename pattern but missing its H1
+/// title must surface as a `P002` warning instead of being silently
+/// dropped from the corpus. Lint exits 0 (advisory-only per
+/// AFM-0003 R1).
+#[test]
+fn parser_p002_missing_title_emits_warning() {
+    let dir = setup_corpus(
+        MINIMAL_CONFIG,
+        &[
+            ("TST-0001-valid-test-adr.md", VALID_ADR),
+            (
+                "TST-0002-no-h1-title.md",
+                "Some prose without an H1 header at all.\n",
+            ),
+        ],
+    );
+
+    adr_forge()
+        .args(["--lint", &adr_root(&dir)])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("warning[P002]"))
+        .stdout(predicate::str::contains("missing or malformed"))
+        .stdout(predicate::str::contains("TST-0002-no-h1-title.md"));
+}
+
+/// An empty file matching the filename pattern must surface as
+/// `P002` (empty file variant) rather than being silently dropped.
+#[test]
+fn parser_p002_empty_file_emits_warning() {
+    let dir = setup_corpus(
+        MINIMAL_CONFIG,
+        &[
+            ("TST-0001-valid-test-adr.md", VALID_ADR),
+            ("TST-0003-empty-file.md", ""),
+        ],
+    );
+
+    adr_forge()
+        .args(["--lint", &adr_root(&dir)])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("warning[P002]"))
+        .stdout(predicate::str::contains("empty"))
+        .stdout(predicate::str::contains("TST-0003-empty-file.md"));
+}
+
+/// A directory whose name matches the ADR filename pattern (e.g.
+/// `TST-0004-actually-a-dir.md/`) causes `fs::read_to_string` to
+/// fail with EISDIR. The parser surfaces this as `P001` rather than
+/// silently dropping the entry.
+#[cfg(unix)]
+#[test]
+fn parser_p001_unreadable_file_emits_warning() {
+    let dir = setup_corpus(MINIMAL_CONFIG, &[("TST-0001-valid-test-adr.md", VALID_ADR)]);
+    let test_subdir = dir
+        .path()
+        .join("docs/adr/test")
+        .join("TST-0004-actually-a-dir.md");
+    fs::create_dir(&test_subdir).expect("create masquerading dir");
+
+    adr_forge()
+        .args(["--lint", &adr_root(&dir)])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("warning[P001]"))
+        .stdout(predicate::str::contains("cannot read ADR file"))
+        .stdout(predicate::str::contains("TST-0004-actually-a-dir.md"));
+}
+
+/// Valid corpus must not emit any P-codes — proves the parser
+/// stays quiet when nothing is wrong. Asserts on the `warning[P`
+/// substring so future P003+ codes are also caught.
+#[test]
+fn parser_no_p_codes_for_valid_corpus() {
+    let dir = setup_corpus(MINIMAL_CONFIG, &[("TST-0001-valid-test-adr.md", VALID_ADR)]);
+
+    adr_forge()
+        .args(["--lint", &adr_root(&dir)])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("warning[P").not());
+}

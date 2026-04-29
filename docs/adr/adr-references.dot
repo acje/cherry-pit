@@ -681,6 +681,7 @@ digraph adr_references {
     "AFM-0014" [label="AFM-0014\nUnified Markdown Output on Stdout", color="#a16207", penwidth=2, fillcolor="white", group="AFM_col_1"];
     "AFM-0015" [label="AFM-0015\nFoundation Domain Inclusion in Context Resolution", color="#a16207", penwidth=2, fillcolor="white", group="AFM_col_2"];
     "AFM-0016" [label="AFM-0016\nStrict Path Containment for Config-Supplied Directories", color="#a16207", penwidth=2, fillcolor="white", group="AFM_col_3"];
+    "AFM-0017" [label="AFM-0017\nParser-Stage Diagnostic Namespace", color="#a16207", penwidth=2, fillcolor="white", group="AFM_col_4"];
     // Layout rows render bottom-to-top as Root, S, A, B, C, D; max 5 ADRs per row.
     subgraph "rank_AFM_00_root_0" {
       rank=same;
@@ -706,10 +707,12 @@ digraph adr_references {
       "AFM-0014";
       "AFM-0015";
       "AFM-0016";
+      "AFM-0017";
     }
     "AFM-0003" -> "AFM-0014" [style=invis, weight=100, constraint=false];
     "AFM-0014" -> "AFM-0015" [style=invis, weight=100, constraint=false];
     "AFM-0015" -> "AFM-0016" [style=invis, weight=100, constraint=false];
+    "AFM-0016" -> "AFM-0017" [style=invis, weight=100, constraint=false];
     subgraph "rank_AFM_04_tier_D_0" {
       rank=same;
       "AFM-0006";
@@ -737,6 +740,7 @@ digraph adr_references {
   }
 
   "AFM-0001" -> "AFM-0003" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
+  "AFM-0017" -> "AFM-0003" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556999", style="dotted", arrowhead="none", tailport="w", headport="e"];
   "AFM-0001" -> "AFM-0004" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
   "AFM-0001" -> "AFM-0006" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
   "AFM-0004" -> "AFM-0006" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556999", style="dashed", arrowhead="none", tailport="e", headport="w"];
@@ -752,6 +756,8 @@ digraph adr_references {
   "AFM-0008" -> "AFM-0015" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556999", style="dashed", arrowhead="none", tailport="e", headport="w"];
   "AFM-0001" -> "AFM-0016" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
   "AFM-0003" -> "AFM-0016" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556999", style="dotted", arrowhead="none", tailport="e", headport="w"];
+  "AFM-0003" -> "AFM-0017" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="e", headport="w"];
+  "AFM-0006" -> "AFM-0017" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#b4530980", style="dotted", arrowhead="none", tailport="s", headport="n"];
   "CHE-0001" -> "CHE-0002" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
   "CHE-0001" -> "CHE-0003" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
   "CHE-0002" -> "CHE-0003" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556999", style="dotted", arrowhead="none", tailport="e", headport="w"];

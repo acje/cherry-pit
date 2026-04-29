@@ -158,9 +158,18 @@ fn main() {
     }
 
     let mut all_records = Vec::new();
+    let mut parse_diagnostics = Vec::new();
     for dir in &domain_dirs {
-        let records = parser::parse_domain(dir);
-        all_records.extend(records);
+        match parser::parse_domain(dir) {
+            Ok(outcome) => {
+                all_records.extend(outcome.records);
+                parse_diagnostics.extend(outcome.diagnostics);
+            }
+            Err(e) => {
+                eprintln!("error: {e}");
+                process::exit(1);
+            }
+        }
     }
 
     // Parse stale directory (optional — may not exist in fresh repos)
@@ -175,8 +184,16 @@ fn main() {
     if let Some(stale_dir) = stale_dir
         && stale_dir.is_dir()
     {
-        let stale_records = parser::parse_stale(&stale_dir, &config);
-        all_records.extend(stale_records);
+        match parser::parse_stale(&stale_dir, &config) {
+            Ok(outcome) => {
+                all_records.extend(outcome.records);
+                parse_diagnostics.extend(outcome.diagnostics);
+            }
+            Err(e) => {
+                eprintln!("error: {e}");
+                process::exit(1);
+            }
+        }
     }
 
     // Mode dispatch
@@ -224,7 +241,11 @@ fn main() {
         // for infrastructure errors (missing config, unreadable files,
         // invalid configuration) handled earlier in this function via
         // eprintln! + process::exit(1).
-        let diagnostics = rules::run_all(&all_records, &config);
+        //
+        // Parser-stage diagnostics (P### per AFM-0017) are merged with
+        // rule-stage diagnostics so the user sees one unified list.
+        let mut diagnostics = parse_diagnostics;
+        diagnostics.extend(rules::run_all(&all_records, &config));
         print!(
             "{}",
             output::render_diagnostics(&diagnostics, all_records.len())
