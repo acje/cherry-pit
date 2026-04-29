@@ -534,9 +534,9 @@ fn check_tagged_rules(
             ));
         }
 
-        // Layer range validation: must be 1-12
+        // Layer range validation: must be 1-12 (Meadows leverage points)
         if rule.layer == 0 || rule.layer > 12 {
-            diags.push(Diagnostic::error(
+            diags.push(Diagnostic::warning(
                 "T016",
                 &record.file_path,
                 rule.line,
@@ -1451,10 +1451,10 @@ params = { max_rules = 10, min_rule_words = 7, max_rule_words = 60 }
         );
     }
 
-    // ── T016 layer validation error tests ──────────────────────────
+    // ── T016 layer validation tests ────────────────────────────────
 
     #[test]
-    fn t016_layer_zero_is_error() {
+    fn t016_layer_zero_is_warning() {
         use crate::model::TaggedRule;
         let mut record = make_record();
         record.decision_rules = vec![TaggedRule {
@@ -1466,22 +1466,22 @@ params = { max_rules = 10, min_rule_words = 7, max_rule_words = 60 }
         let config = make_config();
         let mut diags = Vec::new();
         check(&record, &config, &mut diags);
-        let layer_err = diags
+        let layer_diag = diags
             .iter()
             .find(|d| d.rule == "T016" && d.message.contains("layer 0"));
         assert!(
-            layer_err.is_some(),
-            "layer=0 should produce T016 error, got: {diags:?}"
+            layer_diag.is_some(),
+            "layer=0 should produce T016 warning, got: {diags:?}"
         );
         assert_eq!(
-            layer_err.unwrap().severity,
-            crate::report::Severity::Error,
-            "layer validation must be error severity"
+            layer_diag.unwrap().severity,
+            crate::report::Severity::Warning,
+            "layer validation must be warning severity per AFM-0003"
         );
     }
 
     #[test]
-    fn t016_layer_thirteen_is_error() {
+    fn t016_layer_thirteen_is_warning() {
         use crate::model::TaggedRule;
         let mut record = make_record();
         record.decision_rules = vec![TaggedRule {
@@ -1493,17 +1493,17 @@ params = { max_rules = 10, min_rule_words = 7, max_rule_words = 60 }
         let config = make_config();
         let mut diags = Vec::new();
         check(&record, &config, &mut diags);
-        let layer_err = diags
+        let layer_diag = diags
             .iter()
             .find(|d| d.rule == "T016" && d.message.contains("layer 13"));
         assert!(
-            layer_err.is_some(),
-            "layer=13 should produce T016 error, got: {diags:?}"
+            layer_diag.is_some(),
+            "layer=13 should produce T016 warning, got: {diags:?}"
         );
         assert_eq!(
-            layer_err.unwrap().severity,
-            crate::report::Severity::Error,
-            "layer validation must be error severity"
+            layer_diag.unwrap().severity,
+            crate::report::Severity::Warning,
+            "layer validation must be warning severity per AFM-0003"
         );
     }
 

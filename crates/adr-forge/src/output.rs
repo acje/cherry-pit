@@ -135,7 +135,6 @@ fn render_connected_header(out: &mut String, meta: &HeaderMeta, path: &str) {
 pub fn render_diagnostics(diagnostics: &[Diagnostic], record_count: usize) -> String {
     let mut out = String::new();
 
-    let mut errors = 0u32;
     let mut warnings = 0u32;
 
     for d in diagnostics {
@@ -143,7 +142,6 @@ pub fn render_diagnostics(diagnostics: &[Diagnostic], record_count: usize) -> St
             continue;
         }
         match d.severity {
-            crate::report::Severity::Error => errors += 1,
             crate::report::Severity::Warning => warnings += 1,
         }
 
@@ -164,12 +162,12 @@ pub fn render_diagnostics(diagnostics: &[Diagnostic], record_count: usize) -> St
     if out.is_empty() {
         writeln!(
             out,
-            "## Diagnostics: 0 error(s), 0 warning(s) across {record_count} ADR(s)"
+            "## Diagnostics: 0 warning(s) across {record_count} ADR(s)"
         )
         .unwrap();
     } else {
         let header = format!(
-            "## Diagnostics: {errors} error(s), {warnings} warning(s) across {record_count} ADR(s)\n\n"
+            "## Diagnostics: {warnings} warning(s) across {record_count} ADR(s)\n\n"
         );
         out.insert_str(0, &header);
     }
@@ -427,7 +425,7 @@ mod tests {
     #[test]
     fn render_diagnostics_clean() {
         let output = render_diagnostics(&[], 5);
-        assert!(output.contains("0 error(s), 0 warning(s)"));
+        assert!(output.contains("0 warning(s)"));
     }
 
     #[test]

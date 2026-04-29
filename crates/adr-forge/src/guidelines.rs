@@ -256,11 +256,13 @@ fn print_tagged_rules() {
     println!(
         "    ─────  ─────────────────────────────────────────────────────────────────────  ────"
     );
-    println!("      1    The power to transcend paradigms                                       S");
     println!(
-        "      2    The mindset or paradigm out of which the system arises                  S"
+        "      1    The power to transcend paradigms                                        S"
     );
-    println!("      3    The goals of the system                                                S");
+    println!("      2    The mindset or paradigm out of which the system arises                 S");
+    println!(
+        "      3    The goals of the system                                                 S"
+    );
     println!(
         "      4    The power to add, change, evolve, or self-organize system structure     A"
     );
@@ -283,9 +285,11 @@ fn print_tagged_rules() {
         "     10    The structure of material stocks and flows                              D"
     );
     println!(
-        "     11    The sizes of buffers and other stabilizing stocks, relative to flows      D"
+        "     11    The sizes of buffers and other stabilizing stocks, relative to flows    D"
     );
-    println!("     12    Constants, parameters, numbers                                         D");
+    println!(
+        "     12    Constants, parameters, numbers                                          D"
+    );
     println!();
     println!("  Global ID: PREFIX-NNNN:RN:LN  (e.g., CHE-0042:R1:L5)");
     println!();

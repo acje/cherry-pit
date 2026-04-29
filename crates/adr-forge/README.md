@@ -31,12 +31,15 @@ Auto-discovers `docs/adr/` by walking up from CWD looking for
 ### Lint (default)
 
 Runs all rules (template, link, naming, structure) across every ADR.
-Diagnostic output format:
+All findings emit at warning severity per AFM-0003; lint exits 0 on
+completion regardless of warning count. Exit 1 is reserved for
+infrastructure errors (missing config, unreadable files, invalid
+configuration). Diagnostic output format:
 
 ```text
-## Diagnostics: E error(s), W warning(s) across N ADR(s)
+## Diagnostics: W warning(s) across N ADR(s)
 
-- **severity[RULE_ID]** file:line: message
+- **warning[RULE_ID]** file:line: message
 ```
 
 ### Critique

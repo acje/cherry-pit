@@ -412,7 +412,7 @@ fn valid_corpus_clean_output() {
         .args(["--lint", &adr_root(&dir)])
         .assert()
         .success()
-        .stdout(predicate::str::contains("0 error(s), 0 warning(s)"));
+        .stdout(predicate::str::contains("0 warning(s)"));
 }
 
 #[test]
@@ -537,9 +537,9 @@ fn t005c_preamble_status_field_no_warning() {
         .stdout(predicate::str::contains("T005c").not());
 }
 
-// ── T016 layer error → lint exit(1) ────────────────────────────────
+// ── T016 layer warning → lint exit(0), advisory per AFM-0003 ───────
 
-/// ADR with invalid layer (0) — triggers error-severity T016.
+/// ADR with invalid layer (0) — triggers warning-severity T016.
 const INVALID_LAYER_ADR: &str = "\
 # TST-0012. Invalid Layer ADR
 
@@ -554,19 +554,20 @@ References: TST-0001
 
 ## Context
 
-ADR with an invalid Meadows layer annotation to test error exit code.
+ADR with an invalid Meadows layer annotation to test warning emission.
 
 ## Decision
 
-R1 [0]: This rule has an invalid layer zero which must trigger an error.
+R1 [0]: This rule has an invalid layer zero which must trigger a warning.
 
 ## Consequences
 
-Lint should exit with code 1 when error-severity diagnostics exist.
+Lint completes successfully (exit 0) and emits a T016 warning per AFM-0003
+advisory-only semantics. CI wrappers parse warning counts for enforcement.
 ";
 
 #[test]
-fn lint_exits_nonzero_on_layer_error() {
+fn lint_warns_on_invalid_layer() {
     let dir = setup_corpus(
         MINIMAL_CONFIG,
         &[
@@ -578,9 +579,61 @@ fn lint_exits_nonzero_on_layer_error() {
     adr_forge()
         .args(["--lint", &adr_root(&dir)])
         .assert()
-        .failure()
-        .stdout(predicate::str::contains("error[T016]"))
+        .success()
+        .stdout(predicate::str::contains("warning[T016]"))
         .stdout(predicate::str::contains("layer 0"));
+}
+
+/// ADR with two invalid layer annotations — produces two T016 warnings.
+const TWO_INVALID_LAYERS_ADR: &str = "\
+# TST-0013. Two Invalid Layers ADR
+
+Date: 2026-04-29
+Last-reviewed: 2026-04-29
+Tier: B
+Status: Accepted
+
+## Related
+
+References: TST-0001
+
+## Context
+
+ADR with two invalid Meadows layer annotations to test multi-warning exit-zero
+behavior under AFM-0003 advisory-only semantics.
+
+## Decision
+
+R1 [0]: First rule has an invalid layer zero which must trigger a warning.
+R2 [13]: Second rule has an invalid layer thirteen which must also warn.
+
+## Consequences
+
+Two T016 warnings emitted; lint exits 0 per AFM-0003 R1.
+";
+
+/// AFM-0003 R1/R3 contract test: multiple warnings, exit 0, exact header
+/// format `## Diagnostics: N warning(s)`, no `error(s)` substring.
+#[test]
+fn lint_multiple_warnings_exits_zero() {
+    let dir = setup_corpus(
+        MINIMAL_CONFIG,
+        &[
+            ("TST-0001-valid-test-adr.md", VALID_ADR),
+            ("TST-0013-two-invalid-layers.md", TWO_INVALID_LAYERS_ADR),
+        ],
+    );
+
+    adr_forge()
+        .args(["--lint", &adr_root(&dir)])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("warning[T016]"))
+        .stdout(predicate::str::contains("layer 0"))
+        .stdout(predicate::str::contains("layer 13"))
+        .stdout(predicate::str::contains("## Diagnostics:"))
+        .stdout(predicate::str::contains("warning(s)"))
+        .stdout(predicate::str::contains("error(s)").not());
 }
 
 // ── critique mode ──────────────────────────────────────────────────

@@ -187,19 +187,16 @@ fn main() {
             output::render_tree(&all_records, &domain_dirs, &config, filter)
         );
     } else if cli.lint {
-        // --lint mode
+        // --lint mode: advisory-only per AFM-0003 R1/R2. All rule findings
+        // are warnings; exit 0 always when lint completes. Exit 1 is reserved
+        // for infrastructure errors (missing config, unreadable files,
+        // invalid configuration) handled earlier in this function via
+        // eprintln! + process::exit(1).
         let diagnostics = rules::run_all(&all_records, &config);
         print!(
             "{}",
             output::render_diagnostics(&diagnostics, all_records.len())
         );
-        // Exit with error if any error-severity diagnostics exist
-        if diagnostics
-            .iter()
-            .any(|d| d.severity == report::Severity::Error)
-        {
-            process::exit(1);
-        }
     }
 }
 
