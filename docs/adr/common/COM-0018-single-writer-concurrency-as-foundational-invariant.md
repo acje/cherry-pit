@@ -7,7 +7,7 @@ Status: Proposed
 
 ## Related
 
-References: COM-0001, CHE-0006, PAR-0004, SEC-0006
+References: COM-0001, CHE-0006, PAR-0004
 
 ## Context
 

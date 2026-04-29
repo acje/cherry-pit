@@ -1,7 +1,7 @@
 # CHE-0032. Atomic File Writes via Temp-File and Rename
 
 Date: 2026-04-25
-Last-reviewed: 2026-04-25
+Last-reviewed: 2026-04-28
 Tier: D
 Status: Accepted
 
@@ -41,7 +41,7 @@ Temp file naming uses `{aggregate_filename}.tmp` (e.g.,
 ## Consequences
 
 - Crash during write leaves only the temp file. No corrupt aggregate data.
-- **Platform constraint:** POSIX `rename(2)` is atomic. On Windows, `rename` fails if the destination exists — `append` (which overwrites) would fail. Cherry-pit targets POSIX only for file-based storage.
-- Temp file safety is coupled to per-aggregate locking and sequential ID assignment — removing either would allow concurrent `write_atomic` to the same path.
-- Orphaned `.tmp` files from crashes accumulate; no automatic cleanup is implemented.
-- The entire aggregate history is rewritten on every `append` — simple but not suitable for aggregates with thousands of events.
+- **POSIX only:** `rename(2)` is atomic; Windows `rename` fails if destination exists.
+- Temp file safety is coupled to per-aggregate locking and sequential ID assignment.
+- Orphaned `.tmp` files from crashes accumulate; no automatic cleanup.
+- Entire history rewritten per `append` — unsuitable for long-lived aggregates.

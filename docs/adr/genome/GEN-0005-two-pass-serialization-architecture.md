@@ -36,12 +36,7 @@ R3 [5]: WritingSerializer pre-allocates the exact buffer and writes
 
 ## Consequences
 
-- **Positive:** Peak memory ≈ 1× final message size. No intermediate tree, no
-  back-patching, no reallocation. Note: during serialization, two serde traversals occur sequentially — the sizing pass is stack-only, so total peak allocation is the single pre-allocated output buffer, not 2×.
+- **Positive:** Peak memory ≈ 1× final message size. No intermediate tree, no back-patching, no reallocation. The sizing pass is stack-only, so peak allocation is the single pre-allocated output buffer.
 - **Positive:** Breadth-first heap ordering ensures all offsets are forward-pointing.
-- **Negative:** `value.serialize()` is called twice. Safe for any correct `Serialize`
-  impl (immutable observation), but types with interior mutability during serialization
-  (extremely rare) could produce inconsistent sizing. The sizing mismatch check catches
-  this.
-- **Negative:** Write throughput is lower than a single-pass approach due to two
-  traversals; not yet benchmarked. Acceptable tradeoff for read-optimized format.
+- **Negative:** `value.serialize()` called twice. Safe for correct `Serialize` impls, but types with interior mutability during serialization could produce inconsistent sizing. The mismatch check catches this.
+- **Negative:** Write throughput lower than single-pass due to two traversals. Acceptable for read-optimized format.

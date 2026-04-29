@@ -29,7 +29,7 @@ R2 [5]: Only overwrite files whose first line matches the marker
   exactly; skip files without the marker and emit a warning
 R3 [5]: Create new files with the marker on line 1 if the file
   does not yet exist
-R4 [12]: File writes use `std::fs::write()` without atomic
+R4 [6]: File writes use `std::fs::write()` without atomic
   semantics; idempotent output makes interrupted writes
   self-correcting on the next run
 

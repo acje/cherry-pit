@@ -14,8 +14,8 @@
 //! ```
 //!
 //! Exit codes:
-//!   0 — Analysis complete
-//!   1 — Infrastructure error (missing config, unknown ADR, unknown crate)
+//!   0 — Analysis complete (warnings only, or clean)
+//!   1 — Infrastructure error or lint errors detected
 
 #![forbid(unsafe_code)]
 
@@ -167,14 +167,14 @@ fn main() {
         print!("{}", output::render_blocks(&blocks));
     } else if let Some(ref crate_name) = cli.context {
         // --context mode
-        let rules = match context::context(crate_name, &all_records, &config) {
-            Ok(r) => r,
+        let groups = match context::context_grouped(crate_name, &all_records, &config) {
+            Ok(g) => g,
             Err(e) => {
                 eprintln!("error: {e}");
                 process::exit(1);
             }
         };
-        print!("{}", output::render_rules(crate_name, &rules));
+        print!("{}", output::render_root_groups(crate_name, &groups));
     } else if let Some(ref domain_filter) = cli.tree {
         // --tree mode
         let filter = if domain_filter.is_empty() {
@@ -193,6 +193,13 @@ fn main() {
             "{}",
             output::render_diagnostics(&diagnostics, all_records.len())
         );
+        // Exit with error if any error-severity diagnostics exist
+        if diagnostics
+            .iter()
+            .any(|d| d.severity == report::Severity::Error)
+        {
+            process::exit(1);
+        }
     }
 }
 

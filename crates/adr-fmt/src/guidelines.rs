@@ -234,10 +234,13 @@ fn print_template() {
         "    T016  Tagged rules — tier-scaled signal, not gate. Max rules"
     );
     println!(
-        "          scales with tier. Word count (7–60), sequential IDs,"
+        "          scales with tier. Word count (7–60), sequential IDs"
     );
     println!(
-        "          layer 1–12 still enforced. Exceeding may indicate"
+        "          are warnings. Layer outside 1–12 is an error (invalid"
+    );
+    println!(
+        "          Meadows leverage point). Exceeding may indicate"
     );
     println!(
         "          the ADR covers multiple decisions."

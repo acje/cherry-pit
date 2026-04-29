@@ -1,7 +1,7 @@
 # CHE-0013. Create/Send Split in CommandGateway and EventStore
 
 Date: 2026-04-24
-Last-reviewed: 2026-04-25
+Last-reviewed: 2026-04-28
 Tier: B
 Status: Accepted
 
@@ -49,16 +49,9 @@ R3 [5]: Model aggregate termination as a domain event, not as an
 
 ## Consequences
 
-- Aggregate lifecycle states are explicit: "not yet created" vs
-  "already exists."
-- `CreateResult` and `DispatchResult` are distinct types — callers
-  get exactly the information relevant to each operation.
-- No `delete`/`archive`/`tombstone` at the infrastructure level.
-  Termination is modeled as a domain event (e.g. `OrderClosed`).
-  The aggregate's `apply` tracks its own terminated state.
-- No `load`/`query` on the Gateway — correct CQRS separation. Reads
-  go through projections, not the command gateway.
-- The naming asymmetry (`send` on Gateway vs `dispatch` on Bus) is
-  intentional: Gateway is the external API, Bus is the internal
-  mechanism.
-- In distributed deployments, `create` idempotency must be handled at a higher level (CHE-0041) — if a create command is retried after a network partition, duplicate detection prevents double-creation.
+- Aggregate lifecycle states are explicit: "not yet created" vs "already exists."
+- `CreateResult` and `DispatchResult` are distinct return types.
+- No `delete`/`archive`/`tombstone` at the infrastructure level. Termination is modeled as a domain event (e.g. `OrderClosed`); the aggregate's `apply` tracks terminated state.
+- No `load`/`query` on the Gateway — correct CQRS separation. Reads go through projections.
+- The naming asymmetry (`send` on Gateway vs `dispatch` on Bus) is intentional: Gateway is external API, Bus is internal mechanism.
+- In distributed deployments, `create` idempotency must be handled at a higher level (CHE-0041).

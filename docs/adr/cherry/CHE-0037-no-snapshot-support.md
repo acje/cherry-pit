@@ -1,7 +1,7 @@
 # CHE-0037. No Snapshot Support (Deliberate Deferral)
 
 Date: 2026-04-25
-Last-reviewed: 2026-04-25
+Last-reviewed: 2026-04-28
 Tier: D
 Status: Accepted
 
@@ -11,7 +11,7 @@ References: CHE-0001, CHE-0009, CHE-0010, CHE-0040
 
 ## Context
 
-Event-sourced systems reconstruct aggregate state by replaying all events. As events accumulate, replay time grows linearly. Snapshots mitigate this by persisting materialized state. Cherry-pit's `EventStore::load` returns the complete event history — no `load_from_snapshot`, no `SnapshotStore` trait exists. Adding snapshot support now would require aggregates to be snapshot-serializable, stores to manage snapshots alongside events, and the bus to load snapshot + remaining events. All three deferral conditions hold: aggregates are short-lived, event streams are small, and the system is single-writer with local storage.
+Event-sourced systems reconstruct aggregate state by replaying all events. Snapshots mitigate growing replay time by persisting materialized state. Adding snapshot support now would require aggregates to be snapshot-serializable, stores to manage snapshots alongside events, and the bus to load snapshot + remaining events. All deferral conditions hold: aggregates are short-lived, event streams small, system is single-writer with local storage.
 
 ## Decision
 
@@ -34,8 +34,8 @@ All three conditions hold for cherry-pit's current deployment model
 
 ## Consequences
 
-- **Performance ceiling** — reconstruction is O(n) where n = total events. Sub-millisecond for most domain models but noticeable at scale.
-- **No snapshot serialization requirement** — aggregates need only `Default + Send + Sync`, not `Serialize`/`Deserialize` (CHE-0010).
-- **Simpler traits and bus** — no `load_from_sequence`, `save_snapshot`, or staleness handling.
-- **Full history always available** — debugging replays the exact event sequence without snapshot boundaries.
-- Revisit when: aggregates exceed 10,000 events, dispatch latency exceeds SLA, or multi-process deployment makes replay latency affect failover.
+- **Performance ceiling** — reconstruction is O(n) where n = total events.
+- **No snapshot serialization** — aggregates need only `Default + Send + Sync`, not `Serialize`/`Deserialize`.
+- **Simpler traits** — no `load_from_sequence`, `save_snapshot`, or staleness handling.
+- **Full history always available** — debugging replays exact event sequence.
+- Revisit when aggregates exceed 10,000 events or dispatch latency exceeds SLA.

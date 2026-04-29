@@ -1,7 +1,7 @@
 # PAR-0009. LockedRescuePolicy Enum Replacing Bool
 
 Date: 2026-04-25
-Last-reviewed: 2026-04-25
+Last-reviewed: 2026-04-28
 Tier: D
 Status: Accepted
 
@@ -11,13 +11,7 @@ References: PAR-0001, PAR-0005
 
 ## Context
 
-The original design gated `Locked → Rescue` behind an
-`acknowledge_data_loss: bool` parameter. A boolean conveys intent ("I know
-this is destructive") but not semantics ("what happens to the old data?").
-
-With the new-stream migration model (PAR-0005), rescuing a locked fiber has
-nuanced audit trail semantics: the old events may still exist in the
-deprecated stream's grace period, or they may have already expired.
+The original design gated `Locked → Rescue` behind an `acknowledge_data_loss: bool`. A boolean conveys intent but not semantics. With the new-stream migration model (PAR-0005), rescuing a locked fiber has nuanced audit trail semantics: old events may exist in the deprecated stream's grace period or may have expired.
 
 ## Decision
 
@@ -45,12 +39,8 @@ R2 [9]: Derive Serialize and Deserialize on LockedRescuePolicy for
 
 ## Consequences
 
-- **Positive:** API communicates audit trail semantics, not just
-  acknowledgment.
-- **Positive:** Enum is extensible — future variants (e.g.,
-  `ArchiveToAuditStream`) can be added without changing the method signature.
-- **Positive:** `LockedRescuePolicy` derives `Serialize`/`Deserialize` for
-  persistence and configuration.
-- **Negative:** Slightly more verbose call sites than `bool`.
-- **Negative:** Removed `AcknowledgmentRequired` error variant — the API
-  now enforces policy choice at the type level rather than returning an error.
+- API communicates audit trail semantics, not just acknowledgment.
+- Enum is extensible — future variants added without changing the method signature.
+- `LockedRescuePolicy` derives `Serialize`/`Deserialize` for persistence and configuration.
+- Slightly more verbose call sites than `bool`.
+- Removed `AcknowledgmentRequired` error — policy choice enforced at the type level.

@@ -192,6 +192,13 @@ Three permitted verbs:
 | References | Soft citation | This ADR cites another for context or builds on it |
 | Supersedes | Replaces target entirely | This ADR obsoletes a previous decision |
 
+**Reference order matters.** List references in order of significance
+— most significant first. `adr-fmt --context` assigns each ADR to a
+root subtree using the **first root referenced** in document order.
+Reference ordering governs subtree assignment and communicates which
+relationships are primary constraints vs. secondary context. See
+[GOVERNANCE.md § 5](GOVERNANCE.md#5-reference-ordering-and-root-assignment).
+
 **Constraints:** Root and References cannot coexist (L009). Every
 ADR must have at least one relationship — no orphans (T007).
 
@@ -542,8 +549,9 @@ R4 [5]: Call EventEnvelope::validate() after deserialization in
 
 ## Agent-Extracted Output
 
-Running `adr-fmt --context cherry-pit-core` produces a tier-grouped
-flat list. The worked example above renders as:
+Running `adr-fmt --context cherry-pit-core` produces a root-grouped
+list organized by root ADR subtrees. The worked example above renders
+under its root's group:
 
 ```
 # Architecture Rules
@@ -551,7 +559,10 @@ flat list. The worked example above renders as:
 These rules are mandatory constraints for all code in crate `cherry-pit-core`.
 Follow every rule without exception.
 
-## B-tier
+### COM-0001. Foundation Principle
+- Foundation rules apply universally across all domains and crates. [COM-0001:R1:L5]
+
+### CHE-0001. Design Priority Ordering
 - Construct EventEnvelope exclusively through EventEnvelope::new(), which validates non-nil event_id and returns Result<Self, EnvelopeError> [CHE-0042:R1:L5]
 - Use NonZeroU64 for the EventEnvelope sequence field so zero sequences are rejected at the type level [CHE-0042:R2:L5]
 - Access EventEnvelope fields through accessor methods (event_id(), aggregate_id(), sequence(), timestamp(), payload()) [CHE-0042:R3:L5]
@@ -562,8 +573,10 @@ This is all the agent receives. Notice:
 
 - **Preamble** — imperative framing tells the agent these are
   mandatory constraints, not suggestions
-- **Tier-grouped** — rules sorted by architectural significance
-  (S→D), not by ADR. Eliminates per-ADR metadata noise
+- **Root-grouped** — rules organized by root ADR subtree, with
+  foundation roots first (COM, RST) then domain roots (CHE, PAR).
+  Within each group, rules sorted by Meadows layer (L1→L12),
+  then BFS depth, then ADR number
 - **Rule ID at end** — `[CHE-0042:R1:L5]` anchors traceability
   without leading the attention. The action comes first. Layer
   suffix enables tension analysis in `--critique`.

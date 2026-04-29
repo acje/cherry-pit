@@ -1,7 +1,7 @@
 # PAR-0008. Publish-then-Apply with Durable-First Semantics
 
 Date: 2026-04-25
-Last-reviewed: 2026-04-25
+Last-reviewed: 2026-04-28
 Tier: S
 Status: Accepted
 
@@ -60,7 +60,7 @@ R2 [3]: Each CRUD operation is a single atomic publish-then-apply
   cycle with no compound operations at the library layer
 R3 [3]: Wrap the NATS publish call inside the write lock with
   tokio::time::timeout bounded by ServerConfig::publish_timeout
-R4 [5]: Use tokio::sync::RwLock for Dragline state to permit holding
+R4 [3]: Use tokio::sync::RwLock for Dragline state to permit holding
   the write lock across async NATS publish await points without
   blocking the executor thread
 

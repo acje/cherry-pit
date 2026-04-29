@@ -11,17 +11,7 @@ References: GEN-0001, GEN-0003
 
 ## Context
 
-pardosa-genome files contain per-message and footer checksums for corruption
-detection. The choice of checksum algorithm affects error detection quality,
-performance, and dependency count.
-
-xxHash64 is already a dependency (`xxhash-rust` crate with `const_xxh64` feature)
-for compile-time schema hashing (GEN-0003). It is significantly faster than CRC32
-on modern hardware and provides excellent distribution properties for error
-detection.
-
-Using the same hash family for both schema hashing and integrity checking
-eliminates the need for a separate `crc` crate dependency.
+pardosa-genome files contain per-message and footer checksums for corruption detection. xxHash64 is already a dependency for compile-time schema hashing (GEN-0003). It is faster than CRC32 on modern hardware with excellent distribution. Using the same hash family eliminates a separate `crc` dependency.
 
 ## Decision
 
@@ -75,8 +65,7 @@ R3 [9]: Both per-message and footer checksums are mandatory and always
 
 ## Consequences
 
-- **Positive:** Eliminates `crc` crate dependency — xxHash64 already present for schema hashing. Single algorithm for the entire crate.
-- **Positive:** Faster than CRC32 on modern CPUs (~30 GB/s vs ~5 GB/s). Better error detection distribution at 64 bits; birthday bound ~4 billion messages.
-- **Negative:** Index entry grows from 16 to 24 bytes (~50%). Negligible: 1,000 messages add 8 KiB overhead.
-- **Negative:** Not hardware-accelerated like CRC32 on x86 SSE4.2, but xxHash64 software speed exceeds CRC32 hardware speed on modern CPUs.
-- **Negative:** Same non-cryptographic tamper-detection limitation as CRC32.
+- Eliminates `crc` dependency — single hash algorithm for schema and integrity.
+- Faster than CRC32 on modern CPUs (~30 vs ~5 GB/s). Better distribution at 64 bits.
+- Index entry grows from 16 to 24 bytes (~50%). Negligible: 1,000 messages add 8 KiB.
+- Same non-cryptographic tamper-detection limitation as CRC32.

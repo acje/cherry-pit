@@ -1,7 +1,7 @@
 # COM-0002. Deep Modules Over Shallow Abstractions
 
 Date: 2026-04-25
-Last-reviewed: 2026-04-25
+Last-reviewed: 2026-04-28
 Tier: S
 Status: Accepted
 

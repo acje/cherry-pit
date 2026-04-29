@@ -47,14 +47,9 @@ R3 [6]: Continue event_id from the old stream's last value plus one
 
 ## Consequences
 
-- **Positive:** Idempotent publish and replay — the core requirement for
-  at-least-once delivery.
-- **Positive:** Total ordering of events across generations. Two events
-  can always be ordered by `event_id`.
-- **Positive:** 8 bytes per event (u64). UUID would add 16 bytes for no
-  benefit under the single-writer constraint (PAR-0004).
-- **Negative:** Counter overflow at `u64::MAX` produces `EventIdOverflow`.
-  At 1 billion events per second, overflow occurs after ~584 years.
-- **Negative:** `event_id` is the first field in `Event<T>` — changing its
-  position breaks the genome schema hash.
-- **Dependency:** JetStream's dedup window (`max_age` on the stream) is finite (default 2 minutes). If a phantom event's retry arrives after the window expires, `Nats-Msg-Id` deduplication silently fails. The `publish_timeout` (PAR-0008) must be well within the dedup window for the idempotency guarantee to hold.
+- **Positive:** Idempotent publish and replay — the core requirement for at-least-once delivery.
+- **Positive:** Total ordering of events across generations by `event_id`.
+- **Positive:** 8 bytes per event (u64). UUID would add 16 bytes for no benefit under single-writer (PAR-0004).
+- **Negative:** Counter overflow at `u64::MAX` produces `EventIdOverflow`. At 1B events/sec, overflow after ~584 years.
+- **Negative:** `event_id` as first field in `Event<T>` — changing position breaks the genome schema hash.
+- **Dependency:** JetStream's dedup window is finite (default 2 min). The `publish_timeout` (PAR-0008) must be within the dedup window for idempotency to hold.

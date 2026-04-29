@@ -537,6 +537,52 @@ fn t005c_preamble_status_field_no_warning() {
         .stdout(predicate::str::contains("T005c").not());
 }
 
+// ── T016 layer error → lint exit(1) ────────────────────────────────
+
+/// ADR with invalid layer (0) — triggers error-severity T016.
+const INVALID_LAYER_ADR: &str = "\
+# TST-0012. Invalid Layer ADR
+
+Date: 2026-04-29
+Last-reviewed: 2026-04-29
+Tier: B
+Status: Accepted
+
+## Related
+
+References: TST-0001
+
+## Context
+
+ADR with an invalid Meadows layer annotation to test error exit code.
+
+## Decision
+
+R1 [0]: This rule has an invalid layer zero which must trigger an error.
+
+## Consequences
+
+Lint should exit with code 1 when error-severity diagnostics exist.
+";
+
+#[test]
+fn lint_exits_nonzero_on_layer_error() {
+    let dir = setup_corpus(
+        MINIMAL_CONFIG,
+        &[
+            ("TST-0001-valid-test-adr.md", VALID_ADR),
+            ("TST-0012-invalid-layer.md", INVALID_LAYER_ADR),
+        ],
+    );
+
+    adr_fmt()
+        .args(["--lint", &adr_root(&dir)])
+        .assert()
+        .failure()
+        .stdout(predicate::str::contains("error[T016]"))
+        .stdout(predicate::str::contains("layer 0"));
+}
+
 // ── critique mode ──────────────────────────────────────────────────
 
 #[test]
@@ -797,12 +843,16 @@ fn context_end_to_end_output_format() {
         "missing mandate in preamble:\n{stdout}"
     );
 
-    // ── Tier headers in correct order ──
-    let s_pos = stdout.find("## S-tier").expect("S-tier header missing");
-    let b_pos = stdout.find("## B-tier").expect("B-tier header missing");
+    // ── Root-grouped headers in correct order (foundation first) ──
+    let com_pos = stdout
+        .find("### COM-0001. Foundation Principle")
+        .expect("COM-0001 root header missing");
+    let tst_pos = stdout
+        .find("### TST-0008. Multi-line Rules ADR")
+        .expect("TST-0008 root header missing");
     assert!(
-        s_pos < b_pos,
-        "S-tier ({s_pos}) must appear before B-tier ({b_pos})"
+        com_pos < tst_pos,
+        "Foundation root ({com_pos}) must appear before domain root ({tst_pos})"
     );
 
     // ── Foundation rule with ID and layer at end ──

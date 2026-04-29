@@ -29,7 +29,7 @@ R2 [5]: Every loop or recursion driven by external input has a
   depth or iteration limit
 R3 [5]: Backpressure mechanisms exist at every ingestion point
   to shed load when capacity is exceeded
-R4 [12]: Default resource limits are documented in code comments
+R4 [6]: Default resource limits are documented in code comments
   adjacent to the limit constants
 
 ## Consequences

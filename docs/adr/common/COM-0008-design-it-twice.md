@@ -1,7 +1,7 @@
 # COM-0008. Design It Twice
 
 Date: 2026-04-26
-Last-reviewed: 2026-04-26
+Last-reviewed: 2026-04-28
 Tier: B
 Status: Accepted
 

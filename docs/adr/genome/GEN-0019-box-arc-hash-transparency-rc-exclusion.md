@@ -1,7 +1,7 @@
 # GEN-0019. Box and Arc Hash Transparency — Rc Exclusion
 
 Date: 2026-04-25
-Last-reviewed: 2026-04-25
+Last-reviewed: 2026-04-28
 Tier: D
 Status: Accepted
 
@@ -11,14 +11,7 @@ References: GEN-0001, GEN-0004
 
 ## Context
 
-Rust's smart pointer types (`Box<T>`, `Arc<T>`, `Rc<T>`) are wrappers that do
-not affect serialization — serde serializes the inner value identically regardless
-of the wrapper. The schema hash must decide whether wrapping or unwrapping a smart
-pointer is a schema-compatible change.
-
-A separate concern is which smart pointers should be supported at all. `Rc<T>` is
-`!Send`, making it incompatible with async runtimes (Tokio, Axum) — the primary
-deployment context for pardosa services.
+Rust's smart pointers (`Box<T>`, `Arc<T>`, `Rc<T>`) do not affect serde serialization — the inner value serializes identically. The schema hash must decide whether wrapping/unwrapping is schema-compatible. Separately, `Rc<T>` is `!Send`, incompatible with async runtimes — the primary deployment context.
 
 ## Decision
 
@@ -56,11 +49,7 @@ R3 [9]: Users needing shared ownership must use Arc instead of Rc
 
 ## Consequences
 
-- **Positive:** Refactoring between `T`, `Box<T>`, and `Arc<T>` is
-  schema-compatible. Common Rust refactoring pattern preserved.
-- **Positive:** Forcing `Arc` over `Rc` aligns with async-first architecture.
-  Prevents `!Send` types from entering serializable data models.
-- **Negative:** `Rc` users must refactor to `Arc` before serialization. Deliberate
-  friction — `Rc` in async contexts is a latent bug.
-- **Negative:** `Box<str>` and `Arc<str>` do not currently compile as
-  `GenomeSafe` due to missing `?Sized` bound. Documented for follow-up.
+- Refactoring between `T`, `Box<T>`, and `Arc<T>` is schema-compatible.
+- Forcing `Arc` over `Rc` aligns with async-first architecture, preventing `!Send` types in data models.
+- `Rc` users must refactor to `Arc`. Deliberate friction — `Rc` in async is a latent bug.
+- `Box<str>` and `Arc<str>` need `?Sized` bound adjustment. Documented for follow-up.

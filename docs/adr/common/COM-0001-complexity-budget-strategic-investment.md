@@ -1,7 +1,7 @@
 # COM-0001. Complexity Budget — Strategic Investment
 
 Date: 2026-04-25
-Last-reviewed: 2026-04-25
+Last-reviewed: 2026-04-28
 Tier: S
 Status: Accepted
 
@@ -11,7 +11,7 @@ Root: COM-0001
 
 ## Context
 
-Ousterhout (Ch. 3) distinguishes tactical programming — shortcuts that accumulate into unmaintainable systems — from strategic programming, where every change invests 10–20% additional time in design quality that compounds over the system's lifetime. Cherry-pit adopted strategic programming from inception: 92 ADRs written before most code, compile-fail tests verifying type contracts. This ADR formalizes the investment principle so all other decisions can cite it.
+Ousterhout (Ch. 3) distinguishes tactical programming — shortcuts that accumulate into unmaintainable systems — from strategic programming, where every change invests 10–20% additional time in design quality that compounds over the system's lifetime. Cherry-pit adopted strategic programming from inception: 140+ ADRs written before most code, compile-fail tests verifying type contracts. This ADR formalizes the investment principle so all other decisions can cite it.
 
 ## Decision
 

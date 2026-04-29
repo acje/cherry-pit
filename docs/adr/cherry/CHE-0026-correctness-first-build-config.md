@@ -11,19 +11,7 @@ References: CHE-0001, CHE-0007, RST-0003
 
 ## Context
 
-Rust's release profile controls compiler optimizations, debug
-information, and runtime checks. Several settings trade correctness
-for performance:
-
-- **`overflow-checks`** — when `false` (release default), integer
-  overflow wraps silently. When `true`, overflow panics. The
-  framework uses `u64` for aggregate IDs, sequence numbers, and
-  index arithmetic — silent overflow could cause data corruption.
-- **Clippy lint level** — `pedantic` catches subtle correctness
-  issues (shadowing, implicit conversions, missing docs) but
-  generates many warnings.
-- **LTO, strip, codegen-units** — performance and binary size
-  optimizations that do not affect correctness.
+Rust's release profile controls optimizations and runtime checks. `overflow-checks = false` (release default) wraps integer overflow silently — the framework uses `u64` for aggregate IDs and sequence numbers where silent overflow could cause data corruption. Clippy pedantic catches subtle correctness issues. LTO and `codegen-units = 1` optimize binary size and performance without affecting correctness.
 
 ## Decision
 
@@ -61,6 +49,6 @@ R3 [9]: Use lto = true and codegen-units = 1 for whole-program
 
 ## Consequences
 
-- Integer overflow is always caught in both debug and release. The framework's ID generation uses `checked_add` explicitly, but `overflow-checks = true` catches any unchecked arithmetic that slips through.
-- Clippy pedantic generates many warnings. Individual crates suppress specific lints via `#[allow(clippy::...)]` where justified.
+- Integer overflow caught in both debug and release. The framework also uses `checked_add` explicitly as defense-in-depth.
+- Clippy pedantic generates many warnings; individual crates suppress specific lints via `#[allow(clippy::...)]`.
 - Release build times are longer due to LTO + single codegen unit. Acceptable — release builds are infrequent.

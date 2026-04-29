@@ -47,12 +47,7 @@ R3 [9]: Defer no_std support until an actual consumer exists
 
 ## Consequences
 
-- **Positive:** No misleading `no_std` claims. Users and dependents get accurate
-  capability information.
-- **Positive:** Reduces maintenance surface — no need to maintain untested `no_std`
-  code paths.
-- **Positive:** Design for `no_std` is documented and ready to implement when needed.
-- **Negative:** Cannot be used in `no_std` environments until implemented.
-- **Migration path:** When a `no_std` consumer exists: add `#![no_std]` attribute,
-  gate `std::error::Error` impls, gate collections behind `alloc`, feature-gate
-  `String` vs `&'static str` in error types.
+- No misleading `no_std` claims. Users get accurate capability information.
+- Reduces maintenance surface — no untested `no_std` code paths.
+- Design for `no_std` is documented and ready when needed.
+- Cannot be used in `no_std` environments until implemented.

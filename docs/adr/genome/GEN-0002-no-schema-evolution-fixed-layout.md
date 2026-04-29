@@ -1,7 +1,7 @@
 # GEN-0002. No Schema Evolution — Fixed Layout
 
 Date: 2026-04-25
-Last-reviewed: 2026-04-25
+Last-reviewed: 2026-04-28
 Tier: S
 Status: Accepted
 
@@ -32,7 +32,7 @@ without breaking existing readers (readers reject unknown discriminants with
 R1 [2]: Struct layout is fixed at compile time with no vtables, no field
   presence bits, and no default values for missing fields
 R2 [2]: Schema changes require a new file — no in-place schema evolution
-R3 [5]: A compile-time xxHash64 schema fingerprint detects type
+R3 [3]: A compile-time xxHash64 schema fingerprint detects type
   mismatches at deserialization time with DeError::SchemaMismatch
 
 **Cross-crate sentinel reservation:** Pardosa reserves `u64::MAX` as the

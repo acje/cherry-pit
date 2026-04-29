@@ -1,7 +1,7 @@
 # CHE-0034. jiff::Timestamp as Temporal Foundation
 
 Date: 2026-04-25
-Last-reviewed: 2026-04-25
+Last-reviewed: 2026-04-28
 Tier: D
 Status: Accepted
 
@@ -39,10 +39,7 @@ jiff = { version = "0.2", features = ["serde"] }
 
 ## Consequences
 
-- Lossless serde roundtrips via RFC 9557/RFC 3339 with full precision.
-- DST-safe arithmetic by default.
-- UTC instants only — timezone conversion is a presentation concern, not a persistence concern.
-- Single timestamp per batch — `build_envelopes` calls `Timestamp::now()` once (CHE-0036).
-- `jiff::Timestamp` is embedded in every serialized envelope. Switching libraries requires migrating all persisted events.
-- jiff 0.2 is pre-1.0. A golden-file regression test (CHE-0038) catches serde format changes before incompatible data is written.
-- In distributed deployments, clock skew between nodes makes timestamps unreliable for event ordering — sequence numbers (not timestamps) determine causal order within an aggregate stream.
+- Lossless serde roundtrips via RFC 9557/RFC 3339. DST-safe arithmetic by default. UTC instants only.
+- Single timestamp per batch — `build_envelopes` calls `Timestamp::now()` once.
+- Switching libraries requires migrating all persisted events. jiff 0.2 is pre-1.0; a golden-file test catches format changes.
+- In distributed deployments, clock skew makes timestamps unreliable — sequence numbers determine causal order.

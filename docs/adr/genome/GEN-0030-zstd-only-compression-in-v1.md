@@ -1,7 +1,7 @@
 # GEN-0030. Zstd-Only Compression in v1
 
 Date: 2026-04-25
-Last-reviewed: 2026-04-25
+Last-reviewed: 2026-04-28
 Tier: D
 Status: Accepted
 
@@ -11,7 +11,7 @@ References: GEN-0001, GEN-0014
 
 ## Context
 
-pardosa-genome supports optional compression via the `compression_algo` field. GEN-0014 documents decompression bomb mitigation. Zstd dominates brotli for real-time workloads: ~4× faster decompression (~1500 vs ~400 MB/s), ~25× faster compression at comparable ratios. Brotli's marginally better compression ratio does not justify the speed penalty. The file header reserves 3 bits (7 values) for the algorithm, ensuring brotli can be added later without a format version bump.
+pardosa-genome supports optional compression via `compression_algo`. Zstd dominates brotli for real-time workloads: ~4× faster decompression, ~25× faster compression at comparable ratios. The file header reserves 3 bits (7 values) for the algorithm, ensuring brotli can be added later without a format version bump.
 
 ## Decision
 
@@ -52,15 +52,8 @@ R3 [9]: Reserved algorithm codes 0x02 through 0x07 must be rejected
 
 ## Consequences
 
-- **Positive:** Single compression dependency reduces testing surface and
-  build complexity. Only one decompression code path to audit for security
-  (GEN-0014).
-- **Positive:** Zstd's dictionary support (reserved `dict_id` in file header)
-  enables future 2–5× compression improvement on small messages without
-  algorithm change.
-- **Positive:** Reserved algorithm codes ensure brotli (or other algorithms)
-  can be added without breaking the wire format.
-- **Negative:** Cold storage workloads where write speed is unimportant
-  cannot use brotli's marginally better ratios until a future version.
-- **Negative:** `no_std` consumers who need decompression must use `ruzstd`
-  (experimental) or implement their own decompressor.
+- Single compression dependency reduces testing surface. One decompression path to audit.
+- Zstd dictionary support enables future 2–5× improvement on small messages.
+- Reserved algorithm codes ensure brotli can be added without breaking the wire format.
+- Cold storage workloads cannot use brotli's better ratios until a future version.
+- `no_std` consumers needing decompression must use `ruzstd` (experimental).

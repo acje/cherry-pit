@@ -529,7 +529,7 @@ fn check_tagged_rules(
 
         // Layer range validation: must be 1-12
         if rule.layer == 0 || rule.layer > 12 {
-            diags.push(Diagnostic::warning(
+            diags.push(Diagnostic::error(
                 "T016",
                 &record.file_path,
                 rule.line,
@@ -1441,6 +1441,119 @@ params = { max_rules = 10, min_rule_words = 7, max_rule_words = 60 }
         assert!(
             t016.is_some(),
             "7 rules should trigger T016 at D-tier (limit 6), got: {diags:?}"
+        );
+    }
+
+    // ── T016 layer validation error tests ──────────────────────────
+
+    #[test]
+    fn t016_layer_zero_is_error() {
+        use crate::model::TaggedRule;
+        let mut record = make_record();
+        record.decision_rules = vec![TaggedRule {
+            id: "R1".into(),
+            text: "All events must be versioned with semantic version numbers always".into(),
+            line: 10,
+            layer: 0,
+        }];
+        let config = make_config();
+        let mut diags = Vec::new();
+        check(&record, &config, &mut diags);
+        let layer_err = diags
+            .iter()
+            .find(|d| d.rule == "T016" && d.message.contains("layer 0"));
+        assert!(
+            layer_err.is_some(),
+            "layer=0 should produce T016 error, got: {diags:?}"
+        );
+        assert_eq!(
+            layer_err.unwrap().severity,
+            crate::report::Severity::Error,
+            "layer validation must be error severity"
+        );
+    }
+
+    #[test]
+    fn t016_layer_thirteen_is_error() {
+        use crate::model::TaggedRule;
+        let mut record = make_record();
+        record.decision_rules = vec![TaggedRule {
+            id: "R1".into(),
+            text: "All events must be versioned with semantic version numbers always".into(),
+            line: 10,
+            layer: 13,
+        }];
+        let config = make_config();
+        let mut diags = Vec::new();
+        check(&record, &config, &mut diags);
+        let layer_err = diags
+            .iter()
+            .find(|d| d.rule == "T016" && d.message.contains("layer 13"));
+        assert!(
+            layer_err.is_some(),
+            "layer=13 should produce T016 error, got: {diags:?}"
+        );
+        assert_eq!(
+            layer_err.unwrap().severity,
+            crate::report::Severity::Error,
+            "layer validation must be error severity"
+        );
+    }
+
+    #[test]
+    fn t016_layer_valid_no_error() {
+        use crate::model::TaggedRule;
+        let mut record = make_record();
+        record.decision_rules = vec![TaggedRule {
+            id: "R1".into(),
+            text: "All events must be versioned with semantic version numbers always".into(),
+            line: 10,
+            layer: 5,
+        }];
+        let config = make_config();
+        let mut diags = Vec::new();
+        check(&record, &config, &mut diags);
+        let layer_err = diags
+            .iter()
+            .find(|d| d.rule == "T016" && d.message.contains("layer"));
+        assert!(
+            layer_err.is_none(),
+            "layer=5 should not produce layer error, got: {diags:?}"
+        );
+    }
+
+    #[test]
+    fn t016_layer_boundary_one_and_twelve_pass() {
+        use crate::model::TaggedRule;
+        let mut record = make_record();
+        // Use D-tier so layers 1 and 12 don't both trigger T019;
+        // layer 12 → D (distance 0), layer 1 → S (distance 4 fires T019,
+        // but we only check T016 layer errors, not T019).
+        record.tier = Some(Tier::D);
+        record.decision_rules = vec![
+            TaggedRule {
+                id: "R1".into(),
+                text: "All events must be versioned with semantic version numbers always".into(),
+                line: 10,
+                layer: 1,
+            },
+            TaggedRule {
+                id: "R2".into(),
+                text: "All events must be versioned with semantic version numbers always".into(),
+                line: 11,
+                layer: 12,
+            },
+        ];
+        let config = make_config();
+        let mut diags = Vec::new();
+        check(&record, &config, &mut diags);
+        let layer_errs: Vec<_> = diags
+            .iter()
+            .filter(|d| d.rule == "T016" && d.message.contains("layer"))
+            .collect();
+        assert!(
+            layer_errs.is_empty(),
+            "layers 1 and 12 are valid boundaries, got: {layer_errs:?}"
         );
     }
 

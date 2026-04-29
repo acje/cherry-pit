@@ -42,8 +42,7 @@ thiserror = "2"
 
 ## Consequences
 
-- **Minimal dependency tree** — `cherry-pit-core` depends on exactly three external crates, all load-bearing. No convenience-only dependencies.
-- **Full control over error formatting and chains** — `source()` returns are explicit; `DispatchError::ConcurrencyConflict` includes structured data in a controlled format.
-- **More boilerplate** — ~60 lines of manual impls that `thiserror` would reduce to ~20 lines. Maintenance burden increases with new variants.
-- **Supply-chain risk reduction** — fewer dependencies means fewer attack vectors. For a foundation crate, this is a P2 (security) concern.
+- **Minimal dependency tree** — `cherry-pit-core` depends on three external crates, all load-bearing.
+- **Full control over error formatting** — `source()` returns are explicit; `ConcurrencyConflict` has structured data.
+- **More boilerplate** — ~60 lines of manual impls vs ~20 with `thiserror`. Maintenance burden grows with new variants.
 - Infrastructure crates may use `thiserror` — this decision applies only to `cherry-pit-core`.

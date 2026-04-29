@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use std::fmt::Write as _;
 
 use crate::config::Config;
-use crate::model::{AdrId, AdrRecord, DomainDir, RelVerb, TaggedRule, Tier};
+use crate::model::{AdrId, AdrRecord, DomainDir, RelVerb, Tier};
 use crate::nav::ChildEntry;
 use crate::report::Diagnostic;
 
@@ -39,11 +39,23 @@ pub enum OutputBlock {
     },
 }
 
-/// A rule extracted for `--context` mode.
-pub struct CrateRule {
+/// A group of rules emitted under a single root ADR in `--context` mode.
+#[derive(Debug)]
+pub struct RootGroup {
+    pub root_id: AdrId,
+    pub root_title: String,
+    pub rules: Vec<EmittedRule>,
+}
+
+/// A single rule positioned in root-grouped context output.
+#[derive(Debug)]
+pub struct EmittedRule {
     pub adr_id: AdrId,
-    pub tier: Option<Tier>,
-    pub rules: Vec<TaggedRule>,
+    pub rule_id: String,
+    pub text: String,
+    pub layer: u8,
+    #[allow(dead_code)] // Used in sort key, kept for future rendering
+    pub depth: u16,
 }
 
 // ── Block rendering ────────────────────────────────────────────────
@@ -165,24 +177,18 @@ pub fn render_diagnostics(diagnostics: &[Diagnostic], record_count: usize) -> St
     out
 }
 
-// ── Rules rendering (--context mode) ───────────────────────────────
+// ── Tree rendering (--tree mode) ───────────────────────────────────
 
-/// Tier labels in render order (S→D).
-const TIER_ORDER: &[(Tier, &str)] = &[
-    (Tier::S, "S-tier"),
-    (Tier::A, "A-tier"),
-    (Tier::B, "B-tier"),
-    (Tier::C, "C-tier"),
-    (Tier::D, "D-tier"),
-];
-
-/// Render context mode output: tier-grouped flat list with preamble.
+/// Render root-grouped context output with preamble.
 ///
-/// Rules are grouped by tier (S→D). Each tier with rules gets a `## X-tier`
-/// heading. Rule lines use `- {text} [{ADR_ID}:{RULE_ID}]` format with the
-/// anchoring ID at the end. Rules with `tier=None` render under D-tier.
+/// Rules are grouped by root ADR subtree. Each root with rules gets a
+/// `### ROOT-ID. Title` heading. Rule lines use `- {text} [{ADR_ID}:{RULE_ID}:L{layer}]`
+/// format with the anchoring ID at the end.
+///
+/// Groups with no rules after dedup are skipped. An optional "Unclaimed Rules"
+/// section appears if any eligible rules were not reached by any root's BFS.
 #[must_use]
-pub fn render_rules(crate_name: &str, rules: &[CrateRule]) -> String {
+pub fn render_root_groups(crate_name: &str, groups: &[RootGroup]) -> String {
     let mut out = String::new();
 
     // Preamble
@@ -195,36 +201,28 @@ pub fn render_rules(crate_name: &str, rules: &[CrateRule]) -> String {
     .unwrap();
     writeln!(out, "Follow every rule without exception.").unwrap();
 
-    // Group rules by effective tier
-    for &(tier, label) in TIER_ORDER {
-        let tier_rules: Vec<_> = rules
-            .iter()
-            .filter(|cr| cr.tier.unwrap_or(Tier::D) == tier)
-            .collect();
-
-        if tier_rules.is_empty() {
+    for group in groups {
+        if group.rules.is_empty() {
             continue;
         }
 
         writeln!(out).unwrap();
-        writeln!(out, "## {label}").unwrap();
+        writeln!(out, "### {}. {}", group.root_id, group.root_title).unwrap();
 
-        for cr in &tier_rules {
-            for rule in &cr.rules {
-                writeln!(
-                    out,
-                    "- {} [{}:{}:L{}]",
-                    rule.text, cr.adr_id, rule.id, rule.layer
-                )
-                .unwrap();
-            }
+        for rule in &group.rules {
+            writeln!(
+                out,
+                "- {} [{}:{}:L{}]",
+                rule.text, rule.adr_id, rule.rule_id, rule.layer
+            )
+            .unwrap();
         }
     }
 
     out
 }
 
-// ── Tree rendering (--tree mode) ───────────────────────────────────
+// ── Tree rendering (--tree mode, domain overview) ──────────────────
 
 /// Render the domain tree with box-drawing to stdout.
 #[must_use]
@@ -445,19 +443,22 @@ mod tests {
         assert!(output.contains("T001"));
     }
 
+    // ── render_root_groups tests ────────────────────────────────────
+
     #[test]
-    fn render_rules_basic() {
-        let rules = vec![CrateRule {
-            adr_id: make_id("CHE", 42),
-            tier: Some(Tier::A),
-            rules: vec![TaggedRule {
-                id: "R1".into(),
-                text: "All events versioned".into(),
-                line: 10,
+    fn render_root_groups_basic() {
+        let groups = vec![RootGroup {
+            root_id: make_id("COM", 1),
+            root_title: "Foundation Principle".into(),
+            rules: vec![EmittedRule {
+                adr_id: make_id("COM", 1),
+                rule_id: "R1".into(),
+                text: "All modules must log errors.".into(),
                 layer: 5,
+                depth: 0,
             }],
         }];
-        let output = render_rules("cherry-pit-core", &rules);
+        let output = render_root_groups("cherry-pit-core", &groups);
         // Preamble
         assert!(output.contains("# Architecture Rules"), "output:\n{output}");
         assert!(
@@ -468,100 +469,155 @@ mod tests {
             output.contains("Follow every rule without exception"),
             "output:\n{output}"
         );
-        // Tier header
-        assert!(output.contains("## A-tier"), "output:\n{output}");
-        // Rule with ID and layer at end
+        // Root header
         assert!(
-            output.contains("- All events versioned [CHE-0042:R1:L5]"),
+            output.contains("### COM-0001. Foundation Principle"),
             "output:\n{output}"
         );
-        // No old metadata separators
-        assert!(!output.contains("| Cherry"), "output:\n{output}");
-        assert!(!output.contains("| Status:"), "output:\n{output}");
+        // Rule line with ID and layer
+        assert!(
+            output.contains("- All modules must log errors. [COM-0001:R1:L5]"),
+            "output:\n{output}"
+        );
     }
 
     #[test]
-    fn render_rules_tier_grouping() {
-        let rules = vec![
-            CrateRule {
-                adr_id: make_id("CHE", 1),
-                tier: Some(Tier::A),
-                rules: vec![TaggedRule {
-                    id: "R1".into(),
-                    text: "A-tier rule".into(),
-                    line: 10,
-                    layer: 4,
-                }],
+    fn render_root_groups_empty_group_skipped() {
+        let groups = vec![
+            RootGroup {
+                root_id: make_id("COM", 1),
+                root_title: "Empty Root".into(),
+                rules: vec![],
             },
-            CrateRule {
-                adr_id: make_id("COM", 1),
-                tier: Some(Tier::S),
-                rules: vec![TaggedRule {
-                    id: "R1".into(),
-                    text: "S-tier rule".into(),
-                    line: 10,
-                    layer: 5,
+            RootGroup {
+                root_id: make_id("CHE", 1),
+                root_title: "Non-empty Root".into(),
+                rules: vec![EmittedRule {
+                    adr_id: make_id("CHE", 2),
+                    rule_id: "R1".into(),
+                    text: "Rule here.".into(),
+                    layer: 3,
+                    depth: 1,
                 }],
             },
         ];
-        let output = render_rules("cherry-pit-core", &rules);
-        let s_pos = output.find("## S-tier").expect("S-tier header missing");
-        let a_pos = output.find("## A-tier").expect("A-tier header missing");
-        assert!(s_pos < a_pos, "S-tier should appear before A-tier");
-    }
-
-    #[test]
-    fn render_rules_empty_tier_skipped() {
-        let rules = vec![CrateRule {
-            adr_id: make_id("CHE", 1),
-            tier: Some(Tier::B),
-            rules: vec![TaggedRule {
-                id: "R1".into(),
-                text: "B-tier only".into(),
-                line: 10,
-                layer: 6,
-            }],
-        }];
-        let output = render_rules("cherry-pit-core", &rules);
-        assert!(output.contains("## B-tier"), "output:\n{output}");
+        let output = render_root_groups("test", &groups);
         assert!(
-            !output.contains("## S-tier"),
-            "empty S-tier should be skipped"
+            !output.contains("Empty Root"),
+            "empty group should be skipped:\n{output}"
         );
         assert!(
-            !output.contains("## A-tier"),
-            "empty A-tier should be skipped"
-        );
-        assert!(
-            !output.contains("## C-tier"),
-            "empty C-tier should be skipped"
-        );
-        assert!(
-            !output.contains("## D-tier"),
-            "empty D-tier should be skipped"
+            output.contains("### CHE-0001. Non-empty Root"),
+            "non-empty group should appear:\n{output}"
         );
     }
 
     #[test]
-    fn render_rules_tier_none_maps_to_d() {
-        let rules = vec![CrateRule {
-            adr_id: make_id("CHE", 1),
-            tier: None,
-            rules: vec![TaggedRule {
-                id: "R1".into(),
-                text: "Unclassified rule".into(),
-                line: 10,
-                layer: 5,
-            }],
-        }];
-        let output = render_rules("cherry-pit-core", &rules);
+    fn render_root_groups_multiple_roots_ordering() {
+        let groups = vec![
+            RootGroup {
+                root_id: make_id("COM", 1),
+                root_title: "Foundation".into(),
+                rules: vec![EmittedRule {
+                    adr_id: make_id("COM", 1),
+                    rule_id: "R1".into(),
+                    text: "Foundation rule.".into(),
+                    layer: 1,
+                    depth: 0,
+                }],
+            },
+            RootGroup {
+                root_id: make_id("CHE", 1),
+                root_title: "Domain Root".into(),
+                rules: vec![EmittedRule {
+                    adr_id: make_id("CHE", 5),
+                    rule_id: "R1".into(),
+                    text: "Domain rule.".into(),
+                    layer: 7,
+                    depth: 1,
+                }],
+            },
+        ];
+        let output = render_root_groups("test", &groups);
+        let com_pos = output
+            .find("### COM-0001. Foundation")
+            .expect("COM header missing");
+        let che_pos = output
+            .find("### CHE-0001. Domain Root")
+            .expect("CHE header missing");
         assert!(
-            output.contains("## D-tier"),
-            "tier=None should render under D-tier"
+            com_pos < che_pos,
+            "Groups should render in order given:\n{output}"
+        );
+    }
+
+    #[test]
+    fn render_root_groups_all_empty_produces_preamble_only() {
+        let groups = vec![RootGroup {
+            root_id: make_id("COM", 1),
+            root_title: "Empty".into(),
+            rules: vec![],
+        }];
+        let output = render_root_groups("test", &groups);
+        assert!(output.contains("# Architecture Rules"));
+        assert!(!output.contains("###"), "no root headers for empty groups:\n{output}");
+    }
+
+    #[test]
+    fn render_root_groups_multiple_adrs_under_one_root() {
+        let groups = vec![RootGroup {
+            root_id: make_id("CHE", 1),
+            root_title: "Design Priority".into(),
+            rules: vec![
+                EmittedRule {
+                    adr_id: make_id("CHE", 1),
+                    rule_id: "R1".into(),
+                    text: "Root rule from the root itself.".into(),
+                    layer: 2,
+                    depth: 0,
+                },
+                EmittedRule {
+                    adr_id: make_id("CHE", 5),
+                    rule_id: "R1".into(),
+                    text: "Child rule from CHE-0005.".into(),
+                    layer: 5,
+                    depth: 1,
+                },
+                EmittedRule {
+                    adr_id: make_id("CHE", 10),
+                    rule_id: "R1".into(),
+                    text: "Grandchild rule from CHE-0010.".into(),
+                    layer: 7,
+                    depth: 2,
+                },
+            ],
+        }];
+        let output = render_root_groups("cherry-pit-core", &groups);
+        // Single root header
+        assert!(
+            output.contains("### CHE-0001. Design Priority"),
+            "root header missing:\n{output}"
+        );
+        // All three rules present under that header
+        assert!(
+            output.contains("[CHE-0001:R1:L2]"),
+            "root's own rule missing:\n{output}"
         );
         assert!(
-            output.contains("- Unclassified rule [CHE-0001:R1:L5]"),
-            "output:\n{output}"
+            output.contains("[CHE-0005:R1:L5]"),
+            "child rule missing:\n{output}"
+        );
+        assert!(
+            output.contains("[CHE-0010:R1:L7]"),
+            "grandchild rule missing:\n{output}"
+        );
+        // Verify ordering: L2 before L5 before L7
+        let pos_l2 = output.find("[CHE-0001:R1:L2]").unwrap();
+        let pos_l5 = output.find("[CHE-0005:R1:L5]").unwrap();
+        let pos_l7 = output.find("[CHE-0010:R1:L7]").unwrap();
+        assert!(
+            pos_l2 < pos_l5 && pos_l5 < pos_l7,
+            "rules should appear in layer order:\n{output}"
         );
     }
 }

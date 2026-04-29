@@ -54,7 +54,7 @@ impl fmt::Display for AdrId {
 }
 
 /// Parsed ADR record with all metadata and line numbers.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 #[allow(clippy::struct_excessive_bools)]
 pub struct AdrRecord {
     pub id: AdrId,
@@ -97,6 +97,16 @@ pub struct AdrRecord {
     /// Tagged rules extracted from the Decision section
     /// (`RN [L]: text` pattern). Empty when no tagged rules found.
     pub decision_rules: Vec<TaggedRule>,
+}
+
+impl AdrRecord {
+    /// True if this ADR declares itself as a tree root via `Root: OWN-ID`.
+    #[must_use]
+    pub fn is_root(&self) -> bool {
+        self.relationships
+            .iter()
+            .any(|r| r.verb == RelVerb::Root && r.target == self.id)
+    }
 }
 
 impl Default for AdrRecord {

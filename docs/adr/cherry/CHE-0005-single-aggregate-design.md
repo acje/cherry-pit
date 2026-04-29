@@ -1,13 +1,13 @@
 # CHE-0005. Single-Aggregate Design with Compile-Time Type Safety
 
 Date: 2026-04-24
-Last-reviewed: 2026-04-27
+Last-reviewed: 2026-04-28
 Tier: S
 Status: Accepted
 
 ## Related
 
-References: CHE-0001, CHE-0002, CHE-0004, CHE-0011, CHE-0013, COM-0002
+References: CHE-0001, CHE-0002, COM-0002
 
 ## Context
 

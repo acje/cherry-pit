@@ -1,7 +1,7 @@
 # GEN-0028. Tuple Struct / Tuple Wire Equivalence
 
 Date: 2026-04-25
-Last-reviewed: 2026-04-25
+Last-reviewed: 2026-04-28
 Tier: D
 Status: Accepted
 
@@ -11,16 +11,7 @@ References: GEN-0001, GEN-0003, GEN-0011
 
 ## Context
 
-Serde treats tuple structs (e.g., `struct Point(f64, f64)`) and plain tuples
-(e.g., `(f64, f64)`) identically at the data model level — both call
-`serialize_tuple` with the same element count. This means the serialized
-bytes for the inner data are identical regardless of whether the outer type
-is a named tuple struct or an anonymous tuple.
-
-pardosa-genome's schema hash (GEN-0003) includes the root type name in the
-hash input (`"struct:Point"` vs `"tuple2"`), so the schema hashes differ.
-But the wire bytes after the header (where the schema hash lives) are the
-same.
+Serde treats tuple structs (e.g., `struct Point(f64, f64)`) and plain tuples identically — both call `serialize_tuple`. The serialized bytes are identical regardless of wrapper type. pardosa-genome's schema hash (GEN-0003) includes the root type name, so hashes differ (`"struct:Point"` vs `"tuple2"`), but wire bytes after the header are the same.
 
 ## Decision
 
@@ -48,7 +39,7 @@ R3 [9]: Schema hash is the sole mechanism providing type identity for
 
 ## Consequences
 
-- **Positive:** Consistent with serde's data model — no special-case logic needed.
-- **Positive:** Schema hash catches accidental type substitution in normal operation (GEN-0011).
-- **Negative:** Structurally identical types (`Meters(f64)` vs `Seconds(f64)`) produce identical payload bytes. Schema hash is the only defense; a future `decode_unchecked` bypassing the hash would allow silent type confusion.
-- **Negative:** Users expecting structural typing must understand pardosa-genome uses nominal typing via schema hash.
+- Consistent with serde's data model — no special-case logic.
+- Schema hash catches accidental type substitution in normal operation.
+- Structurally identical types produce identical payload; a future `decode_unchecked` bypassing the hash would allow silent type confusion.
+- Users expecting structural typing must understand pardosa-genome uses nominal typing via schema hash.

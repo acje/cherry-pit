@@ -1,7 +1,7 @@
 # PAR-0002. Index::NONE Sentinel Replacing Option\<Index\>
 
 Date: 2026-04-25
-Last-reviewed: 2026-04-25
+Last-reviewed: 2026-04-28
 Tier: D
 Status: Accepted
 
@@ -46,4 +46,4 @@ R3 [9]: Index::checked_next() caps at u64::MAX minus 1 so valid
 
 ## Consequences
 
-Saves 4 bytes inline plus heap indirection per event in genome encoding (~4 MiB for 1M events). `Index` is `Copy` with no heap allocation or option branching on reads. Sentinel semantics are explicit via `is_none()` and `NONE` constant. Trade-off: less type-safe than `Option` — callers could forget `is_none()` checks. `u64::MAX` is permanently consumed from the value space (no runtime impact given physical constraints). Genome's wire format must not assign structural meaning to `u64::MAX` for `Index`-typed fields; see [GEN-0002](../genome/GEN-0002-no-schema-evolution-fixed-layout.md) and [GEN-0007](../genome/GEN-0007-flatbuffers-style-offset-based-binary-layout.md).
+Saves 4 bytes inline plus heap indirection per event in genome encoding (~4 MiB for 1M events). `Index` is `Copy` with no heap allocation. Sentinel semantics are explicit via `is_none()` and `NONE` constant. Trade-off: less type-safe than `Option` — callers could forget `is_none()` checks. `u64::MAX` is permanently consumed from the value space (no runtime impact).

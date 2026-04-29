@@ -1,7 +1,7 @@
 # CHE-0036. File-Per-Stream Full-Rewrite Storage Model
 
 Date: 2026-04-25
-Last-reviewed: 2026-04-25
+Last-reviewed: 2026-04-28
 Tier: D
 Status: Accepted
 
@@ -11,7 +11,7 @@ References: CHE-0001, CHE-0031, CHE-0032
 
 ## Context
 
-`MsgpackFileStore<E>` needs a storage topology and persistence strategy. CHE-0031 covers serialization format; CHE-0032 covers write atomicity. Neither addresses structural decisions. Three topology options: single file for all aggregates (requires index for random access), file per aggregate instance (single file read, no index), or directory with segments (premature). Three persistence strategies: append-only (impossible with MessagePack's fixed array length), full rewrite (simple, O(n) cost), or WAL with compaction (premature).
+`MsgpackFileStore<E>` needs a storage topology and persistence strategy. Three topology options: single file for all aggregates, file per instance, or directory with segments. Three persistence strategies: append-only (impossible with MessagePack's fixed array length), full rewrite, or WAL with compaction.
 
 ## Decision
 
@@ -60,10 +60,8 @@ load(id):
 
 ## Consequences
 
-- **O(n) write cost per append** — every append rewrites entire history. Acceptable for development; production with long-lived aggregates should use a database-backed store.
-- **O(1) file reads per load** — single file read, no index, no scanning.
-- **File count equals aggregate count** — file systems handle this up to ~1M files; beyond that, sharding or switching backends is needed.
-- **No partial reads** — consistent with CHE-0037 (no snapshots).
-- **MessagePack's `Vec` encoding** writes array length first (CHE-0031), making incremental append structurally impossible.
-- **Atomic rename (CHE-0032)** ensures readers never see partial writes.
-- This is a `cherry-pit-gateway` implementation choice, not a framework constraint.
+- **O(n) write per append** — rewrites entire history. Production should use a database store.
+- **O(1) file reads per load** — single file read, no index.
+- **File count equals aggregate count** — scales to ~1M files; sharding needed beyond that.
+- **No partial reads** — consistent with CHE-0037.
+- Atomic rename (CHE-0032) ensures readers never see partial writes.

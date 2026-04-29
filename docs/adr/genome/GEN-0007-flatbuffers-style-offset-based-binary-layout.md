@@ -1,7 +1,7 @@
 # GEN-0007. FlatBuffers-Style Offset-Based Binary Layout
 
 Date: 2026-04-25
-Last-reviewed: 2026-04-25
+Last-reviewed: 2026-04-28
 Tier: S
 Status: Accepted
 
@@ -36,12 +36,12 @@ Key layout rules:
 
 R1 [2]: Use a two-region layout with inline region for scalars and heap
   region for variable-length data referenced by 4-byte LE offsets
-R2 [5]: Scalars are inline at natural alignment with LE encoding
-R3 [5]: Strings and bytes use 4-byte offset inline pointing to heap
+R2 [3]: Scalars are inline at natural alignment with LE encoding
+R3 [3]: Strings and bytes use 4-byte offset inline pointing to heap
   len-prefixed data
-R4 [5]: Enums use discriminant-u32 plus offset-u32 inline pointing to
+R4 [3]: Enums use discriminant-u32 plus offset-u32 inline pointing to
   heap variant data
-R5 [5]: All u32 offsets are absolute byte positions measured from the
+R5 [3]: All u32 offsets are absolute byte positions measured from the
   start of the message buffer data region
 
 ## Consequences

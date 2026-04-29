@@ -12,28 +12,20 @@ References: AFM-0001
 
 ## Context
 
-AFM-0002 chose manual `std::env::args()` parsing when adr-fmt had
-three flags. The argument surface has since grown to six modes
-(lint, guidelines, tree, critique, context, plus default) with
-additional parameters (`--depth` for critique, crate name for
-context, optional domain filter for tree). Manual parsing at this
-scale duplicates clap concerns: mutual exclusivity, help text
-generation, version display, and error formatting. The R4
-reassessment trigger in AFM-0002 ("beyond five flags or
-subcommands") has been reached.
+AFM-0002 chose manual `std::env::args()` parsing when adr-fmt had three flags. The argument surface has grown to six modes with additional parameters (`--depth`, crate name, domain filter). Manual parsing duplicates clap concerns: mutual exclusivity, help text, version display, error formatting. The reassessment trigger in AFM-0002 has been reached.
 
 ## Decision
 
 Parse CLI arguments using clap's derive API. A single `Cli` struct
 with `#[derive(Parser)]` replaces manual `resolve_args()` logic.
 
-R1 [5]: A single `Cli` struct with `#[derive(Parser)]` defines
+R1 [9]: A single `Cli` struct with `#[derive(Parser)]` defines
   all arguments; no manual `args()` iteration exists outside this
   struct
-R2 [5]: Mutually exclusive mode flags use clap's `group` attribute
+R2 [9]: Mutually exclusive mode flags use clap's `group` attribute
   to enforce exclusivity at parse time rather than runtime match
   logic
-R3 [5]: Each mode flag maps to the internal `Mode` enum via a
+R3 [9]: Each mode flag maps to the internal `Mode` enum via a
   conversion step after clap parsing
 R4 [12]: Reassess if the argument surface requires subcommands
   or dynamic argument generation beyond clap derive capabilities

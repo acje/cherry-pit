@@ -1,7 +1,7 @@
 # GEN-0031. Rust-Only — Cross-Language Read Deferred
 
 Date: 2026-04-25
-Last-reviewed: 2026-04-25
+Last-reviewed: 2026-04-28
 Tier: D
 Status: Accepted
 
@@ -11,17 +11,7 @@ References: GEN-0001, GEN-0003, GEN-0009
 
 ## Context
 
-Schema hashing in pardosa-genome uses `stringify!` to produce canonical Rust type
-definitions at compile time (GEN-0003). This is inherently Rust-specific — the schema
-source text contains Rust syntax (`struct Player { name: String, hp: u32 }`), and the
-hash is computed from this Rust-specific representation.
-
-Cross-language serialization formats (FlatBuffers, Cap'n Proto, Protocol Buffers) use
-language-neutral IDL files and code generators. pardosa-genome does not have an IDL —
-the Rust type definition _is_ the schema.
-
-[genome.md](../../plans/genome.md) §Future Scope already identifies an "Exportable Schema
-Definition Format" as a future direction.
+Schema hashing uses `stringify!` to produce canonical Rust type definitions at compile time (GEN-0003). This is inherently Rust-specific — the hash is computed from Rust syntax. Cross-language formats use language-neutral IDLs and code generators. pardosa-genome has no IDL — the Rust type definition _is_ the schema.
 
 ## Decision
 
@@ -47,10 +37,8 @@ R3 [9]: Cross-language read-only support is deferred to a future
 
 ## Consequences
 
-- **Positive:** No IDL complexity. Rust types are the single source of truth.
-- **Positive:** `stringify!`-based hashing is simple, deterministic, and zero-dependency.
-- **Negative:** Non-Rust consumers cannot read genome files without custom parsers.
-- **Negative:** Schema hash depends on Rust syntax — any future IDL must produce
-  compatible hashes or define a separate hash namespace.
-- **Mitigated:** The wire format (GEN-0007, GEN-0012) is language-neutral by construction
-  (LE integers, offsets, heap regions). Only schema identification is Rust-specific.
+- No IDL complexity. Rust types are the single source of truth.
+- `stringify!`-based hashing is simple, deterministic, and zero-dependency.
+- Non-Rust consumers cannot read genome files without custom parsers.
+- Schema hash depends on Rust syntax — any future IDL must produce compatible hashes.
+- Wire format is language-neutral by construction; only schema identification is Rust-specific.

@@ -1,13 +1,13 @@
 # GEN-0032. Canonical Encoding Contract
 
 Date: 2026-04-25
-Last-reviewed: 2026-04-25
+Last-reviewed: 2026-04-28
 Tier: S
 Status: Accepted
 
 ## Related
 
-References: GEN-0001, GEN-0004, GEN-0018, GEN-0020, GEN-0021, GEN-0024, GEN-0029, GEN-0033
+References: GEN-0001, GEN-0004, GEN-0021
 
 ## Context
 

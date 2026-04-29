@@ -1,7 +1,7 @@
 # CHE-0035. Two-Level Concurrency Architecture
 
 Date: 2026-04-25
-Last-reviewed: 2026-04-25
+Last-reviewed: 2026-04-28
 Tier: D
 Status: Accepted
 
@@ -11,21 +11,7 @@ References: CHE-0001, CHE-0006, CHE-0032, COM-0003
 
 ## Context
 
-`MsgpackFileStore` must handle concurrent operations safely:
-
-- Multiple aggregates can be written simultaneously.
-- Two appends to the same aggregate must be serialized.
-- New aggregate ID assignment must be globally unique.
-- Reads should not block writes or other reads.
-
-Options for concurrent access:
-
-1. **Global lock** — one `Mutex` protecting all operations. Simple but
-   eliminates all write parallelism. Reads blocked by writes.
-2. **Per-aggregate lock** — fine-grained locking. Different aggregates
-   proceed in parallel. Same-aggregate writes are serialized.
-3. **Lock-free** — atomic operations only. Complex, hard to reason
-   about with file I/O.
+`MsgpackFileStore` must handle concurrent operations safely. Multiple aggregates can be written simultaneously, but two appends to the same aggregate must be serialized. New aggregate ID assignment must be globally unique. Options: global lock (simple, no parallelism), per-aggregate lock (fine-grained), or lock-free (complex with file I/O).
 
 ## Decision
 
@@ -67,7 +53,6 @@ know the new ID.
 
 - Different aggregates can be read and written concurrently without contention.
 - Same-aggregate writes are serialized, preventing read-check-write races.
-- Reads never block — a concurrent read sees the pre-write state.
-- The `scc::HashMap` grows monotonically — locks are never removed. Minor memory leak, acceptable for the target use case.
-- `scan_max_id` runs once on first `create`. Files added externally after initialization are invisible, consistent with single-writer (CHE-0006).
-- `create` without per-aggregate lock and `write_atomic` temp file naming are coupled — `write_atomic` must not be called concurrently for the same path without external serialization.
+- Reads never block — concurrent reads see the pre-write state.
+- The `scc::HashMap` grows monotonically — locks are never removed.
+- `create` without per-aggregate lock is safe because temp file naming is coupled to sequential ID uniqueness.

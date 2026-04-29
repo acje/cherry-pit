@@ -1,17 +1,17 @@
 # CHE-0044. Object Store Backend (Planned)
 
 Date: 2026-04-25
-Last-reviewed: 2026-04-25
+Last-reviewed: 2026-04-28
 Tier: D
 Status: Proposed
 
 ## Related
 
-References: CHE-0001, CHE-0004, CHE-0006, CHE-0031, CHE-0032, CHE-0035, CHE-0036, CHE-0037, CHE-0043
+References: CHE-0001, CHE-0006, CHE-0031, CHE-0032, CHE-0043
 
 ## Context
 
-`MsgpackFileStore` is the sole `EventStore` implementation, using local-filesystem atomic writes (CHE-0032), per-aggregate locking (CHE-0035), and process-level fencing (CHE-0043). This limits deployment to a single machine. The `object_store` crate (Apache Arrow) provides a unified API for local filesystem, S3, GCS, Azure Blob, and in-memory backends. It supports conditional put (`PutMode::Update` with ETags) mapping naturally to optimistic concurrency, replacing both advisory locking and temp-file-rename. The MessagePack wire format (CHE-0031) is orthogonal to the storage backend.
+`MsgpackFileStore` is the sole `EventStore` implementation, limited to single-machine deployment. The `object_store` crate (Apache Arrow) provides a unified API for local filesystem, S3, GCS, and Azure Blob. Its conditional put (`PutMode::Update` with ETags) maps naturally to optimistic concurrency, replacing advisory locking and temp-file-rename.
 
 ## Decision
 
@@ -42,9 +42,8 @@ choose at wiring time.
 
 ## Consequences
 
-- **New dependency** — `object_store` and feature flags increase compile time and binary size. Feature-gated to minimize impact.
-- **Latency profile changes** — object storage has higher per-request latency, increasing pressure toward snapshot support (CHE-0037).
-- **No flock needed** — conditional put replaces advisory locking. CHE-0043's fencing becomes `MsgpackFileStore`-specific.
-- **ETag semantics vary** by provider; the `object_store` crate abstracts this but tests must cover each backend.
-- **ID assignment** — `scan_max_id` via directory listing has eventual consistency edge cases on S3; may need a separate metadata object.
-- **Migration path** — copy `.msgpack` files to object storage. Wire format is identical; only storage and concurrency layers change.
+- **New dependency** — `object_store` increases compile time. Feature-gated.
+- **Higher latency** — object storage per-request latency increases pressure toward snapshots.
+- **No flock needed** — conditional put replaces advisory locking.
+- **ETag semantics vary** by provider; tests must cover each backend.
+- **Migration path** — copy `.msgpack` files to object storage. Wire format identical.

@@ -1,7 +1,7 @@
 # GEN-0026. No Format Auto-Detection — Bare vs File
 
 Date: 2026-04-25
-Last-reviewed: 2026-04-25
+Last-reviewed: 2026-04-28
 Tier: D
 Status: Accepted
 
@@ -11,7 +11,7 @@ References: GEN-0001, GEN-0008
 
 ## Context
 
-pardosa-genome defines two wire formats: bare messages (starting with `format_version: u16 LE`) and files (starting with `"PGNO"` magic). Auto-detection is trivially possible by checking the first 4 bytes, but introduces ambiguity (bare messages whose bytes happen to match `"PG"`), forces a combined error type, and merges stateless (`decode`) and stateful (`Reader`) APIs. Compression auto-detection within bare messages via the `algo` byte IS implemented and is unaffected by this decision.
+pardosa-genome defines two wire formats: bare messages (starting with `format_version: u16 LE`) and files (starting with `"PGNO"` magic). Auto-detection introduces ambiguity, forces a combined error type, and merges stateless and stateful APIs. Compression auto-detection within bare messages via the `algo` byte IS implemented and unaffected.
 
 ## Decision
 
@@ -49,11 +49,7 @@ R3 [9]: Separate error types DeError and FileError are used for bare
 
 ## Consequences
 
-- **Positive:** Zero ambiguity at the API level. No false-positive format
-  detection possible.
-- **Positive:** Separate error types for separate failure modes.
-- **Negative:** Slight ergonomic friction — callers must know the format in
-  advance. In practice, this is always known from context (file path vs.
-  network buffer vs. IPC channel).
-- **Negative:** Third-party tools that receive unknown pardosa-genome data
-  must try both APIs or require out-of-band format indication.
+- Zero ambiguity at the API level. No false-positive format detection.
+- Separate error types for separate failure modes.
+- Slight ergonomic friction — callers must know the format. In practice always known from context.
+- Third-party tools receiving unknown data must try both APIs or require out-of-band format indication.

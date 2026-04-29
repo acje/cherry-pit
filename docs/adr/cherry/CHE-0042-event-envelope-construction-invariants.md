@@ -1,13 +1,13 @@
 # CHE-0042. EventEnvelope Construction Invariants
 
 Date: 2026-04-25
-Last-reviewed: 2026-04-25
+Last-reviewed: 2026-04-28
 Tier: A
 Status: Accepted
 
 ## Related
 
-References: CHE-0001, CHE-0002, CHE-0010, CHE-0016, CHE-0033, CHE-0034, CHE-0039
+References: CHE-0001, CHE-0002, CHE-0010, CHE-0016, CHE-0039
 
 ## Context
 

@@ -212,3 +212,49 @@ concrete transport-level implementation.
 Merging is reserved for cases where two ADRs in the **same domain**
 genuinely cover the same decision space — then the newer ADR supersedes
 the older one.
+
+---
+
+## 5. Reference Ordering and Root Assignment
+
+### Reference Order = Significance Order
+
+Within an ADR's `## Related` section, references are listed in order
+of significance — the most significant reference appears first.
+This convention is semantic: it communicates which relationships are
+primary constraints vs. secondary context.
+
+Example: An ADR that primarily implements a Cherry architecture decision
+and secondarily relates to an EDA pattern should list:
+
+```
+References: CHE-0001 | References: CHE-0004
+```
+
+Not the reverse. The first reference carries the strongest semantic
+relationship.
+
+### Root Assignment Rule
+
+`adr-fmt --context` assigns each ADR to exactly one root ADR subtree
+using a **first-root-referenced** rule: scan the ADR's references in
+document order; the first target that is a root ADR wins assignment.
+
+This means reference ordering directly controls which subtree an ADR
+appears under in context output. Authors govern root assignment by
+ordering their references intentionally.
+
+ADRs that don't directly reference any root ADR are assigned via BFS
+proximity — they inherit the root of their nearest assigned ancestor
+in the reference graph.
+
+### Root ADRs
+
+A root ADR declares itself via `Root: OWN-ID` in the Related section.
+Root ADRs serve as organizational anchors for `--context` output.
+Each root defines a subtree of ADRs reachable through the reference
+graph.
+
+Foundation roots (from foundation domains like COM, RST) appear before
+domain roots in context output. Within each category, roots are sorted
+by their minimum layer (ascending), then by ADR number.

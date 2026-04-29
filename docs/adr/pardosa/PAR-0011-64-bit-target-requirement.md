@@ -11,13 +11,7 @@ References: PAR-0001
 
 ## Context
 
-Pardosa uses `Index(u64)` for line positions. Converting `Index` to a `Vec`
-index requires `u64 → usize`. On 32-bit targets, `usize` is 4 bytes — valid
-`Index` values above `u32::MAX` would silently truncate, corrupting lookups.
-
-The `Index::as_usize()` method documents this: "Panics on 32-bit targets if
-the value exceeds `usize::MAX`." But a panic on a valid index is a
-correctness bug, not an acceptable fallback.
+Pardosa uses `Index(u64)` for line positions. Converting to `Vec` index requires `u64 → usize`. On 32-bit targets, `usize` is 4 bytes — valid `Index` values above `u32::MAX` would silently truncate, corrupting lookups. A panic on a valid index is a correctness bug, not an acceptable fallback.
 
 ## Decision
 
@@ -38,10 +32,7 @@ R2 [9]: Use Index::value() as usize without checked conversion
 
 ## Consequences
 
-- **Positive:** Eliminates an entire class of truncation bugs. `Index::value()
-  as usize` is always lossless.
-- **Positive:** Explicit — the error message explains why and what to do.
-- **Negative:** Pardosa cannot be used on 32-bit embedded or WASM32 targets.
-  Acceptable for an EDA storage layer that targets server deployments.
-- **Negative:** If 32-bit support is ever needed, `Index` would need to be
-  redesigned (e.g., `usize`-based or with checked conversion at every use).
+- Eliminates an entire class of truncation bugs. `Index::value() as usize` is always lossless.
+- Explicit — the error message explains why and what to do.
+- Cannot be used on 32-bit or WASM32 targets. Acceptable for server deployments.
+- If 32-bit support is ever needed, `Index` would need redesign.

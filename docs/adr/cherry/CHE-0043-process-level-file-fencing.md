@@ -1,24 +1,17 @@
 # CHE-0043. Process-Level File Fencing
 
 Date: 2026-04-25
-Last-reviewed: 2026-04-25
+Last-reviewed: 2026-04-28
 Tier: D
 Status: Accepted
 
 ## Related
 
-References: CHE-0001, CHE-0006, CHE-0021, CHE-0032, CHE-0035, COM-0003, PAR-0004
+References: CHE-0001, CHE-0006, CHE-0032, CHE-0035, COM-0003
 
 ## Context
 
-CHE-0006 establishes the single-writer assumption: each aggregate
-instance is owned by exactly one OS process. However, no enforcement
-mechanism existed — if two processes accidentally shared a store
-directory, concurrent writes could corrupt data silently.
-
-The gap: CHE-0006 documented the risk ("No fencing mechanism exists
-at the storage level. If two processes accidentally share a store
-directory, data corruption is possible") but deferred mitigation.
+CHE-0006 establishes the single-writer assumption: each aggregate instance is owned by exactly one OS process. However, no enforcement mechanism existed — two processes sharing a store directory could corrupt data silently. CHE-0006 documented this gap but deferred mitigation.
 
 ## Decision
 
@@ -64,10 +57,8 @@ and `File::lock()` in `std::fs`.
 
 ## Consequences
 
-- Two processes on same directory → second fails fast with `StoreError::StoreLocked` instead of silent corruption.
-- Two `MsgpackFileStore` instances in the same process contending for the same directory also conflict (desirable).
-- Read-only access unaffected — `load` does not call `ensure_fenced`.
+- Two processes on same directory → second fails fast with `StoreError::StoreLocked`.
+- Two `MsgpackFileStore` instances in the same process also conflict (desirable).
+- Read-only access unaffected — `load` does not fence.
 - Zero new dependencies — uses `std::fs::File::try_lock()` (Rust 1.95+).
 - Advisory, not mandatory — defense-in-depth, not a security boundary.
-- `flock` is unreliable on NFS; store directory must be local filesystem (consistent with CHE-0006).
-- `.lock` file remains after exit — harmless; the lock is on the file descriptor, not the file's existence.

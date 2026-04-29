@@ -1,7 +1,7 @@
 # GEN-0024. NaN Bit-Pattern Preservation — No Canonicalization
 
 Date: 2026-04-25
-Last-reviewed: 2026-04-25
+Last-reviewed: 2026-04-28
 Tier: D
 Status: Accepted
 
@@ -11,7 +11,7 @@ References: GEN-0001, GEN-0012
 
 ## Context
 
-IEEE 754 NaN allows ~2^52 distinct bit patterns for f64. NaN payloads are used for NaN-boxing and diagnostic tagging. Different architectures produce different NaN payloads for the same arithmetic, so identical computations on different platforms yield different NaN bits. GEN-0012 states NaN bit patterns are preserved but does not document the rationale. Two approaches: canonicalization (Cap'n Proto — replaces all NaN with a single canonical value, destroying payloads) or bit-pattern preservation (round-trips exact `to_bits()`, no cross-platform byte equality for NaN-producing arithmetic).
+IEEE 754 NaN allows ~2^52 distinct bit patterns for f64. Different architectures produce different NaN payloads for the same arithmetic. Two approaches: canonicalization (Cap'n Proto — destroys payloads) or bit-pattern preservation (round-trips exact `to_bits()`, no cross-platform byte equality for NaN-producing arithmetic).
 
 ## Decision
 
@@ -33,8 +33,7 @@ R3 [9]: The deserializer reads raw bytes via from_le_bytes with no NaN
 
 ## Consequences
 
-- **Positive:** Bit-fidelity preserved — NaN-boxing and payload tagging round-trip without loss. Zero overhead on hot path.
-- **Positive:** Value-level determinism: same `to_bits()` always produces same bytes.
-- **Negative:** Cross-platform determinism NOT guaranteed for NaN-producing arithmetic. Different architectures may produce different NaN payloads, affecting content-addressable storage across heterogeneous clusters.
-- **Negative:** `-0.0` and `+0.0` serialize differently despite `==` equality. Applications needing byte-equivalent zeros must canonicalize at the application level.
-- **Mitigation:** Canonicalize NaN values at the application level before serialization if cross-platform byte equality is required.
+- Bit-fidelity preserved — NaN-boxing and payload tagging round-trip without loss. Zero overhead.
+- Value-level determinism: same `to_bits()` always produces same bytes.
+- Cross-platform determinism NOT guaranteed for NaN-producing arithmetic.
+- `-0.0` and `+0.0` serialize differently despite `==` equality. Canonicalize at application level if needed.

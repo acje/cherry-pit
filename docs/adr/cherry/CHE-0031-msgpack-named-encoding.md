@@ -1,7 +1,7 @@
 # CHE-0031. MessagePack with Named Encoding for Persistence
 
 Date: 2026-04-25
-Last-reviewed: 2026-04-25
+Last-reviewed: 2026-04-28
 Tier: D
 Status: Accepted
 
@@ -31,8 +31,7 @@ these fields deserializes with `None` values. A dedicated test
 
 ## Consequences
 
-- New `Option` fields with `#[serde(default)]` can be added without migrating existing data — the primary reason for named encoding.
+- New `Option` fields with `#[serde(default)]` can be added without migrating existing data.
 - Wire size is larger than positional msgpack. Acceptable for a development/small-deployment store.
 - The format is implementation-specific to `MsgpackFileStore`, not a trait-level requirement.
-- Switching formats requires a migration tool — the store cannot hot-swap.
-- The entire aggregate history is stored as a single `Vec<EventEnvelope<E>>`, simplifying atomic writes but loading full history into memory.
+- Switching formats requires a migration tool — no hot-swap.
