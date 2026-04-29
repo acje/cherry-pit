@@ -560,7 +560,10 @@ mod tests {
         }];
         let output = render_root_groups("test", &groups);
         assert!(output.contains("# Architecture Rules"));
-        assert!(!output.contains("###"), "no root headers for empty groups:\n{output}");
+        assert!(
+            !output.contains("###"),
+            "no root headers for empty groups:\n{output}"
+        );
     }
 
     #[test]

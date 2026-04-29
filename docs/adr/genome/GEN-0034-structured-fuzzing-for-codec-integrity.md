@@ -1,13 +1,13 @@
 # GEN-0034. Structured Fuzzing and Property-Based Testing for Codec Integrity
 
 Date: 2026-04-28
-Last-reviewed: 2026-04-28
+Last-reviewed: 2026-04-29
 Tier: B
-Status: Proposed
+Status: Accepted
 
 ## Related
 
-References: GEN-0001, GEN-0032, GEN-0006, GEN-0011, GEN-0013
+References: GEN-0032, GEN-0006, GEN-0011, GEN-0013
 
 ## Context
 
@@ -37,14 +37,11 @@ R2 [5]: Use proptest to verify roundtrip identity: for all T where
 R3 [6]: Fuzz targets cover all PageClass configurations from
   GEN-0013 to exercise resource limit enforcement under adversarial
   input
+R4 [5]: Maintain a coverage matrix mapping fuzz and proptest cases to
+  each GEN-0011 verification check and each wire-layout type
+R5 [5]: Golden malformed-input fixtures cover header, footer, offset,
+  padding, compression, checksum, and schema-hash rejection paths
 
 ## Consequences
 
-- **Catches logic bugs unreachable by manual testing.** Offset
-  arithmetic errors, overflow conditions, and edge-case panics.
-- **CI cost.** Fuzz runs are time-bounded (e.g., 5 minutes per
-  target per CI run). Longer runs scheduled periodically.
-- **Corpus maintenance.** Fuzz corpus grows over time and should
-  be committed for regression coverage.
-- **Complements GEN-0011.** Verification checks are the specification;
-  fuzzing validates the implementation matches the specification.
+Fuzzing catches offset arithmetic, overflow, and parser panic bugs unreachable by examples. CI runs are time-bounded, with longer scheduled runs. The coverage matrix keeps fuzzing tied to GEN-0011 instead of becoming unspecific random testing.

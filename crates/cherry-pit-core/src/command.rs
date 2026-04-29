@@ -4,6 +4,12 @@
 /// may be rejected. Commands are consumed on handling (moved, not
 /// borrowed) because they represent a one-time intent.
 ///
+/// Commands entering from remote or retried boundaries should carry an
+/// application-level idempotency key in their own payload. The framework
+/// deliberately keeps this trait minimal, but duplicate create/ingress
+/// commands must have a stable domain key so handlers can return the
+/// original effect or no new events after retry.
+///
 /// # Design rationale
 ///
 /// - Commands are not required to be serializable by default. Only

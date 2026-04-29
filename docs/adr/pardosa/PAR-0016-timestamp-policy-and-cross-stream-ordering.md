@@ -1,13 +1,13 @@
 # PAR-0016. Timestamp Policy and Cross-Stream Ordering
 
 Date: 2026-04-28
-Last-reviewed: 2026-04-28
+Last-reviewed: 2026-04-29
 Tier: B
-Status: Proposed
+Status: Accepted
 
 ## Related
 
-References: PAR-0004, PAR-0008, PAR-0007
+References: PAR-0004, PAR-0008, PAR-0007, COM-0025
 
 ## Context
 
@@ -17,38 +17,32 @@ Across streams, wall-clock is unreliable: NTP drift, VM migration, leap
 seconds. Lamport (1978) establishes wall-clock is insufficient for causal
 ordering across independent writers.
 
-1. **Advisory timestamps** — informational only; cross-stream uses
-   JetStream sequences.
+1. **Advisory timestamps** — informational only; cross-stream has no
+   global order and joins use domain correlation keys.
 2. **Hybrid Logical Clocks** — causal ordering, 8-byte overhead per event.
 3. **Vector clocks** — full causal history, overkill for single-writer.
 
-Option 1 chosen: cross-stream consumers use JetStream sequences. HLC
-deferred until multi-writer is required.
+Option 1 chosen: cross-stream consumers compare JetStream sequence
+numbers only within the same stream. HLC deferred until multi-writer is
+required.
 
 ## Decision
 
 Timestamps are advisory metadata — not a causal ordering mechanism.
-Cross-stream event correlation uses JetStream stream sequences.
+There is no global cross-stream order. Cross-stream event correlation
+uses domain-level keys and causation metadata, while JetStream sequence
+numbers are compared only within each individual stream.
 
 R1 [6]: Persist timestamps via jiff::Timestamp::now() as advisory
   metadata in EventEnvelope, documented as non-causal across streams
-R2 [5]: Cross-stream event ordering uses JetStream-provided stream
+R2 [5]: Per-stream event ordering uses JetStream-provided stream
   sequence numbers accessed through the consumer API
 R3 [6]: Consumers correlating events across multiple streams compare
   JetStream sequences within each stream independently
+R4 [6]: Cross-stream projections use domain identifiers,
+  correlation_id, causation_id, or explicit join keys rather than
+  timestamp or sequence equality
 
 ## Consequences
 
-- **Eliminates false ordering assumptions.** Developers cannot rely on
-  timestamp comparison for cross-stream causality.
-- **No additional per-event overhead.** No HLC or vector clock fields.
-- **Limitation documented.** Systems requiring causal cross-stream
-  ordering need explicit coordination (saga pattern, CHE-0040).
-- **Timestamp still useful** for human-readable audit, approximate
-  time-windowed queries, and single-stream ordering where event_id
-  is unavailable.
-- **Cross-stream sequences are incomparable.** JetStream sequence
-  numbers are per-stream counters — sequence 42 in stream A has no
-  causal relationship to sequence 42 in stream B. Consumers
-  correlating across streams must join on domain-level keys (e.g.,
-  order_id), not on sequence equality.
+False cross-stream ordering assumptions are eliminated without adding HLC or vector-clock overhead. Timestamps remain useful for audit and approximate windows. Cross-stream correlation joins on domain keys or explicit causality fields.

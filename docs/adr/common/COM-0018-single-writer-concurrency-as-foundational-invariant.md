@@ -1,9 +1,9 @@
 # COM-0018. Single-Writer Concurrency as Foundational Invariant
 
 Date: 2026-04-28
-Last-reviewed: 2026-04-28
+Last-reviewed: 2026-04-29
 Tier: S
-Status: Proposed
+Status: Accepted
 
 ## Related
 
@@ -41,14 +41,10 @@ R3 [3]: Where shared reads are required, use read-only snapshots
   or immutable projections rather than read-write lock sharing
 R4 [3]: Document the single-writer boundary for each stateful
   component, identifying what entity owns the write path
+R5 [3]: Ownership transfer for MsgpackFileStore, Dragline, and
+  JetStream stream writers uses fencing, leases, epochs, or
+  compare-and-swap before the replacement writer mutates state
 
 ## Consequences
 
-Domain crates can reason about state transitions sequentially,
-eliminating an entire class of concurrency bugs. The existing
-decisions in CHE-0006 and PAR-0004 become instances of this
-foundation rule rather than independent choices. New crates inherit
-the invariant automatically via foundation context (AFM-0015).
-Shared-nothing architectures scale horizontally but require
-explicit coordination for cross-partition operations — addressed
-by saga patterns (CHE-0040) and idempotency (CHE-0041).
+Domain crates can reason about state transitions sequentially. CHE-0006 and PAR-0004 become instances of this foundation rule. Shared-nothing architectures scale horizontally but require explicit fencing for failover and explicit coordination for cross-partition operations.

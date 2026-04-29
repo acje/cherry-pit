@@ -1,9 +1,9 @@
 # SEC-0009. Supply Chain Security via Dependency Auditing
 
 Date: 2026-04-28
-Last-reviewed: 2026-04-28
+Last-reviewed: 2026-04-29
 Tier: B
-Status: Proposed
+Status: Accepted
 
 ## Related
 
@@ -37,14 +37,11 @@ R3 [6]: Run cargo-geiger periodically to report transitive unsafe
   code surface area, flagged for review when new unsafe appears
 R4 [5]: Dependency updates follow RST-0002 dedicated-PR discipline
   with cargo tree diff included in the PR description
+R5 [6]: CI runs cargo-deny against advisories, licenses, bans,
+  and source registries before merging dependency changes
+R6 [6]: Dependency review records cargo-deny warnings, cargo tree
+  diffs, and new unsafe transitive code before accepting updates
 
 ## Consequences
 
-- **Closes the infrastructure gap.** Application-level SEC rules now
-  rest on a verified dependency foundation.
-- **CI friction.** cargo-deny adds ~10s to CI. Acceptable given the
-  threat surface.
-- **False positives.** License detection and duplicate checks may
-  flag legitimate dependencies, requiring deny.toml exceptions.
-- **cargo-vet deferred.** First-party attestation is recommended
-  when dependency count exceeds 50 direct dependencies.
+Application-level SEC rules now rest on an audited dependency foundation. cargo-deny adds CI friction and may require deny.toml exceptions. cargo-vet remains deferred until dependency volume or risk justifies first-party attestation.

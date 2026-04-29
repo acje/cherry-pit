@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-References: CHE-0001, CHE-0006, CHE-0016, CHE-0034
+References: CHE-0001, CHE-0006, CHE-0016, CHE-0034, COM-0025
 
 ## Context
 
@@ -20,6 +20,8 @@ Every `EventEnvelope` carries an `event_id`. UUID v4 is random with no ordering.
 R1 [10]: Generate event_id as UUID v7 via uuid::Uuid::now_v7()
 R2 [10]: UUID v7 IDs are globally unique across all aggregate types
   and processes without coordination
+R3 [10]: Use EventEnvelope::sequence as the authoritative per-stream
+  ordering field; treat event_id ordering as diagnostic metadata
 
 ```rust
 // EventEnvelope field
@@ -36,8 +38,4 @@ uuid = { version = "1", features = ["v7", "serde"] }
 
 ## Consequences
 
-- Natural chronological ordering — sorting by `event_id` approximates creation-time ordering.
-- Global uniqueness without coordination — safe for correlation/causation IDs across bounded contexts.
-- 16 bytes on the wire; MessagePack encodes as binary, minimal overhead.
-- Monotonicity within a millisecond via RFC 9562 counter-based ordering.
-- Switching ID schemes requires migrating all existing event data.
+UUID v7 gives compact global identity and approximate chronological sort for debugging. It is not causal ordering: clock rollback, restart, and multi-process generation can disagree with stream order. `EventEnvelope::sequence` remains authoritative inside a stream. Changing ID schemes requires migration.

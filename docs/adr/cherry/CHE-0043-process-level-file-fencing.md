@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-References: CHE-0001, CHE-0006, COM-0003, CHE-0032, CHE-0035
+References: CHE-0006, CHE-0032, CHE-0035, COM-0025
 
 ## Context
 
@@ -57,8 +57,4 @@ and `File::lock()` in `std::fs`.
 
 ## Consequences
 
-- Two processes on same directory → second fails fast with `StoreError::StoreLocked`.
-- Two `MsgpackFileStore` instances in the same process also conflict (desirable).
-- Read-only access unaffected — `load` does not fence.
-- Zero new dependencies — uses `std::fs::File::try_lock()` (Rust 1.95+).
-- Advisory, not mandatory — defense-in-depth, not a security boundary.
+The second writer fails fast with `StoreError::StoreLocked`; read-only `load` remains unfenced. This adds no dependencies and is advisory defense-in-depth, not a security boundary. Networked, object-backed, or shared filesystems require backend-specific fencing.

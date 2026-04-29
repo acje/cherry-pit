@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-References: CHE-0001, CHE-0022, CHE-0045
+References: CHE-0001, CHE-0022, CHE-0045, COM-0024
 
 ## Context
 
@@ -23,6 +23,8 @@ R1 [9]: Use rmp_serde::encode::to_vec_named (map encoding with
   string keys) for all MsgpackFileStore writes
 R2 [9]: New Option fields with #[serde(default)] can be added to
   EventEnvelope without migrating existing data files
+R3 [9]: MsgpackFileStore keeps a committed golden fixture for a
+  representative Vec<EventEnvelope<E>> stream encoded with named keys
 
 This was validated when `correlation_id` and `causation_id` were added
 to `EventEnvelope` with `#[serde(default)]` — existing data without
@@ -31,7 +33,4 @@ these fields deserializes with `None` values. A dedicated test
 
 ## Consequences
 
-- New `Option` fields with `#[serde(default)]` can be added without migrating existing data.
-- Wire size is larger than positional msgpack. Acceptable for a development/small-deployment store.
-- The format is implementation-specific to `MsgpackFileStore`, not a trait-level requirement.
-- Switching formats requires a migration tool — no hot-swap.
+New `Option` fields with `#[serde(default)]` can be added without migrating existing data. Wire size grows versus positional msgpack, acceptable for the file store. Switching formats requires migration. Golden fixtures catch accidental serializer or envelope-layout changes.

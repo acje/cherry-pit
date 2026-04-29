@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-References: COM-0001, COM-0002, COM-0012, COM-0017
+References: COM-0001, COM-0002, COM-0012, COM-0017, COM-0025
 
 ## Context
 
@@ -35,6 +35,9 @@ R4 [5]: Infrastructure adapter correctness verified by integration
 R5 [6]: State machines with finite transition tables are tested
   exhaustively over all state-action pairs including invalid
   transitions
+R6 [6]: Distributed invariants such as replay ordering, idempotency,
+  fencing, corruption handling, and crash recovery are verified with
+  property, fault-injection, or golden-fixture tests
 
 ## Consequences
 

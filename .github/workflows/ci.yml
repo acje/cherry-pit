@@ -1,0 +1,68 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - master
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  correctness:
+    name: Workspace correctness gates
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.95
+          components: clippy,rustfmt
+
+      - name: Verify pinned toolchain files
+        run: |
+          test "$(grep '^rust-version = ' Cargo.toml)" = 'rust-version = "1.95"'
+          test "$(grep '^channel = ' rust-toolchain.toml)" = 'channel = "1.95"'
+          test "$(grep '^msrv = ' clippy.toml)" = 'msrv = "1.95"'
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Run clippy
+        run: cargo clippy --workspace --all-targets
+
+      - name: Run tests
+        run: cargo test --workspace --all-targets
+
+      - name: Verify ADR corpus
+        run: cargo run -p adr-fmt -- --lint
+
+      - name: Verify release profile invariants
+        run: |
+          grep -q '^lto = true$' Cargo.toml
+          grep -q '^strip = true$' Cargo.toml
+          grep -q '^codegen-units = 1$' Cargo.toml
+          grep -q '^overflow-checks = true$' Cargo.toml
+
+  supply-chain:
+    name: Supply-chain audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.95
+
+      - name: Install cargo-deny
+        uses: taiki-e/install-action@cargo-deny
+
+      - name: Run cargo-deny
+        run: cargo deny check advisories licenses bans sources

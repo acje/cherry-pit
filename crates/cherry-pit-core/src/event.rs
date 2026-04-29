@@ -128,6 +128,48 @@ impl<E: DomainEvent> EventEnvelope<E> {
         Ok(())
     }
 
+    /// Validate a full aggregate stream after deserialization.
+    ///
+    /// This enforces the replay contract for one stream: every envelope
+    /// belongs to the requested aggregate, and sequences are exactly
+    /// contiguous from 1 through `stream.len()`. The check detects gaps,
+    /// duplicates, out-of-order events, and cross-stream corruption before
+    /// state is rebuilt from persisted facts.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`EnvelopeError::NilEventId`] for malformed event identity,
+    /// [`EnvelopeError::AggregateIdMismatch`] for cross-stream data, or
+    /// [`EnvelopeError::SequenceGap`] for non-contiguous sequence numbers.
+    pub fn validate_stream(
+        aggregate_id: AggregateId,
+        stream: &[Self],
+    ) -> Result<(), EnvelopeError> {
+        for (index, envelope) in stream.iter().enumerate() {
+            envelope.validate()?;
+
+            if envelope.aggregate_id != aggregate_id {
+                return Err(EnvelopeError::AggregateIdMismatch {
+                    expected: aggregate_id,
+                    actual: envelope.aggregate_id,
+                });
+            }
+
+            let expected_sequence = u64::try_from(index)
+                .ok()
+                .and_then(|i| i.checked_add(1))
+                .unwrap_or(u64::MAX);
+            if envelope.sequence() != expected_sequence {
+                return Err(EnvelopeError::SequenceGap {
+                    expected_sequence,
+                    actual_sequence: envelope.sequence(),
+                });
+            }
+        }
+
+        Ok(())
+    }
+
     /// The unique event identifier (UUID v7).
     #[must_use]
     pub fn event_id(&self) -> uuid::Uuid {
@@ -288,6 +330,94 @@ mod tests {
         .unwrap();
 
         assert!(envelope.validate().is_ok());
+    }
+
+    #[test]
+    fn validate_stream_accepts_contiguous_stream() {
+        let id = AggregateId::new(NonZeroU64::new(1).unwrap());
+        let stream = vec![
+            EventEnvelope::new(
+                uuid::Uuid::now_v7(),
+                id,
+                NonZeroU64::new(1).unwrap(),
+                jiff::Timestamp::now(),
+                None,
+                None,
+                TestEvent::Happened { value: "a".into() },
+            )
+            .unwrap(),
+            EventEnvelope::new(
+                uuid::Uuid::now_v7(),
+                id,
+                NonZeroU64::new(2).unwrap(),
+                jiff::Timestamp::now(),
+                None,
+                None,
+                TestEvent::Happened { value: "b".into() },
+            )
+            .unwrap(),
+        ];
+
+        assert!(EventEnvelope::validate_stream(id, &stream).is_ok());
+    }
+
+    #[test]
+    fn validate_stream_rejects_sequence_gap() {
+        let id = AggregateId::new(NonZeroU64::new(1).unwrap());
+        let stream = vec![
+            EventEnvelope::new(
+                uuid::Uuid::now_v7(),
+                id,
+                NonZeroU64::new(1).unwrap(),
+                jiff::Timestamp::now(),
+                None,
+                None,
+                TestEvent::Happened { value: "a".into() },
+            )
+            .unwrap(),
+            EventEnvelope::new(
+                uuid::Uuid::now_v7(),
+                id,
+                NonZeroU64::new(3).unwrap(),
+                jiff::Timestamp::now(),
+                None,
+                None,
+                TestEvent::Happened { value: "b".into() },
+            )
+            .unwrap(),
+        ];
+
+        assert!(matches!(
+            EventEnvelope::validate_stream(id, &stream),
+            Err(EnvelopeError::SequenceGap {
+                expected_sequence: 2,
+                actual_sequence: 3,
+            })
+        ));
+    }
+
+    #[test]
+    fn validate_stream_rejects_aggregate_mismatch() {
+        let id = AggregateId::new(NonZeroU64::new(1).unwrap());
+        let other_id = AggregateId::new(NonZeroU64::new(2).unwrap());
+        let stream = vec![
+            EventEnvelope::new(
+                uuid::Uuid::now_v7(),
+                other_id,
+                NonZeroU64::new(1).unwrap(),
+                jiff::Timestamp::now(),
+                None,
+                None,
+                TestEvent::Happened { value: "a".into() },
+            )
+            .unwrap(),
+        ];
+
+        assert!(matches!(
+            EventEnvelope::validate_stream(id, &stream),
+            Err(EnvelopeError::AggregateIdMismatch { expected, actual })
+                if expected == id && actual == other_id
+        ));
     }
 
     // ── golden-file serde regression ───────────────────────────────

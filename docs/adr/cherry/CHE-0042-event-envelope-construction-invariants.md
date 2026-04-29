@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-References: CHE-0001, CHE-0002, CHE-0010, CHE-0039, CHE-0016
+References: CHE-0002, CHE-0039, CHE-0016, COM-0025
 
 ## Context
 
@@ -25,8 +25,9 @@ R2 [5]: Use NonZeroU64 for the EventEnvelope sequence field so
   zero sequences are rejected at the type level
 R3 [5]: Access EventEnvelope fields through accessor methods
   (event_id(), aggregate_id(), sequence(), timestamp(), payload())
-R4 [5]: Call EventEnvelope::validate() after deserialization in
-  EventStore::load implementations to catch corrupt stored data
+R4 [5]: Call EventEnvelope::validate_stream() after deserialization in
+  EventStore::load implementations to catch corrupt stored data,
+  aggregate_id mismatches, and sequence gaps
 
 ### Struct definition
 
@@ -102,35 +103,29 @@ Rust's `#[derive(Deserialize)]` can access private fields within
 the defining module. Deserialization reconstructs `EventEnvelope`
 without calling `new()` — this bypasses constructor validation.
 
-Mitigation: **post-deserialization validation in `EventStore::load`
+Mitigation: **post-deserialization stream validation in `EventStore::load`
 implementations.** After deserializing envelopes from storage, the
-store calls a `validate()` method on each envelope:
+store calls `EventEnvelope::validate_stream(aggregate_id, envelopes)`:
 
 ```rust
 impl<E: DomainEvent> EventEnvelope<E> {
-    /// Validate invariants on a deserialized envelope.
-    ///
-    /// Called by EventStore::load after deserialization. Returns
-    /// an error if the envelope violates construction invariants
-    /// (nil event_id). Zero sequence is impossible — `NonZeroU64`
-    /// serde rejects zero on deserialization.
-    pub fn validate(&self) -> Result<(), EnvelopeError> {
-        if self.event_id.is_nil() {
-            return Err(EnvelopeError::NilEventId);
-        }
-        Ok(())
-    }
+    pub fn validate_stream(
+        aggregate_id: AggregateId,
+        stream: &[Self],
+    ) -> Result<(), EnvelopeError>;
 }
 ```
 
 This keeps the `Deserialize` derive simple (no custom impl with
 complex generic bounds) while ensuring invalid data from corrupt
-storage is caught at load time.
+storage is caught at load time. Stream validation rejects nil event
+IDs, envelopes whose aggregate_id differs from the requested stream,
+and sequences that are not exactly contiguous from 1..=N.
 
 ## Consequences
 
 - **CHE-0002 compliance restored.** External code cannot construct malformed envelopes. Validated constructor rejects nil event_id, `NonZeroU64` eliminates zero sequences, and post-deserialization validation catches corrupt stored data.
 - **Breaking change.** 48 locations in `cherry-pit-gateway` change (field accesses → accessors, struct literals → `new()` calls). All mechanical.
 - **Sequencing dependency on CHE-0039** — constructor accepts correlation/causation IDs from `CorrelationContext`.
-- **Serde bypass is defense-in-depth.** `validate()` in `load()` catches corrupt data; the invalid-state window is contained within the store.
+- **Serde bypass is defense-in-depth.** `validate_stream()` in `load()` catches corrupt data; the invalid-state window is contained within the store.
 - Future compile-fail test (CHE-0028) should verify struct literal construction fails.

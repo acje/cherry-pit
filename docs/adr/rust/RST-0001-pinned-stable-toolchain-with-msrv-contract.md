@@ -37,6 +37,8 @@ R4 [5]: `Cargo.lock` is committed to version control for
   reproducible dependency resolution across environments
 R5 [6]: Toolchain profile is `minimal` with only `clippy` and
   `rustfmt` components explicitly included
+R6 [5]: CI verifies rust-toolchain.toml, Cargo.toml rust-version,
+  and clippy.toml msrv all declare the same Rust version
 
 ## Consequences
 
@@ -45,5 +47,5 @@ Build results are reproducible across environments. Toolchain
 updates become deliberate, reviewable events (RST-0002), not
 ambient drift. MSRV appears in three files (`rust-toolchain.toml`,
 `clippy.toml`, `Cargo.toml`) which must stay in sync during
-updates. Mechanized enforcement of this invariant is a candidate
-for future CI validation per COM-0017.
+updates. CI enforces that `rust-toolchain.toml`, `Cargo.toml`, and
+`clippy.toml` remain synchronized.

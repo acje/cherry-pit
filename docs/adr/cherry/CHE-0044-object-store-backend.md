@@ -1,13 +1,13 @@
 # CHE-0044. Object Store Backend (Planned)
 
 Date: 2026-04-25
-Last-reviewed: 2026-04-28
+Last-reviewed: 2026-04-29
 Tier: D
-Status: Proposed
+Status: Accepted
 
 ## Related
 
-References: CHE-0001, CHE-0006, CHE-0031, CHE-0032, CHE-0043
+References: CHE-0006, CHE-0031, CHE-0032, CHE-0043, COM-0025
 
 ## Context
 
@@ -25,6 +25,10 @@ R2 [10]: Preserve the MessagePack named-fields wire format across
   all storage backends
 R3 [10]: Keep MsgpackFileStore available for single-machine
   zero-dependency deployments alongside the object store backend
+R4 [10]: Verify each object store provider's ETag, conditional put,
+  read-after-write, overwrite, and list consistency before support
+R5 [10]: Treat object listing as advisory; authoritative stream reads
+  use exact aggregate object keys and compare-and-swap metadata
 
 1. Implement `EventStore` with the same `MessagePack + named fields`
    wire format.
@@ -32,9 +36,10 @@ R3 [10]: Keep MsgpackFileStore available for single-machine
    instead of file locks and rename.
 3. Support local filesystem via `object_store::local::LocalFileSystem`
    as a drop-in replacement for `MsgpackFileStore` in tests.
-4. Support S3-compatible backends via `object_store::aws::AmazonS3`.
-5. Remove the need for process-level fencing (CHE-0043) — the storage
-   backend provides distributed concurrency control.
+4. Support S3-compatible backends only after provider consistency tests
+   prove ETag and conditional write semantics.
+5. Replace process-level fencing (CHE-0043) with backend CAS semantics
+   for each aggregate object key.
 
 The `MsgpackFileStore` remains available for single-machine,
 zero-dependency deployments. The two implementations coexist — users
@@ -42,8 +47,4 @@ choose at wiring time.
 
 ## Consequences
 
-- **New dependency** — `object_store` increases compile time. Feature-gated.
-- **Higher latency** — object storage per-request latency increases pressure toward snapshots.
-- **No flock needed** — conditional put replaces advisory locking.
-- **ETag semantics vary** by provider; tests must cover each backend.
-- **Migration path** — copy `.msgpack` files to object storage. Wire format identical.
+The object backend adds a feature-gated dependency and higher request latency. Conditional put replaces local flock only after provider-specific CAS tests pass. The wire format remains identical, so migration copies `.msgpack` streams to object keys.

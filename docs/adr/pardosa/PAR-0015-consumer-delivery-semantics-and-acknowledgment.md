@@ -1,13 +1,13 @@
 # PAR-0015. Consumer Delivery Semantics and Acknowledgment Policy
 
 Date: 2026-04-28
-Last-reviewed: 2026-04-28
+Last-reviewed: 2026-04-29
 Tier: B
-Status: Proposed
+Status: Accepted
 
 ## Related
 
-References: PAR-0004, PAR-0008, PAR-0007, PAR-0013
+References: PAR-0008, PAR-0007, PAR-0013, COM-0025
 
 ## Context
 
@@ -37,16 +37,11 @@ R3 [5]: Track consumer position via JetStream durable consumer name
   so subscriptions resume from the last acknowledged sequence on restart
 R4 [8]: Consumers acknowledge each event only after successful
   processing to prevent data loss on crash
+R5 [5]: Consumer handlers persist idempotency state keyed by stream,
+  sequence, and durable consumer name before acknowledging messages
+R6 [5]: Dead-letter records include stream, sequence, event_id,
+  delivery count, error category, and correlation_id for repair
 
 ## Consequences
 
-- **Publish-consume symmetry.** Both sides now have explicit correctness
-  contracts: PAR-0007/PAR-0008 for publish, PAR-0015 for consume.
-- **Dead-letter visibility.** Poison messages are captured rather than
-  silently retried forever or dropped.
-- **Per-message ACK overhead.** Higher than AckAll but bounded by
-  JetStream batching at the transport level.
-- **Replay safety.** Durable consumers resume from last ACK, enabling
-  safe restart without full replay.
-- **Projection rebuild** requires resetting consumer position to
-  stream start — operational tooling needed.
+Publish and consume paths now both have explicit correctness contracts. AckExplicit adds per-message overhead but prevents crash loss. Durable consumers resume from the last ACK. Poison messages become repairable dead letters instead of infinite retries or silent drops.

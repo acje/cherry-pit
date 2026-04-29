@@ -9,6 +9,35 @@ pub const MAGIC: [u8; 4] = *b"PGNO";
 /// any file. Position and encoding will never change across versions.
 pub const FORMAT_VERSION: u16 = 1;
 
+/// Stable fixture for the v1 empty-file header.
+///
+/// The fixture pins byte order, field offsets, reserved-zero policy, and
+/// default metadata. It is intentionally small enough to inspect directly in
+/// tests and external conformance suites.
+pub const V1_EMPTY_FILE_HEADER_FIXTURE: [u8; FILE_HEADER_SIZE] = [
+    b'P', b'G', b'N', b'O', // magic
+    0x01, 0x00, // version = 1 (little endian)
+    0x00, 0x00, // flags = no compression, reserved bits zero
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // schema_hash = 0 fixture
+    0x00, 0x00, 0x00, 0x00, // dict_id = 0
+    0x00, // page_class = Page0
+    0x00, 0x00, 0x00, 0x00, // schema_size = 0
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // reserved
+];
+
+/// Stable fixture for the v1 empty-file footer.
+///
+/// This pins footer offset layout and terminal magic placement. The checksum
+/// is zero because this fixture represents the structural minimum, not a real
+/// file checksum calculation.
+pub const V1_EMPTY_FILE_FOOTER_FIXTURE: [u8; FILE_FOOTER_SIZE] = [
+    0x20, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // index_offset = 32
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // message_count = 0
+    0x00, 0x00, 0x00, 0x00, // reserved
+    b'P', b'G', b'N', b'O', // footer magic
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // checksum fixture
+];
+
 // ---------------------------------------------------------------------------
 // File header layout (32 bytes)
 // ---------------------------------------------------------------------------

@@ -11,6 +11,9 @@ use crate::event::{DomainEvent, EventEnvelope};
 /// The event store is the single source of truth for aggregate state
 /// in an event-sourced system. Every aggregate's history is an ordered
 /// sequence of `EventEnvelope`s keyed by `(AggregateId, sequence)`.
+/// Stores validate that loaded streams are gap-free, duplicate-free,
+/// ordered by contiguous sequence numbers, and scoped to the requested
+/// `AggregateId` before returning events to callers.
 ///
 /// Each event store instance is bound to exactly one domain event type
 /// via the `Event` associated type. This gives compile-time proof that
@@ -49,7 +52,10 @@ pub trait EventStore: Send + Sync + 'static {
     ///
     /// Returns an empty `Vec` if no events exist for this aggregate.
     /// This is not an error — it means the aggregate has never been
-    /// created.
+    /// created. Implementations reject corrupt streams with
+    /// [`StoreError::CorruptData`](crate::StoreError::CorruptData) when
+    /// sequences are not exactly contiguous from 1..=N or an envelope
+    /// belongs to a different aggregate ID.
     fn load(
         &self,
         id: AggregateId,

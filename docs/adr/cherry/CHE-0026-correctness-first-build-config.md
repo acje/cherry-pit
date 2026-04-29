@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-References: CHE-0001, CHE-0007, RST-0003
+References: CHE-0001, CHE-0007, RST-0003, RST-0001
 
 ## Context
 
@@ -35,6 +35,8 @@ R1 [9]: Set overflow-checks = true in the release profile so integer
 R2 [9]: Set clippy::pedantic at warn level across the entire workspace
 R3 [9]: Use lto = true and codegen-units = 1 for whole-program
   optimization in release builds
+R4 [9]: CI verifies release profile invariants lto, strip,
+  codegen-units, and overflow-checks before merging changes
 
 - **`overflow-checks = true`** — integer overflow panics in release
   builds, not just debug builds. Consistent with design priority P1
@@ -49,6 +51,4 @@ R3 [9]: Use lto = true and codegen-units = 1 for whole-program
 
 ## Consequences
 
-- Integer overflow caught in both debug and release. The framework also uses `checked_add` explicitly as defense-in-depth.
-- Clippy pedantic generates many warnings; individual crates suppress specific lints via `#[allow(clippy::...)]`.
-- Release build times are longer due to LTO + single codegen unit. Acceptable — release builds are infrequent.
+Overflow is caught in debug and release; `checked_add` remains defense-in-depth. Clippy pedantic is workspace-wide. Release builds are slower due to LTO and one codegen unit. CI guards release-profile drift.

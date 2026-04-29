@@ -100,7 +100,14 @@ pub fn check(record: &AdrRecord, config: &Config, diags: &mut Vec<Diagnostic>) {
     let max_rule_words = config
         .rule_param_u64("T016", "max_rule_words")
         .unwrap_or(DEFAULT_MAX_RULE_WORDS);
-    check_tagged_rules(record, tier, effective_max_rules, min_rule_words, max_rule_words, diags);
+    check_tagged_rules(
+        record,
+        tier,
+        effective_max_rules,
+        min_rule_words,
+        max_rule_words,
+        diags,
+    );
 
     // T019: Rule-tier tension — fire when Meadows layer implies a tier >1 rank from ADR tier
     check_rule_tier_tension(record, tier, diags);
@@ -1614,7 +1621,10 @@ params = { max_rules = 10, min_rule_words = 7, max_rule_words = 60 }
         let mut diags = Vec::new();
         check(&record, &config, &mut diags);
         let t019 = diags.iter().find(|d| d.rule == "T019");
-        assert!(t019.is_some(), "distance 4 should trigger T019, got: {diags:?}");
+        assert!(
+            t019.is_some(),
+            "distance 4 should trigger T019, got: {diags:?}"
+        );
         assert!(
             t019.unwrap().message.contains("4 tiers"),
             "message should mention distance: {}",
@@ -1637,7 +1647,10 @@ params = { max_rules = 10, min_rule_words = 7, max_rule_words = 60 }
         let mut diags = Vec::new();
         check(&record, &config, &mut diags);
         let t019 = diags.iter().find(|d| d.rule == "T019");
-        assert!(t019.is_some(), "distance 2 should trigger T019, got: {diags:?}");
+        assert!(
+            t019.is_some(),
+            "distance 2 should trigger T019, got: {diags:?}"
+        );
     }
 
     // ── T020 reference load tests ──────────────────────────────────
@@ -1791,7 +1804,9 @@ params = { max_rules = 10, min_rule_words = 7, max_rule_words = 60 }
         let mut diags = Vec::new();
         check(&record, &config, &mut diags);
         assert!(
-            !diags.iter().any(|d| d.rule == "T015" && d.message.contains("limit")),
+            !diags
+                .iter()
+                .any(|d| d.rule == "T015" && d.message.contains("limit")),
             "20 words should be within D-tier limit (33*0.6=19.8→20), got: {diags:?}"
         );
     }
@@ -1827,7 +1842,9 @@ params = { max_rules = 10, min_rule_words = 7, max_rule_words = 60 }
         let mut diags = Vec::new();
         check(&record, &config, &mut diags);
         assert!(
-            diags.iter().any(|d| d.rule == "T015" && d.message.contains("D-tier limit 20")),
+            diags
+                .iter()
+                .any(|d| d.rule == "T015" && d.message.contains("D-tier limit 20")),
             "21 words should trigger T015 at D-tier (limit 20), got: {diags:?}"
         );
     }

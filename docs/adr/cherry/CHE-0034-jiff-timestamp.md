@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-References: CHE-0001, CHE-0016
+References: CHE-0001, CHE-0016, COM-0025
 
 ## Context
 
@@ -22,6 +22,9 @@ built-in IANA timezone support without a separate crate.
 R1 [10]: Use jiff::Timestamp for all temporal values in the framework
 R2 [10]: Call Timestamp::now() once per batch so all events in an
   atomic batch share the same timestamp
+R3 [10]: Treat jiff::Timestamp as observational metadata; use
+  EventEnvelope::sequence for per-stream order and explicit
+  correlation identifiers for cross-stream causality
 
 ```rust
 // EventEnvelope field
@@ -39,7 +42,4 @@ jiff = { version = "0.2", features = ["serde"] }
 
 ## Consequences
 
-- Lossless serde roundtrips via RFC 9557/RFC 3339. DST-safe arithmetic by default. UTC instants only.
-- Single timestamp per batch — `build_envelopes` calls `Timestamp::now()` once.
-- Switching libraries requires migrating all persisted events. jiff 0.2 is pre-1.0; a golden-file test catches format changes.
-- In distributed deployments, clock skew makes timestamps unreliable — sequence numbers determine causal order.
+Timestamps roundtrip losslessly, use UTC instants, and are stamped once per batch. Changing libraries requires migrating persisted events. Clock skew makes timestamps observational only; sequence defines per-stream order, while correlation and causation IDs express cross-stream causality.

@@ -1,13 +1,13 @@
 # CHE-0040. Saga and Compensation Patterns (Deliberate Deferral)
 
 Date: 2026-04-25
-Last-reviewed: 2026-04-25
+Last-reviewed: 2026-04-29
 Tier: B
 Status: Accepted
 
 ## Related
 
-References: CHE-0001, CHE-0039, CHE-0017, CHE-0024
+References: CHE-0039, CHE-0017, CHE-0024, COM-0025
 
 ## Context
 
@@ -22,6 +22,12 @@ R1 [5]: Use Policy::react for choreography-style coordination only;
   no saga orchestrator exists pre-1.0
 R2 [5]: Model compensation as domain events reacted to by policies,
   not as automatic framework-level rollback
+R3 [5]: Failed policy output commands are recorded as dead-letter
+  entries with event_id, output type, error category, and correlation_id
+R4 [5]: Compensation commands carry idempotency keys derived from
+  the triggering EventEnvelope event_id and policy identity
+R5 [5]: Timeout-driven compensation is represented by explicit
+  domain timeout events, not hidden framework timers
 
 **What cherry-pit provides today:**
 
@@ -37,12 +43,11 @@ R2 [5]: Model compensation as domain events reacted to by policies,
 - No saga coordinator / process manager type.
 - No step tracking or completion state machine.
 - No automatic compensation on downstream command failure.
-- No dead-letter handling for failed policy output commands.
-- No timeout mechanism for steps that never complete.
+- No saga coordinator / process manager type.
+- No step tracking or completion state machine.
+- No automatic compensation on downstream command failure.
+- No hidden timeout mechanism for steps that never complete.
 
 ## Consequences
 
-- Framework stays minimal. Users own compensation logic entirely.
-- Choreography-first is consistent with event-sourcing philosophy: events are facts, policies react to facts, compensation is itself a domain event.
-- Dead-letter handling for failed policy outputs is the most likely near-term need — when `CommandBus` is built, it must decide what happens when a policy-triggered command is rejected.
-- Revisit when: `cherry-pit-agent` is built, multi-step processes cannot decompose into independent policy reactions, or `CorrelationContext` (CHE-0039) has been validated in practice.
+Framework orchestration stays minimal while failed policy outputs become visible and repairable. Compensation remains domain-owned and idempotent. Revisit when `cherry-pit-agent` exists or multi-step processes cannot decompose into independent policy reactions.

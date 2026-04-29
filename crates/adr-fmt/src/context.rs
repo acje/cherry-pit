@@ -199,10 +199,11 @@ pub fn context_grouped(
     // Foundation roots first (by min_layer ascending, then number),
     // then domain roots (same sort).
 
-    let foundation_set: HashSet<&str> =
-        foundation_prefixes.iter().copied().collect();
+    let foundation_set: HashSet<&str> = foundation_prefixes.iter().copied().collect();
 
-    let mut context_roots: Vec<AdrId> = assignment.values().collect::<HashSet<_>>()
+    let mut context_roots: Vec<AdrId> = assignment
+        .values()
+        .collect::<HashSet<_>>()
         .into_iter()
         .cloned()
         .collect();
@@ -219,11 +220,23 @@ pub fn context_grouped(
                 // Within group: sort by min layer of root's own rules
                 let a_min_layer = record_by_id
                     .get(a)
-                    .map(|r| r.decision_rules.iter().map(|rule| rule.layer).min().unwrap_or(u8::MAX))
+                    .map(|r| {
+                        r.decision_rules
+                            .iter()
+                            .map(|rule| rule.layer)
+                            .min()
+                            .unwrap_or(u8::MAX)
+                    })
                     .unwrap_or(u8::MAX);
                 let b_min_layer = record_by_id
                     .get(b)
-                    .map(|r| r.decision_rules.iter().map(|rule| rule.layer).min().unwrap_or(u8::MAX))
+                    .map(|r| {
+                        r.decision_rules
+                            .iter()
+                            .map(|rule| rule.layer)
+                            .min()
+                            .unwrap_or(u8::MAX)
+                    })
                     .unwrap_or(u8::MAX);
                 a_min_layer.cmp(&b_min_layer)
             })
@@ -349,7 +362,7 @@ pub fn context_grouped(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::{AdrId, AdrRecord, Relationship, RelVerb, Status, TaggedRule, Tier};
+    use crate::model::{AdrId, AdrRecord, RelVerb, Relationship, Status, TaggedRule, Tier};
     use std::path::PathBuf;
 
     fn make_id(prefix: &str, num: u16) -> AdrId {
@@ -459,10 +472,20 @@ description = "test"
     #[test]
     fn includes_foundation_and_domain() {
         let records = vec![
-            make_record("COM", 1, vec![], vec![("R1", 2, "Foundation rule")],
-                vec![(RelVerb::Root, "COM", 1)]),
-            make_record("CHE", 1, vec![], vec![("R1", 5, "Cherry rule")],
-                vec![(RelVerb::Root, "CHE", 1)]),
+            make_record(
+                "COM",
+                1,
+                vec![],
+                vec![("R1", 2, "Foundation rule")],
+                vec![(RelVerb::Root, "COM", 1)],
+            ),
+            make_record(
+                "CHE",
+                1,
+                vec![],
+                vec![("R1", 5, "Cherry rule")],
+                vec![(RelVerb::Root, "CHE", 1)],
+            ),
         ];
         let config = make_config();
         let groups = context_grouped("cherry-pit-core", &records, &config).unwrap();
@@ -475,32 +498,58 @@ description = "test"
 
     #[test]
     fn excludes_draft() {
-        let mut draft = make_record("CHE", 2, vec![], vec![("R1", 5, "Draft rule")],
-            vec![(RelVerb::References, "CHE", 1)]);
+        let mut draft = make_record(
+            "CHE",
+            2,
+            vec![],
+            vec![("R1", 5, "Draft rule")],
+            vec![(RelVerb::References, "CHE", 1)],
+        );
         draft.status = Some(Status::Draft);
 
         let records = vec![
-            make_record("CHE", 1, vec![], vec![("R1", 5, "Active rule")],
-                vec![(RelVerb::Root, "CHE", 1)]),
+            make_record(
+                "CHE",
+                1,
+                vec![],
+                vec![("R1", 5, "Active rule")],
+                vec![(RelVerb::Root, "CHE", 1)],
+            ),
             draft,
         ];
         let config = make_config();
         let groups = context_grouped("cherry-pit-core", &records, &config).unwrap();
 
         let ids = all_emitted_adr_ids(&groups);
-        assert!(ids.contains(&make_id("CHE", 1)), "accepted should be included");
-        assert!(!ids.contains(&make_id("CHE", 2)), "draft should be excluded");
+        assert!(
+            ids.contains(&make_id("CHE", 1)),
+            "accepted should be included"
+        );
+        assert!(
+            !ids.contains(&make_id("CHE", 2)),
+            "draft should be excluded"
+        );
     }
 
     #[test]
     fn excludes_rejected() {
-        let mut rejected = make_record("CHE", 2, vec![], vec![("R1", 5, "Rejected rule")],
-            vec![(RelVerb::References, "CHE", 1)]);
+        let mut rejected = make_record(
+            "CHE",
+            2,
+            vec![],
+            vec![("R1", 5, "Rejected rule")],
+            vec![(RelVerb::References, "CHE", 1)],
+        );
         rejected.status = Some(Status::Rejected);
 
         let records = vec![
-            make_record("CHE", 1, vec![], vec![("R1", 5, "Active rule")],
-                vec![(RelVerb::Root, "CHE", 1)]),
+            make_record(
+                "CHE",
+                1,
+                vec![],
+                vec![("R1", 5, "Active rule")],
+                vec![(RelVerb::Root, "CHE", 1)],
+            ),
             rejected,
         ];
         let config = make_config();
@@ -508,55 +557,102 @@ description = "test"
 
         let ids = all_emitted_adr_ids(&groups);
         assert!(ids.contains(&make_id("CHE", 1)));
-        assert!(!ids.contains(&make_id("CHE", 2)), "rejected should be excluded");
+        assert!(
+            !ids.contains(&make_id("CHE", 2)),
+            "rejected should be excluded"
+        );
     }
 
     #[test]
     fn excludes_proposed_foundation() {
-        let mut proposed = make_record("COM", 1, vec![], vec![("R1", 2, "Proposed rule")],
-            vec![(RelVerb::Root, "COM", 1)]);
+        let mut proposed = make_record(
+            "COM",
+            1,
+            vec![],
+            vec![("R1", 2, "Proposed rule")],
+            vec![(RelVerb::Root, "COM", 1)],
+        );
         proposed.status = Some(Status::Proposed);
 
         let records = vec![
             proposed,
-            make_record("CHE", 1, vec![], vec![("R1", 5, "Active rule")],
-                vec![(RelVerb::Root, "CHE", 1)]),
+            make_record(
+                "CHE",
+                1,
+                vec![],
+                vec![("R1", 5, "Active rule")],
+                vec![(RelVerb::Root, "CHE", 1)],
+            ),
         ];
         let config = make_config();
         let groups = context_grouped("cherry-pit-core", &records, &config).unwrap();
 
         let ids = all_emitted_adr_ids(&groups);
-        assert!(!ids.contains(&make_id("COM", 1)), "proposed foundation excluded");
+        assert!(
+            !ids.contains(&make_id("COM", 1)),
+            "proposed foundation excluded"
+        );
         assert!(ids.contains(&make_id("CHE", 1)));
     }
 
     #[test]
     fn filters_by_per_adr_crates() {
         let records = vec![
-            make_record("CHE", 1, vec![], vec![("R1", 5, "Root rule")],
-                vec![(RelVerb::Root, "CHE", 1)]),
-            make_record("CHE", 2, vec!["cherry-pit-core"], vec![("R1", 5, "Core rule")],
-                vec![(RelVerb::References, "CHE", 1)]),
-            make_record("CHE", 3, vec!["cherry-pit-gateway"], vec![("R1", 5, "Gateway rule")],
-                vec![(RelVerb::References, "CHE", 1)]),
+            make_record(
+                "CHE",
+                1,
+                vec![],
+                vec![("R1", 5, "Root rule")],
+                vec![(RelVerb::Root, "CHE", 1)],
+            ),
+            make_record(
+                "CHE",
+                2,
+                vec!["cherry-pit-core"],
+                vec![("R1", 5, "Core rule")],
+                vec![(RelVerb::References, "CHE", 1)],
+            ),
+            make_record(
+                "CHE",
+                3,
+                vec!["cherry-pit-gateway"],
+                vec![("R1", 5, "Gateway rule")],
+                vec![(RelVerb::References, "CHE", 1)],
+            ),
         ];
         let config = make_config();
         let groups = context_grouped("cherry-pit-core", &records, &config).unwrap();
 
         let ids = all_emitted_adr_ids(&groups);
-        assert!(ids.contains(&make_id("CHE", 2)), "core ADR should be included");
-        assert!(!ids.contains(&make_id("CHE", 3)), "gateway ADR should be excluded");
+        assert!(
+            ids.contains(&make_id("CHE", 2)),
+            "core ADR should be included"
+        );
+        assert!(
+            !ids.contains(&make_id("CHE", 3)),
+            "gateway ADR should be excluded"
+        );
     }
 
     #[test]
     fn excludes_stale() {
-        let mut stale = make_record("CHE", 2, vec![], vec![("R1", 5, "Stale rule")],
-            vec![(RelVerb::References, "CHE", 1)]);
+        let mut stale = make_record(
+            "CHE",
+            2,
+            vec![],
+            vec![("R1", 5, "Stale rule")],
+            vec![(RelVerb::References, "CHE", 1)],
+        );
         stale.is_stale = true;
 
         let records = vec![
-            make_record("CHE", 1, vec![], vec![("R1", 5, "Active rule")],
-                vec![(RelVerb::Root, "CHE", 1)]),
+            make_record(
+                "CHE",
+                1,
+                vec![],
+                vec![("R1", 5, "Active rule")],
+                vec![(RelVerb::Root, "CHE", 1)],
+            ),
             stale,
         ];
         let config = make_config();
@@ -564,13 +660,21 @@ description = "test"
 
         let ids = all_emitted_adr_ids(&groups);
         assert!(ids.contains(&make_id("CHE", 1)));
-        assert!(!ids.contains(&make_id("CHE", 2)), "stale should be excluded");
+        assert!(
+            !ids.contains(&make_id("CHE", 2)),
+            "stale should be excluded"
+        );
     }
 
     #[test]
     fn unknown_crate_returns_error() {
-        let records = vec![make_record("CHE", 1, vec![], vec![("R1", 5, "Rule")],
-            vec![(RelVerb::Root, "CHE", 1)])];
+        let records = vec![make_record(
+            "CHE",
+            1,
+            vec![],
+            vec![("R1", 5, "Rule")],
+            vec![(RelVerb::Root, "CHE", 1)],
+        )];
         let config = make_config();
         let result = context_grouped("nonexistent-crate", &records, &config);
         assert!(result.is_err());
@@ -584,24 +688,54 @@ description = "test"
         // CHE-0002 references both CHE-0001 and CHE-0004 (roots).
         // CHE-0001 listed first → CHE-0002 assigned to CHE-0001.
         let records = vec![
-            make_record("CHE", 1, vec![], vec![("R1", 2, "Root 1 rule")],
-                vec![(RelVerb::Root, "CHE", 1)]),
-            make_record("CHE", 4, vec![], vec![("R1", 5, "Root 4 rule")],
-                vec![(RelVerb::Root, "CHE", 4)]),
-            make_record("CHE", 2, vec![], vec![("R1", 5, "Child rule")],
-                vec![(RelVerb::References, "CHE", 1), (RelVerb::References, "CHE", 4)]),
+            make_record(
+                "CHE",
+                1,
+                vec![],
+                vec![("R1", 2, "Root 1 rule")],
+                vec![(RelVerb::Root, "CHE", 1)],
+            ),
+            make_record(
+                "CHE",
+                4,
+                vec![],
+                vec![("R1", 5, "Root 4 rule")],
+                vec![(RelVerb::Root, "CHE", 4)],
+            ),
+            make_record(
+                "CHE",
+                2,
+                vec![],
+                vec![("R1", 5, "Child rule")],
+                vec![
+                    (RelVerb::References, "CHE", 1),
+                    (RelVerb::References, "CHE", 4),
+                ],
+            ),
         ];
         let config = make_config();
         let groups = context_grouped("cherry-pit-core", &records, &config).unwrap();
 
         // CHE-0002 should appear under CHE-0001's group
-        let che1_group = groups.iter().find(|g| g.root_id == make_id("CHE", 1)).unwrap();
+        let che1_group = groups
+            .iter()
+            .find(|g| g.root_id == make_id("CHE", 1))
+            .unwrap();
         let che1_adr_ids: Vec<&AdrId> = che1_group.rules.iter().map(|r| &r.adr_id).collect();
-        assert!(che1_adr_ids.contains(&&make_id("CHE", 2)), "CHE-0002 should be under CHE-0001");
+        assert!(
+            che1_adr_ids.contains(&&make_id("CHE", 2)),
+            "CHE-0002 should be under CHE-0001"
+        );
 
-        let che4_group = groups.iter().find(|g| g.root_id == make_id("CHE", 4)).unwrap();
+        let che4_group = groups
+            .iter()
+            .find(|g| g.root_id == make_id("CHE", 4))
+            .unwrap();
         let che4_adr_ids: Vec<&AdrId> = che4_group.rules.iter().map(|r| &r.adr_id).collect();
-        assert!(!che4_adr_ids.contains(&&make_id("CHE", 2)), "CHE-0002 should NOT be under CHE-0004");
+        assert!(
+            !che4_adr_ids.contains(&&make_id("CHE", 2)),
+            "CHE-0002 should NOT be under CHE-0004"
+        );
     }
 
     #[test]
@@ -609,37 +743,77 @@ description = "test"
         // CHE-0003 references CHE-0002 (not a root). CHE-0002 references CHE-0001 (root).
         // CHE-0003 should be assigned to CHE-0001 via fallback.
         let records = vec![
-            make_record("CHE", 1, vec![], vec![("R1", 2, "Root rule")],
-                vec![(RelVerb::Root, "CHE", 1)]),
-            make_record("CHE", 2, vec![], vec![("R1", 5, "Middle rule")],
-                vec![(RelVerb::References, "CHE", 1)]),
-            make_record("CHE", 3, vec![], vec![("R1", 5, "Leaf rule")],
-                vec![(RelVerb::References, "CHE", 2)]),
+            make_record(
+                "CHE",
+                1,
+                vec![],
+                vec![("R1", 2, "Root rule")],
+                vec![(RelVerb::Root, "CHE", 1)],
+            ),
+            make_record(
+                "CHE",
+                2,
+                vec![],
+                vec![("R1", 5, "Middle rule")],
+                vec![(RelVerb::References, "CHE", 1)],
+            ),
+            make_record(
+                "CHE",
+                3,
+                vec![],
+                vec![("R1", 5, "Leaf rule")],
+                vec![(RelVerb::References, "CHE", 2)],
+            ),
         ];
         let config = make_config();
         let groups = context_grouped("cherry-pit-core", &records, &config).unwrap();
 
-        let che1_group = groups.iter().find(|g| g.root_id == make_id("CHE", 1)).unwrap();
+        let che1_group = groups
+            .iter()
+            .find(|g| g.root_id == make_id("CHE", 1))
+            .unwrap();
         let adr_ids: Vec<&AdrId> = che1_group.rules.iter().map(|r| &r.adr_id).collect();
-        assert!(adr_ids.contains(&&make_id("CHE", 3)), "CHE-0003 should reach CHE-0001 via fallback");
+        assert!(
+            adr_ids.contains(&&make_id("CHE", 3)),
+            "CHE-0003 should reach CHE-0001 via fallback"
+        );
     }
 
     #[test]
     fn no_rule_appears_twice() {
         // Two roots with overlapping subtree: CHE-0003 references both.
         let records = vec![
-            make_record("CHE", 1, vec![], vec![("R1", 2, "Root 1")],
-                vec![(RelVerb::Root, "CHE", 1)]),
-            make_record("CHE", 4, vec![], vec![("R1", 5, "Root 4")],
-                vec![(RelVerb::Root, "CHE", 4)]),
-            make_record("CHE", 3, vec![], vec![("R1", 5, "Shared rule")],
-                vec![(RelVerb::References, "CHE", 1), (RelVerb::References, "CHE", 4)]),
+            make_record(
+                "CHE",
+                1,
+                vec![],
+                vec![("R1", 2, "Root 1")],
+                vec![(RelVerb::Root, "CHE", 1)],
+            ),
+            make_record(
+                "CHE",
+                4,
+                vec![],
+                vec![("R1", 5, "Root 4")],
+                vec![(RelVerb::Root, "CHE", 4)],
+            ),
+            make_record(
+                "CHE",
+                3,
+                vec![],
+                vec![("R1", 5, "Shared rule")],
+                vec![
+                    (RelVerb::References, "CHE", 1),
+                    (RelVerb::References, "CHE", 4),
+                ],
+            ),
         ];
         let config = make_config();
         let groups = context_grouped("cherry-pit-core", &records, &config).unwrap();
 
         // Count total occurrences of CHE-0003's rules
-        let che3_count: usize = groups.iter()
+        let che3_count: usize = groups
+            .iter()
             .flat_map(|g| &g.rules)
             .filter(|r| r.adr_id == make_id("CHE", 3))
             .count();
@@ -652,12 +826,33 @@ description = "test"
     fn cycle_does_not_loop() {
         // CHE-0002 ↔ CHE-0003 form a cycle, both reference root CHE-0001
         let records = vec![
-            make_record("CHE", 1, vec![], vec![("R1", 2, "Root rule")],
-                vec![(RelVerb::Root, "CHE", 1)]),
-            make_record("CHE", 2, vec![], vec![("R1", 5, "Cycle A")],
-                vec![(RelVerb::References, "CHE", 1), (RelVerb::References, "CHE", 3)]),
-            make_record("CHE", 3, vec![], vec![("R1", 5, "Cycle B")],
-                vec![(RelVerb::References, "CHE", 1), (RelVerb::References, "CHE", 2)]),
+            make_record(
+                "CHE",
+                1,
+                vec![],
+                vec![("R1", 2, "Root rule")],
+                vec![(RelVerb::Root, "CHE", 1)],
+            ),
+            make_record(
+                "CHE",
+                2,
+                vec![],
+                vec![("R1", 5, "Cycle A")],
+                vec![
+                    (RelVerb::References, "CHE", 1),
+                    (RelVerb::References, "CHE", 3),
+                ],
+            ),
+            make_record(
+                "CHE",
+                3,
+                vec![],
+                vec![("R1", 5, "Cycle B")],
+                vec![
+                    (RelVerb::References, "CHE", 1),
+                    (RelVerb::References, "CHE", 2),
+                ],
+            ),
         ];
         let config = make_config();
         let groups = context_grouped("cherry-pit-core", &records, &config).unwrap();
@@ -671,10 +866,20 @@ description = "test"
     #[test]
     fn foundation_roots_before_domain_roots() {
         let records = vec![
-            make_record("COM", 1, vec![], vec![("R1", 2, "Foundation root")],
-                vec![(RelVerb::Root, "COM", 1)]),
-            make_record("CHE", 1, vec![], vec![("R1", 5, "Domain root")],
-                vec![(RelVerb::Root, "CHE", 1)]),
+            make_record(
+                "COM",
+                1,
+                vec![],
+                vec![("R1", 2, "Foundation root")],
+                vec![(RelVerb::Root, "COM", 1)],
+            ),
+            make_record(
+                "CHE",
+                1,
+                vec![],
+                vec![("R1", 5, "Domain root")],
+                vec![(RelVerb::Root, "CHE", 1)],
+            ),
         ];
         let config = make_config();
         let groups = context_grouped("cherry-pit-core", &records, &config).unwrap();
@@ -689,40 +894,77 @@ description = "test"
     #[test]
     fn within_root_rules_sorted_by_layer() {
         let records = vec![
-            make_record("CHE", 1, vec![], vec![],
-                vec![(RelVerb::Root, "CHE", 1)]),
-            make_record("CHE", 2, vec![], vec![("R1", 9, "D-tier rule")],
-                vec![(RelVerb::References, "CHE", 1)]),
-            make_record("CHE", 3, vec![], vec![("R1", 2, "S-tier rule")],
-                vec![(RelVerb::References, "CHE", 1)]),
-            make_record("CHE", 4, vec![], vec![("R1", 5, "B-tier rule")],
-                vec![(RelVerb::References, "CHE", 1)]),
+            make_record("CHE", 1, vec![], vec![], vec![(RelVerb::Root, "CHE", 1)]),
+            make_record(
+                "CHE",
+                2,
+                vec![],
+                vec![("R1", 9, "D-tier rule")],
+                vec![(RelVerb::References, "CHE", 1)],
+            ),
+            make_record(
+                "CHE",
+                3,
+                vec![],
+                vec![("R1", 2, "S-tier rule")],
+                vec![(RelVerb::References, "CHE", 1)],
+            ),
+            make_record(
+                "CHE",
+                4,
+                vec![],
+                vec![("R1", 5, "B-tier rule")],
+                vec![(RelVerb::References, "CHE", 1)],
+            ),
         ];
         let config = make_config();
         let groups = context_grouped("cherry-pit-core", &records, &config).unwrap();
 
-        let che_group = groups.iter().find(|g| g.root_id == make_id("CHE", 1)).unwrap();
+        let che_group = groups
+            .iter()
+            .find(|g| g.root_id == make_id("CHE", 1))
+            .unwrap();
         let layers: Vec<u8> = che_group.rules.iter().map(|r| r.layer).collect();
-        assert_eq!(layers, vec![2, 5, 9], "rules should be sorted by layer ascending");
+        assert_eq!(
+            layers,
+            vec![2, 5, 9],
+            "rules should be sorted by layer ascending"
+        );
     }
 
     #[test]
     fn within_same_layer_depth_then_number() {
         // CHE-0002 is depth 1, CHE-0003 is depth 2 (via CHE-0002), both at layer 5
         let records = vec![
-            make_record("CHE", 1, vec![], vec![],
-                vec![(RelVerb::Root, "CHE", 1)]),
-            make_record("CHE", 2, vec![], vec![("R1", 5, "Depth 1 rule")],
-                vec![(RelVerb::References, "CHE", 1)]),
-            make_record("CHE", 3, vec![], vec![("R1", 5, "Depth 2 rule")],
-                vec![(RelVerb::References, "CHE", 2)]),
+            make_record("CHE", 1, vec![], vec![], vec![(RelVerb::Root, "CHE", 1)]),
+            make_record(
+                "CHE",
+                2,
+                vec![],
+                vec![("R1", 5, "Depth 1 rule")],
+                vec![(RelVerb::References, "CHE", 1)],
+            ),
+            make_record(
+                "CHE",
+                3,
+                vec![],
+                vec![("R1", 5, "Depth 2 rule")],
+                vec![(RelVerb::References, "CHE", 2)],
+            ),
         ];
         let config = make_config();
         let groups = context_grouped("cherry-pit-core", &records, &config).unwrap();
 
-        let che_group = groups.iter().find(|g| g.root_id == make_id("CHE", 1)).unwrap();
+        let che_group = groups
+            .iter()
+            .find(|g| g.root_id == make_id("CHE", 1))
+            .unwrap();
         let adr_nums: Vec<u16> = che_group.rules.iter().map(|r| r.adr_id.number).collect();
-        assert_eq!(adr_nums, vec![2, 3], "depth 1 (CHE-0002) before depth 2 (CHE-0003)");
+        assert_eq!(
+            adr_nums,
+            vec![2, 3],
+            "depth 1 (CHE-0002) before depth 2 (CHE-0003)"
+        );
     }
 
     // ── Edge cases ─────────────────────────────────────────────────
@@ -731,30 +973,47 @@ description = "test"
     fn root_with_no_rules_but_has_children() {
         // Root CHE-0001 has no rules, but child CHE-0002 does
         let records = vec![
-            make_record("CHE", 1, vec![], vec![],
-                vec![(RelVerb::Root, "CHE", 1)]),
-            make_record("CHE", 2, vec![], vec![("R1", 5, "Child rule")],
-                vec![(RelVerb::References, "CHE", 1)]),
+            make_record("CHE", 1, vec![], vec![], vec![(RelVerb::Root, "CHE", 1)]),
+            make_record(
+                "CHE",
+                2,
+                vec![],
+                vec![("R1", 5, "Child rule")],
+                vec![(RelVerb::References, "CHE", 1)],
+            ),
         ];
         let config = make_config();
         let groups = context_grouped("cherry-pit-core", &records, &config).unwrap();
 
-        let che_group = groups.iter().find(|g| g.root_id == make_id("CHE", 1)).unwrap();
-        assert_eq!(che_group.rules.len(), 1, "children's rules should appear under root");
+        let che_group = groups
+            .iter()
+            .find(|g| g.root_id == make_id("CHE", 1))
+            .unwrap();
+        assert_eq!(
+            che_group.rules.len(),
+            1,
+            "children's rules should appear under root"
+        );
     }
 
     #[test]
     fn empty_root_group_still_created() {
         // Root CHE-0001 has no rules and no eligible children
-        let records = vec![
-            make_record("CHE", 1, vec![], vec![],
-                vec![(RelVerb::Root, "CHE", 1)]),
-        ];
+        let records = vec![make_record(
+            "CHE",
+            1,
+            vec![],
+            vec![],
+            vec![(RelVerb::Root, "CHE", 1)],
+        )];
         let config = make_config();
         let groups = context_grouped("cherry-pit-core", &records, &config).unwrap();
 
         // Root should not produce a group (no eligible rules)
-        assert!(groups.is_empty(), "root with no rules and no children → no group");
+        assert!(
+            groups.is_empty(),
+            "root with no rules and no children → no group"
+        );
     }
 
     #[test]
@@ -762,64 +1021,131 @@ description = "test"
         // CHE-0002 is Draft but links CHE-0001 → CHE-0003 in graph.
         // CHE-0003 references CHE-0002 (Draft). CHE-0003 should still
         // be assigned via fallback: CHE-0003 → CHE-0002 → CHE-0001.
-        let mut draft = make_record("CHE", 2, vec![], vec![("R1", 5, "Draft rule")],
-            vec![(RelVerb::References, "CHE", 1)]);
+        let mut draft = make_record(
+            "CHE",
+            2,
+            vec![],
+            vec![("R1", 5, "Draft rule")],
+            vec![(RelVerb::References, "CHE", 1)],
+        );
         draft.status = Some(Status::Draft);
 
         let records = vec![
-            make_record("CHE", 1, vec![], vec![("R1", 2, "Root rule")],
-                vec![(RelVerb::Root, "CHE", 1)]),
+            make_record(
+                "CHE",
+                1,
+                vec![],
+                vec![("R1", 2, "Root rule")],
+                vec![(RelVerb::Root, "CHE", 1)],
+            ),
             draft,
-            make_record("CHE", 3, vec![], vec![("R1", 5, "Leaf rule")],
-                vec![(RelVerb::References, "CHE", 2)]),
+            make_record(
+                "CHE",
+                3,
+                vec![],
+                vec![("R1", 5, "Leaf rule")],
+                vec![(RelVerb::References, "CHE", 2)],
+            ),
         ];
         let config = make_config();
         let groups = context_grouped("cherry-pit-core", &records, &config).unwrap();
 
         let ids = all_emitted_adr_ids(&groups);
         assert!(ids.contains(&make_id("CHE", 1)), "root should be included");
-        assert!(!ids.contains(&make_id("CHE", 2)), "draft should not emit rules");
-        assert!(ids.contains(&make_id("CHE", 3)), "leaf should be reachable via draft waypoint");
+        assert!(
+            !ids.contains(&make_id("CHE", 2)),
+            "draft should not emit rules"
+        );
+        assert!(
+            ids.contains(&make_id("CHE", 3)),
+            "leaf should be reachable via draft waypoint"
+        );
     }
 
     #[test]
     fn unclaimed_fallback_when_unreachable() {
         // CHE-0002 references nothing — unreachable from any root
         let records = vec![
-            make_record("CHE", 1, vec![], vec![("R1", 2, "Root rule")],
-                vec![(RelVerb::Root, "CHE", 1)]),
-            make_record("CHE", 2, vec![], vec![("R1", 5, "Orphan rule")],
-                vec![]),
+            make_record(
+                "CHE",
+                1,
+                vec![],
+                vec![("R1", 2, "Root rule")],
+                vec![(RelVerb::Root, "CHE", 1)],
+            ),
+            make_record("CHE", 2, vec![], vec![("R1", 5, "Orphan rule")], vec![]),
         ];
         let config = make_config();
         let groups = context_grouped("cherry-pit-core", &records, &config).unwrap();
 
         let unclaimed = groups.iter().find(|g| g.root_title == "Unclaimed Rules");
         assert!(unclaimed.is_some(), "should have unclaimed section");
-        let unclaimed_ids: Vec<&AdrId> = unclaimed.unwrap().rules.iter().map(|r| &r.adr_id).collect();
+        let unclaimed_ids: Vec<&AdrId> =
+            unclaimed.unwrap().rules.iter().map(|r| &r.adr_id).collect();
         assert!(unclaimed_ids.contains(&&make_id("CHE", 2)));
     }
 
     #[test]
     fn root_processing_order_deterministic() {
         // Same records in different input order should produce same output
-        let r1 = make_record("CHE", 1, vec![], vec![("R1", 2, "Root 1")],
-            vec![(RelVerb::Root, "CHE", 1)]);
-        let r4 = make_record("CHE", 4, vec![], vec![("R1", 5, "Root 4")],
-            vec![(RelVerb::Root, "CHE", 4)]);
-        let r2 = make_record("CHE", 2, vec![], vec![("R1", 5, "Child")],
-            vec![(RelVerb::References, "CHE", 1), (RelVerb::References, "CHE", 4)]);
+        let r1 = make_record(
+            "CHE",
+            1,
+            vec![],
+            vec![("R1", 2, "Root 1")],
+            vec![(RelVerb::Root, "CHE", 1)],
+        );
+        let r4 = make_record(
+            "CHE",
+            4,
+            vec![],
+            vec![("R1", 5, "Root 4")],
+            vec![(RelVerb::Root, "CHE", 4)],
+        );
+        let r2 = make_record(
+            "CHE",
+            2,
+            vec![],
+            vec![("R1", 5, "Child")],
+            vec![
+                (RelVerb::References, "CHE", 1),
+                (RelVerb::References, "CHE", 4),
+            ],
+        );
 
         let config = make_config();
 
-        let groups_a = context_grouped("cherry-pit-core", &[r1.clone(), r4.clone(), r2.clone()], &config).unwrap();
+        let groups_a = context_grouped(
+            "cherry-pit-core",
+            &[r1.clone(), r4.clone(), r2.clone()],
+            &config,
+        )
+        .unwrap();
         // Note: can't easily clone AdrRecord, so create fresh for order B
-        let r1b = make_record("CHE", 1, vec![], vec![("R1", 2, "Root 1")],
-            vec![(RelVerb::Root, "CHE", 1)]);
-        let r4b = make_record("CHE", 4, vec![], vec![("R1", 5, "Root 4")],
-            vec![(RelVerb::Root, "CHE", 4)]);
-        let r2b = make_record("CHE", 2, vec![], vec![("R1", 5, "Child")],
-            vec![(RelVerb::References, "CHE", 1), (RelVerb::References, "CHE", 4)]);
+        let r1b = make_record(
+            "CHE",
+            1,
+            vec![],
+            vec![("R1", 2, "Root 1")],
+            vec![(RelVerb::Root, "CHE", 1)],
+        );
+        let r4b = make_record(
+            "CHE",
+            4,
+            vec![],
+            vec![("R1", 5, "Root 4")],
+            vec![(RelVerb::Root, "CHE", 4)],
+        );
+        let r2b = make_record(
+            "CHE",
+            2,
+            vec![],
+            vec![("R1", 5, "Child")],
+            vec![
+                (RelVerb::References, "CHE", 1),
+                (RelVerb::References, "CHE", 4),
+            ],
+        );
 
         let groups_b = context_grouped("cherry-pit-core", &[r4b, r2b, r1b], &config).unwrap();
 

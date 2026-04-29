@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-References: CHE-0001, CHE-0006, CHE-0008, CHE-0039, CHE-0017, COM-0005
+References: CHE-0001, CHE-0006, CHE-0008, CHE-0039, CHE-0017, COM-0005, COM-0025
 
 ## Context
 
@@ -24,11 +24,16 @@ R2 [5]: Policy::react must be a pure function where same
   EventEnvelope input produces the same Vec<Output>
 R3 [5]: Optimistic concurrency via expected_sequence prevents
   duplicate appends at the store level
+R4 [5]: Commands entering from retried external boundaries carry a
+  stable domain idempotency key in their command payload
 
 ### Command-level idempotency
 
-No framework idempotency key. Aggregates are the authority on
-whether a command is a duplicate.
+Aggregates are the authority on whether a command is a duplicate.
+Commands entering from retried external boundaries (HTTP APIs,
+webhooks, message queues, scheduled jobs) carry a stable domain
+idempotency key in the command payload. In-process commands that are
+not retried across a boundary may omit this key.
 
 The aggregate's state (rebuilt from events) contains enough
 information to detect duplicates. Examples:
@@ -37,6 +42,10 @@ information to detect duplicates. Examples:
   state, returns `Err(AlreadyCreated)` or `Ok(vec![])`.
 - `ConfirmPayment { payment_id }` when `payment_id` is already
   recorded → `handle` returns `Ok(vec![])`.
+- `CreateOrder { request_id, customer_id, ... }` retried by an HTTP
+  client → `handle` records `request_id` or a natural unique key and
+  returns the original effect or `Ok(vec![])` instead of creating a
+  second aggregate.
 
 This approach is correct because the aggregate is the single source
 of truth for its own state. External deduplication tables can go
@@ -72,11 +81,11 @@ events: two events produced by different `handle` calls will always
 have different `event_id` values. This is not deduplication — it is
 identity.
 
-### Future: CommandBus idempotency key
+### Future: CommandBus idempotency key cache
 
-When the `CommandBus` is implemented, it may add optional
-idempotency key support for commands entering from external sources
-(webhooks, message queues). Design sketch:
+When the `CommandBus` is implemented, it may add optional result-cache
+support for commands entering from external sources (webhooks, message
+queues). Design sketch:
 
 ```rust
 // Optional idempotency key on CommandGateway
@@ -91,9 +100,10 @@ where ...;
 ```
 
 The bus would check a deduplication store before dispatching. If the
-key has been seen, it returns the original result without
-re-executing the command. This is infrastructure-level deduplication
-layered on top of the domain-level idempotency.
+key has been seen, it returns the original result without re-executing
+the command. This is infrastructure-level optimization layered on top
+of the domain-level idempotency key, not a replacement for aggregate
+duplicate detection.
 
 This is deferred until `CommandBus` is built and the external
 command ingestion pattern is concrete.
@@ -101,7 +111,7 @@ command ingestion pattern is concrete.
 ## Consequences
 
 - **Type-system boundary acknowledged.** Idempotency is behavioral; the compiler cannot verify it. Convention + documentation is the pragmatic answer.
-- **Aggregate is the idempotency authority.** No external deduplication table needed — the aggregate's state IS the deduplication state.
+- **Aggregate is the idempotency authority.** Retried external commands carry stable idempotency keys, and the aggregate's state remains the authoritative deduplication state.
 - **Policy purity is the key invariant.** If `react` is pure AND downstream handling is idempotent, at-least-once delivery is safe without policy-level deduplication. Testing should verify purity (CHE-0038).
 - **`event_id` (UUID v7) is a natural deduplication key** for external systems receiving events.
 - **No automatic retry** — `Command` has no `Clone` (CHE-0014), so callers must reconstruct and re-dispatch.

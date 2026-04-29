@@ -221,48 +221,20 @@ fn print_template() {
     println!("    T010  Consequences section present");
     println!("    T011  Code block size limit (max 20 lines)");
     println!("    T014  Section order (Related → Context → Decision → Consequences)");
-    println!(
-        "    T015  Section word count — tier-scaled signal, not gate."
-    );
-    println!(
-        "          Limits scale with tier: S-tier ADRs get more room,"
-    );
-    println!(
-        "          D-tier must be tighter. Flags the section for review."
-    );
-    println!(
-        "    T016  Tagged rules — tier-scaled signal, not gate. Max rules"
-    );
-    println!(
-        "          scales with tier. Word count (7–60), sequential IDs"
-    );
-    println!(
-        "          are warnings. Layer outside 1–12 is an error (invalid"
-    );
-    println!(
-        "          Meadows leverage point). Exceeding may indicate"
-    );
-    println!(
-        "          the ADR covers multiple decisions."
-    );
-    println!(
-        "    T019  Rule-tier tension — flags rules whose Meadows layer"
-    );
-    println!(
-        "          implies a tier >1 rank from the ADR's tier. Move rule"
-    );
-    println!(
-        "          to a matching-tier ADR or adjust the layer annotation."
-    );
-    println!(
-        "    T020  Reference load — tier-scaled limit on References:"
-    );
-    println!(
-        "          count. Root and Supersedes are structural and don't"
-    );
-    println!(
-        "          count. High reference count signals broad scope."
-    );
+    println!("    T015  Section word count — tier-scaled signal, not gate.");
+    println!("          Limits scale with tier: S-tier ADRs get more room,");
+    println!("          D-tier must be tighter. Flags the section for review.");
+    println!("    T016  Tagged rules — tier-scaled signal, not gate. Max rules");
+    println!("          scales with tier. Word count (7–60), sequential IDs");
+    println!("          are warnings. Layer outside 1–12 is an error (invalid");
+    println!("          Meadows leverage point). Exceeding may indicate");
+    println!("          the ADR covers multiple decisions.");
+    println!("    T019  Rule-tier tension — flags rules whose Meadows layer");
+    println!("          implies a tier >1 rank from the ADR's tier. Move rule");
+    println!("          to a matching-tier ADR or adjust the layer annotation.");
+    println!("    T020  Reference load — tier-scaled limit on References:");
+    println!("          count. Root and Supersedes are structural and don't");
+    println!("          count. High reference count signals broad scope.");
     println!();
 }
 
@@ -277,11 +249,43 @@ fn print_tagged_rules() {
     println!("           Multi-line rules: indent continuation ≥2 spaces");
     println!();
     println!("  [N] = Meadows leverage layer (1–12)");
-    println!("    1–3 → S-tier (paradigm/goals/mindset)");
-    println!("    4   → A-tier (self-organization)");
-    println!("    5–6 → B-tier (rules/information flows)");
-    println!("    7–8 → C-tier (feedback loops/delays)");
-    println!("    9–12→ D-tier (parameters/buffers)");
+    println!();
+    println!(
+        "    Layer  Leverage point (Meadows)                                              Tier"
+    );
+    println!(
+        "    ─────  ─────────────────────────────────────────────────────────────────────  ────"
+    );
+    println!("      1    The power to transcend paradigms                                       S");
+    println!(
+        "      2    The mindset or paradigm out of which the system arises                  S"
+    );
+    println!("      3    The goals of the system                                                S");
+    println!(
+        "      4    The power to add, change, evolve, or self-organize system structure     A"
+    );
+    println!(
+        "      5    The rules of the system (incentives, punishments, constraints)          B"
+    );
+    println!(
+        "      6    The structure of information flows (who does and does not have access)  B"
+    );
+    println!(
+        "      7    The gain around driving positive feedback loops                         C"
+    );
+    println!(
+        "      8    The strength of negative feedback loops                                 C"
+    );
+    println!(
+        "      9    The lengths of delays, relative to the rate of system change            D"
+    );
+    println!(
+        "     10    The structure of material stocks and flows                              D"
+    );
+    println!(
+        "     11    The sizes of buffers and other stabilizing stocks, relative to flows      D"
+    );
+    println!("     12    Constants, parameters, numbers                                         D");
     println!();
     println!("  Global ID: PREFIX-NNNN:RN:LN  (e.g., CHE-0042:R1:L5)");
     println!();

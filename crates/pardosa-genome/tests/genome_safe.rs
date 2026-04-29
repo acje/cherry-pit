@@ -274,6 +274,8 @@ fn format_constants() {
     assert_eq!(INDEX_ENTRY_SIZE, 24);
     assert_eq!(MIN_FILE_SIZE, 64);
     assert_eq!(NONE_SENTINEL, 0xFFFF_FFFF);
+    assert_eq!(V1_EMPTY_FILE_HEADER_FIXTURE.len(), FILE_HEADER_SIZE);
+    assert_eq!(V1_EMPTY_FILE_FOOTER_FIXTURE.len(), FILE_FOOTER_SIZE);
 
     // Footer field offsets must sum correctly to FILE_FOOTER_SIZE
     assert_eq!(FOOTER_RESERVED_OFFSET, 16);
@@ -281,6 +283,77 @@ fn format_constants() {
     assert_eq!(FOOTER_MAGIC_OFFSET, 20);
     assert_eq!(FOOTER_CHECKSUM_OFFSET, 24);
     assert_eq!(FOOTER_CHECKSUM_OFFSET + 8, FILE_FOOTER_SIZE);
+}
+
+#[test]
+fn v1_empty_file_header_golden_fixture() {
+    use pardosa_genome::format::*;
+
+    let fixture = V1_EMPTY_FILE_HEADER_FIXTURE;
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/fixtures/v1_empty_file_header.bin");
+    if !path.exists() {
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(&path, fixture).unwrap();
+        eprintln!(
+            "Golden file written to {}. Commit this file.",
+            path.display()
+        );
+    }
+
+    let expected = std::fs::read(&path).unwrap();
+    assert_eq!(fixture.as_slice(), expected.as_slice());
+    assert_eq!(
+        &fixture[HEADER_MAGIC_OFFSET..HEADER_MAGIC_OFFSET + 4],
+        b"PGNO"
+    );
+    assert_eq!(
+        u16::from_le_bytes([
+            fixture[HEADER_VERSION_OFFSET],
+            fixture[HEADER_VERSION_OFFSET + 1],
+        ]),
+        FORMAT_VERSION,
+    );
+    assert_eq!(
+        &fixture[HEADER_RESERVED_OFFSET..],
+        &[0; HEADER_RESERVED_LEN]
+    );
+}
+
+#[test]
+fn v1_empty_file_footer_golden_fixture() {
+    use pardosa_genome::format::*;
+
+    let fixture = V1_EMPTY_FILE_FOOTER_FIXTURE;
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/fixtures/v1_empty_file_footer.bin");
+    if !path.exists() {
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(&path, fixture).unwrap();
+        eprintln!(
+            "Golden file written to {}. Commit this file.",
+            path.display()
+        );
+    }
+
+    let expected = std::fs::read(&path).unwrap();
+    assert_eq!(fixture.as_slice(), expected.as_slice());
+    assert_eq!(
+        u64::from_le_bytes(
+            fixture[FOOTER_INDEX_OFFSET..FOOTER_INDEX_OFFSET + 8]
+                .try_into()
+                .unwrap()
+        ),
+        FILE_HEADER_SIZE as u64,
+    );
+    assert_eq!(
+        &fixture[FOOTER_MAGIC_OFFSET..FOOTER_MAGIC_OFFSET + 4],
+        b"PGNO"
+    );
+    assert_eq!(
+        &fixture[FOOTER_RESERVED_OFFSET..FOOTER_RESERVED_OFFSET + FOOTER_RESERVED_LEN],
+        &[0; FOOTER_RESERVED_LEN],
+    );
 }
 
 #[test]

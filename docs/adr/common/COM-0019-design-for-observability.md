@@ -1,9 +1,9 @@
 # COM-0019. Design for Observability at Every Abstraction Layer
 
 Date: 2026-04-28
-Last-reviewed: 2026-04-28
+Last-reviewed: 2026-04-29
 Tier: A
-Status: Proposed
+Status: Accepted
 
 ## Related
 
@@ -38,6 +38,14 @@ R3 [4]: Observability instrumentation is reviewed alongside the trait
   interface during design, documented in interface comments
 R4 [6]: Correlation identifiers from CorrelationContext flow through
   all operation boundaries for distributed trace reconstruction
+R5 [6]: Telemetry fields that may contain user data use redacted
+  wrapper types or explicit allowlists before logging or tracing
+R6 [6]: High-cardinality telemetry labels such as aggregate_id,
+  event_id, correlation_id, and causation_id stay in traces or logs
+  rather than unbounded metric dimensions
+R7 [6]: Retry loops in CommandGateway, EventBus, EventStore, and
+  Pardosa consumers emit attempt count, terminal category, and
+  correlation_id in structured telemetry
 
 ## Consequences
 
@@ -51,3 +59,4 @@ R4 [6]: Correlation identifiers from CorrelationContext flow through
 - **Distributed debugging.** Correlation propagation enables end-to-end
   trace reconstruction across NATS publish, store operations, and
   consumer processing.
+Redaction and cardinality limits keep telemetry from becoming a confidentiality leak or denial-of-service vector. Correlation propagation plus retry telemetry gives operators enough context to reconstruct failures without exposing domain payloads.

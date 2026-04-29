@@ -43,6 +43,7 @@
 //! - [`StoreError`] — event store operation errors
 //! - [`EnvelopeError`] — envelope construction/validation errors
 //! - [`BusError`] — event bus publication errors
+//! - [`ErrorCategory`] — stable retryable/terminal error guidance
 
 #![forbid(unsafe_code)]
 
@@ -63,7 +64,9 @@ pub use aggregate_id::AggregateId;
 pub use bus::{CommandBus, EventBus};
 pub use command::Command;
 pub use correlation::CorrelationContext;
-pub use error::{BusError, CreateResult, DispatchError, DispatchResult, EnvelopeError, StoreError};
+pub use error::{
+    BusError, CreateResult, DispatchError, DispatchResult, EnvelopeError, ErrorCategory, StoreError,
+};
 pub use event::{DomainEvent, EventEnvelope};
 pub use gateway::CommandGateway;
 pub use policy::Policy;

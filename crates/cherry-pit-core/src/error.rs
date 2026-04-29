@@ -6,6 +6,37 @@ use crate::aggregate::{Aggregate, HandleCommand};
 use crate::aggregate_id::AggregateId;
 use crate::event::EventEnvelope;
 
+/// Stable retry guidance for framework errors.
+///
+/// This category is intentionally coarse. Callers use it to choose a
+/// first response strategy without matching every concrete error variant:
+/// retry after reloading/backing off, or stop and surface the condition
+/// for domain/operator action.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ErrorCategory {
+    /// Repeating the operation may succeed after backoff, reload, or
+    /// infrastructure recovery.
+    Retryable,
+
+    /// Repeating the same operation against the same state is expected
+    /// to fail until input, domain state, or stored data is repaired.
+    Terminal,
+}
+
+impl ErrorCategory {
+    /// Returns true for errors where retry is a valid first response.
+    #[must_use]
+    pub const fn is_retryable(self) -> bool {
+        matches!(self, Self::Retryable)
+    }
+
+    /// Returns true for errors requiring caller/operator action before retry.
+    #[must_use]
+    pub const fn is_terminal(self) -> bool {
+        matches!(self, Self::Terminal)
+    }
+}
+
 /// Errors that can occur during command dispatch.
 ///
 /// Generic over `E` — the domain-specific error type from
@@ -32,6 +63,17 @@ pub enum DispatchError<E: Error + Send + Sync> {
     /// Infrastructure failure (event store unavailable, serialization
     /// error, transport timeout, etc.).
     Infrastructure(Box<dyn Error + Send + Sync>),
+}
+
+impl<E: Error + Send + Sync> DispatchError<E> {
+    /// Classify the dispatch failure as retryable or terminal.
+    #[must_use]
+    pub const fn category(&self) -> ErrorCategory {
+        match self {
+            Self::ConcurrencyConflict { .. } | Self::Infrastructure(_) => ErrorCategory::Retryable,
+            Self::Rejected(_) | Self::AggregateNotFound { .. } => ErrorCategory::Terminal,
+        }
+    }
 }
 
 impl<E: Error + Send + Sync> fmt::Display for DispatchError<E> {
@@ -87,8 +129,29 @@ pub enum StoreError {
         path: PathBuf,
     },
 
+    /// Persisted data failed structural or semantic validation.
+    ///
+    /// This includes malformed bytes, invalid envelopes, aggregate ID
+    /// mismatches, sequence gaps, duplicates, and out-of-order events.
+    /// Retrying the same read is not expected to succeed until the store
+    /// is repaired or restored from backup.
+    CorruptData(Box<dyn Error + Send + Sync>),
+
     /// Infrastructure failure (disk I/O, network, serialization).
     Infrastructure(Box<dyn Error + Send + Sync>),
+}
+
+impl StoreError {
+    /// Classify the store failure as retryable or terminal.
+    #[must_use]
+    pub const fn category(&self) -> ErrorCategory {
+        match self {
+            Self::ConcurrencyConflict { .. }
+            | Self::StoreLocked { .. }
+            | Self::Infrastructure(_) => ErrorCategory::Retryable,
+            Self::CorruptData(_) => ErrorCategory::Terminal,
+        }
+    }
 }
 
 impl fmt::Display for StoreError {
@@ -107,6 +170,7 @@ impl fmt::Display for StoreError {
                 "store directory is locked by another process: {}",
                 path.display()
             ),
+            Self::CorruptData(e) => write!(f, "store corrupt data: {e}"),
             Self::Infrastructure(e) => write!(f, "store infrastructure error: {e}"),
         }
     }
@@ -115,7 +179,7 @@ impl fmt::Display for StoreError {
 impl Error for StoreError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
-            Self::Infrastructure(e) => Some(e.as_ref()),
+            Self::CorruptData(e) | Self::Infrastructure(e) => Some(e.as_ref()),
             Self::ConcurrencyConflict { .. } | Self::StoreLocked { .. } => None,
         }
     }
@@ -140,6 +204,12 @@ impl BusError {
     #[must_use]
     pub fn into_inner(self) -> Box<dyn Error + Send + Sync> {
         self.0
+    }
+
+    /// Classify event publication failure as retryable.
+    #[must_use]
+    pub const fn category(&self) -> ErrorCategory {
+        ErrorCategory::Retryable
     }
 }
 
@@ -166,12 +236,48 @@ pub enum EnvelopeError {
     /// The `event_id` is nil (`Uuid::nil()`), which indicates a
     /// missing or corrupted event identifier.
     NilEventId,
+
+    /// The envelope belongs to a different aggregate stream than the
+    /// file or store partition being loaded.
+    AggregateIdMismatch {
+        /// Aggregate ID expected from the stream key.
+        expected: AggregateId,
+        /// Aggregate ID found in the envelope.
+        actual: AggregateId,
+    },
+
+    /// The stream sequence is not exactly contiguous from 1..=N.
+    SequenceGap {
+        /// Sequence required at this stream position.
+        expected_sequence: u64,
+        /// Sequence found in the envelope.
+        actual_sequence: u64,
+    },
+}
+
+impl EnvelopeError {
+    /// Envelope validation failures indicate corrupt or malformed data.
+    #[must_use]
+    pub const fn category(&self) -> ErrorCategory {
+        ErrorCategory::Terminal
+    }
 }
 
 impl fmt::Display for EnvelopeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::NilEventId => write!(f, "event_id must not be nil"),
+            Self::AggregateIdMismatch { expected, actual } => write!(
+                f,
+                "event aggregate_id mismatch: expected {expected}, actual {actual}"
+            ),
+            Self::SequenceGap {
+                expected_sequence,
+                actual_sequence,
+            } => write!(
+                f,
+                "event sequence gap: expected sequence {expected_sequence}, actual {actual_sequence}"
+            ),
         }
     }
 }

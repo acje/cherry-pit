@@ -1,4 +1,5 @@
 use std::io;
+use std::io::Write;
 use std::marker::PhantomData;
 use std::num::NonZeroU64;
 use std::path::PathBuf;
@@ -69,7 +70,18 @@ pub struct MsgpackFileStore<E: DomainEvent> {
     /// The `std::fs::File` handle keeps the flock alive — releasing
     /// happens automatically on drop.
     dir_lock: tokio::sync::OnceCell<std::fs::File>,
+    /// Best-effort recovery of orphaned temp files. Runs once after
+    /// process-level fencing succeeds, before the first mutating write.
+    temp_recovery: tokio::sync::OnceCell<()>,
     _phantom: PhantomData<E>,
+}
+
+fn infrastructure_error(error: impl Into<Box<dyn std::error::Error + Send + Sync>>) -> StoreError {
+    StoreError::Infrastructure(error.into())
+}
+
+fn corrupt_data(error: impl Into<Box<dyn std::error::Error + Send + Sync>>) -> StoreError {
+    StoreError::CorruptData(error.into())
 }
 
 impl<E: DomainEvent> MsgpackFileStore<E> {
@@ -83,6 +95,7 @@ impl<E: DomainEvent> MsgpackFileStore<E> {
             next_id: tokio::sync::Mutex::new(None),
             locks: scc::HashMap::new(),
             dir_lock: tokio::sync::OnceCell::new(),
+            temp_recovery: tokio::sync::OnceCell::new(),
             _phantom: PhantomData,
         }
     }
@@ -124,24 +137,20 @@ impl<E: DomainEvent> MsgpackFileStore<E> {
             .get_or_try_init(|| async {
                 let dir = self.dir.clone();
                 tokio::task::spawn_blocking(move || {
-                    std::fs::create_dir_all(&dir)
-                        .map_err(|e| StoreError::Infrastructure(Box::new(e)))?;
+                    std::fs::create_dir_all(&dir).map_err(infrastructure_error)?;
 
                     let lock_path = dir.join(".lock");
-                    let file = std::fs::File::create(&lock_path)
-                        .map_err(|e| StoreError::Infrastructure(Box::new(e)))?;
+                    let file = std::fs::File::create(&lock_path).map_err(infrastructure_error)?;
 
                     file.try_lock().map_err(|e| match e {
                         std::fs::TryLockError::WouldBlock => StoreError::StoreLocked { path: dir },
-                        std::fs::TryLockError::Error(io_err) => {
-                            StoreError::Infrastructure(Box::new(io_err))
-                        }
+                        std::fs::TryLockError::Error(io_err) => infrastructure_error(io_err),
                     })?;
 
                     Ok(file)
                 })
                 .await
-                .map_err(|e| StoreError::Infrastructure(Box::new(e)))?
+                .map_err(infrastructure_error)?
             })
             .await?;
         Ok(())
@@ -155,13 +164,9 @@ impl<E: DomainEvent> MsgpackFileStore<E> {
         let mut entries = match tokio::fs::read_dir(&self.dir).await {
             Ok(entries) => entries,
             Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(0),
-            Err(e) => return Err(StoreError::Infrastructure(Box::new(e))),
+            Err(e) => return Err(infrastructure_error(e)),
         };
-        while let Some(entry) = entries
-            .next_entry()
-            .await
-            .map_err(|e| StoreError::Infrastructure(Box::new(e)))?
-        {
+        while let Some(entry) = entries.next_entry().await.map_err(infrastructure_error)? {
             if let Some(stem) = entry.path().file_stem().and_then(|s| s.to_str())
                 && let Ok(id) = stem.parse::<u64>()
             {
@@ -169,6 +174,53 @@ impl<E: DomainEvent> MsgpackFileStore<E> {
             }
         }
         Ok(max)
+    }
+
+    /// Remove leftover temp files from interrupted atomic writes.
+    ///
+    /// A `.msgpack.tmp` file is never authoritative: it is written before
+    /// the atomic rename and only exists after a crash or failed rename.
+    /// Cleanup is best-effort, scoped to this store's temp-file suffix, and
+    /// runs only once per store instance so it cannot race with active writes.
+    async fn recover_temp_files(&self) -> Result<(), StoreError> {
+        self.temp_recovery
+            .get_or_try_init(|| async {
+                let mut entries = match tokio::fs::read_dir(&self.dir).await {
+                    Ok(entries) => entries,
+                    Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(()),
+                    Err(e) => return Err(infrastructure_error(e)),
+                };
+
+                while let Some(entry) = entries.next_entry().await.map_err(infrastructure_error)? {
+                    let file_type = entry.file_type().await.map_err(infrastructure_error)?;
+                    if !file_type.is_file() {
+                        continue;
+                    }
+
+                    let name = entry.file_name();
+                    let name = name.to_string_lossy();
+                    if name.ends_with(".msgpack.tmp") {
+                        tokio::fs::remove_file(entry.path())
+                            .await
+                            .map_err(infrastructure_error)?;
+                    }
+                }
+
+                Ok(())
+            })
+            .await?;
+
+        Ok(())
+    }
+
+    fn deserialize_and_validate_stream(
+        id: AggregateId,
+        bytes: &[u8],
+    ) -> Result<Vec<EventEnvelope<E>>, StoreError> {
+        let envelopes: Vec<EventEnvelope<E>> =
+            rmp_serde::from_slice(bytes).map_err(corrupt_data)?;
+        EventEnvelope::validate_stream(id, &envelopes).map_err(corrupt_data)?;
+        Ok(envelopes)
     }
 
     /// Build envelopes from raw domain events.
@@ -191,16 +243,16 @@ impl<E: DomainEvent> MsgpackFileStore<E> {
                 .checked_add(i_u64)
                 .and_then(|s| s.checked_add(1))
                 .ok_or_else(|| {
-                    StoreError::Infrastructure(Box::new(io::Error::new(
+                    infrastructure_error(io::Error::new(
                         io::ErrorKind::InvalidInput,
                         "sequence overflow",
-                    )))
+                    ))
                 })?;
             let sequence = NonZeroU64::new(sequence_raw).ok_or_else(|| {
-                StoreError::Infrastructure(Box::new(io::Error::new(
+                infrastructure_error(io::Error::new(
                     io::ErrorKind::InvalidInput,
                     "sequence must be non-zero",
-                )))
+                ))
             })?;
             let envelope = EventEnvelope::new(
                 uuid::Uuid::now_v7(),
@@ -211,7 +263,7 @@ impl<E: DomainEvent> MsgpackFileStore<E> {
                 context.causation_id(),
                 payload,
             )
-            .map_err(|e| StoreError::Infrastructure(Box::new(e)))?;
+            .map_err(infrastructure_error)?;
             envelopes.push(envelope);
         }
         Ok(envelopes)
@@ -223,12 +275,11 @@ impl<E: DomainEvent> MsgpackFileStore<E> {
         path: &std::path::Path,
         envelopes: &[EventEnvelope<E>],
     ) -> Result<(), StoreError> {
-        let bytes = rmp_serde::encode::to_vec_named(envelopes)
-            .map_err(|e| StoreError::Infrastructure(Box::new(e)))?;
+        let bytes = rmp_serde::encode::to_vec_named(envelopes).map_err(infrastructure_error)?;
 
         tokio::fs::create_dir_all(&self.dir)
             .await
-            .map_err(|e| StoreError::Infrastructure(Box::new(e)))?;
+            .map_err(infrastructure_error)?;
 
         // Use a unique temp file per aggregate to prevent collisions
         // between concurrent writes to different aggregates.
@@ -237,13 +288,35 @@ impl<E: DomainEvent> MsgpackFileStore<E> {
             path.file_name().and_then(|n| n.to_str()).unwrap_or("tmp")
         );
         let tmp_path = self.dir.join(tmp_name);
-        tokio::fs::write(&tmp_path, &bytes)
-            .await
-            .map_err(|e| StoreError::Infrastructure(Box::new(e)))?;
+
+        let tmp_path_for_write = tmp_path.clone();
+        let bytes_for_write = bytes;
+        tokio::task::spawn_blocking(move || -> Result<(), StoreError> {
+            let mut tmp_file =
+                std::fs::File::create(&tmp_path_for_write).map_err(infrastructure_error)?;
+            tmp_file
+                .write_all(&bytes_for_write)
+                .map_err(infrastructure_error)?;
+            tmp_file.sync_all().map_err(infrastructure_error)?;
+            Ok(())
+        })
+        .await
+        .map_err(infrastructure_error)??;
+
         if let Err(e) = tokio::fs::rename(&tmp_path, path).await {
             let _ = tokio::fs::remove_file(&tmp_path).await;
-            return Err(StoreError::Infrastructure(Box::new(e)));
+            return Err(infrastructure_error(e));
         }
+
+        let dir = self.dir.clone();
+        tokio::task::spawn_blocking(move || -> Result<(), StoreError> {
+            let dir_file = std::fs::File::open(dir).map_err(infrastructure_error)?;
+            dir_file.sync_all().map_err(infrastructure_error)?;
+            Ok(())
+        })
+        .await
+        .map_err(infrastructure_error)??;
+
         Ok(())
     }
 }
@@ -261,18 +334,9 @@ impl<E: DomainEvent> EventStore for MsgpackFileStore<E> {
     async fn load(&self, id: AggregateId) -> Result<Vec<EventEnvelope<E>>, StoreError> {
         let path = self.aggregate_path(id);
         match tokio::fs::read(&path).await {
-            Ok(bytes) => {
-                let envelopes: Vec<EventEnvelope<E>> = rmp_serde::from_slice(&bytes)
-                    .map_err(|e| StoreError::Infrastructure(Box::new(e)))?;
-                for envelope in &envelopes {
-                    envelope
-                        .validate()
-                        .map_err(|e| StoreError::Infrastructure(Box::new(e)))?;
-                }
-                Ok(envelopes)
-            }
+            Ok(bytes) => Self::deserialize_and_validate_stream(id, &bytes),
             Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(Vec::new()),
-            Err(e) => Err(StoreError::Infrastructure(Box::new(e))),
+            Err(e) => Err(infrastructure_error(e)),
         }
     }
 
@@ -282,12 +346,13 @@ impl<E: DomainEvent> EventStore for MsgpackFileStore<E> {
         context: CorrelationContext,
     ) -> Result<(AggregateId, Vec<EventEnvelope<E>>), StoreError> {
         self.ensure_fenced().await?;
+        self.recover_temp_files().await?;
 
         if events.is_empty() {
-            return Err(StoreError::Infrastructure(Box::new(io::Error::new(
+            return Err(infrastructure_error(io::Error::new(
                 io::ErrorKind::InvalidInput,
                 "cannot create aggregate with zero events",
-            ))));
+            )));
         }
 
         // Assign next ID under lock.
@@ -298,17 +363,15 @@ impl<E: DomainEvent> EventStore for MsgpackFileStore<E> {
             } else {
                 let max = self.scan_max_id().await?;
                 max.checked_add(1).ok_or_else(|| {
-                    StoreError::Infrastructure(Box::new(io::Error::other("aggregate ID overflow")))
+                    infrastructure_error(io::Error::other("aggregate ID overflow"))
                 })?
             };
-            let after = n.checked_add(1).ok_or_else(|| {
-                StoreError::Infrastructure(Box::new(io::Error::other("aggregate ID overflow")))
-            })?;
+            let after = n
+                .checked_add(1)
+                .ok_or_else(|| infrastructure_error(io::Error::other("aggregate ID overflow")))?;
             *next = Some(after);
             let nz = NonZeroU64::new(n).ok_or_else(|| {
-                StoreError::Infrastructure(Box::new(io::Error::other(
-                    "aggregate ID must be non-zero",
-                )))
+                infrastructure_error(io::Error::other("aggregate ID must be non-zero"))
             })?;
             AggregateId::new(nz)
         };
@@ -332,6 +395,7 @@ impl<E: DomainEvent> EventStore for MsgpackFileStore<E> {
         }
 
         self.ensure_fenced().await?;
+        self.recover_temp_files().await?;
 
         let lock = self.get_lock(id.get());
         let _guard = lock.lock().await;
@@ -342,22 +406,13 @@ impl<E: DomainEvent> EventStore for MsgpackFileStore<E> {
         // via `create()` first. If the file does not exist, the
         // aggregate was never created and append is not valid.
         let mut existing: Vec<EventEnvelope<E>> = match tokio::fs::read(&path).await {
-            Ok(bytes) => {
-                let envelopes: Vec<EventEnvelope<E>> = rmp_serde::from_slice(&bytes)
-                    .map_err(|e| StoreError::Infrastructure(Box::new(e)))?;
-                for envelope in &envelopes {
-                    envelope
-                        .validate()
-                        .map_err(|e| StoreError::Infrastructure(Box::new(e)))?;
-                }
-                envelopes
-            }
+            Ok(bytes) => Self::deserialize_and_validate_stream(id, &bytes)?,
             Err(e) if e.kind() == io::ErrorKind::NotFound => {
-                return Err(StoreError::Infrastructure(Box::from(format!(
+                return Err(infrastructure_error(format!(
                     "cannot append to aggregate {id}: not created (use create() first)"
-                ))));
+                )));
             }
-            Err(e) => return Err(StoreError::Infrastructure(Box::new(e))),
+            Err(e) => return Err(infrastructure_error(e)),
         };
 
         // Optimistic concurrency check.
@@ -417,6 +472,24 @@ mod tests {
     /// Helper to construct a `NonZeroU64` from a raw `u64` in tests.
     fn nz(n: u64) -> NonZeroU64 {
         NonZeroU64::new(n).unwrap()
+    }
+
+    fn fixed_timestamp() -> jiff::Timestamp {
+        jiff::Timestamp::from_second(1_700_000_000).unwrap()
+    }
+
+    async fn has_tmp_file(dir: &std::path::Path) -> bool {
+        let mut entries = tokio::fs::read_dir(dir).await.unwrap();
+        while let Some(entry) = entries.next_entry().await.unwrap() {
+            if entry
+                .file_name()
+                .to_string_lossy()
+                .ends_with(".msgpack.tmp")
+            {
+                return true;
+            }
+        }
+        false
     }
 
     // ── create ──────────────────────────────────────────────────────
@@ -567,8 +640,81 @@ mod tests {
         let result: Result<Vec<EventEnvelope<TestEvent>>, _> = store.load(agg_id(1)).await;
         assert!(result.is_err());
         assert!(
-            matches!(result.unwrap_err(), StoreError::Infrastructure(_)),
-            "expected Infrastructure error for corrupt file"
+            matches!(result.unwrap_err(), StoreError::CorruptData(_)),
+            "expected CorruptData error for corrupt file"
+        );
+    }
+
+    #[tokio::test]
+    async fn load_rejects_sequence_gap() {
+        let dir = tempfile::tempdir().unwrap();
+        tokio::fs::create_dir_all(dir.path()).await.unwrap();
+
+        let id = agg_id(1);
+        let envelopes = vec![
+            EventEnvelope::new(
+                uuid::Uuid::now_v7(),
+                id,
+                NonZeroU64::new(1).unwrap(),
+                jiff::Timestamp::now(),
+                None,
+                None,
+                TestEvent::Created { name: "a".into() },
+            )
+            .unwrap(),
+            EventEnvelope::new(
+                uuid::Uuid::now_v7(),
+                id,
+                NonZeroU64::new(3).unwrap(),
+                jiff::Timestamp::now(),
+                None,
+                None,
+                TestEvent::Updated { name: "b".into() },
+            )
+            .unwrap(),
+        ];
+        let bytes = rmp_serde::encode::to_vec_named(&envelopes).unwrap();
+        tokio::fs::write(dir.path().join("1.msgpack"), &bytes)
+            .await
+            .unwrap();
+
+        let store = MsgpackFileStore::<TestEvent>::new(dir.path());
+        let result = store.load(id).await;
+
+        assert!(
+            matches!(result, Err(StoreError::CorruptData(_))),
+            "expected CorruptData for sequence gap, got: {result:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn load_rejects_aggregate_id_mismatch() {
+        let dir = tempfile::tempdir().unwrap();
+        tokio::fs::create_dir_all(dir.path()).await.unwrap();
+
+        let envelope = EventEnvelope::new(
+            uuid::Uuid::now_v7(),
+            agg_id(2),
+            NonZeroU64::new(1).unwrap(),
+            jiff::Timestamp::now(),
+            None,
+            None,
+            TestEvent::Created {
+                name: "wrong".into(),
+            },
+        )
+        .unwrap();
+        let bytes = rmp_serde::encode::to_vec_named(&vec![envelope]).unwrap();
+        tokio::fs::write(dir.path().join("1.msgpack"), &bytes)
+            .await
+            .unwrap();
+
+        let store = MsgpackFileStore::<TestEvent>::new(dir.path());
+        let result = store.load(agg_id(1)).await;
+
+        assert!(
+            matches!(result, Err(StoreError::CorruptData(_))),
+            "expected CorruptData for aggregate mismatch, got: {result:?}"
         );
     }
 
@@ -594,6 +740,80 @@ mod tests {
         assert_eq!(*loaded[0].payload(), *created[0].payload());
         assert_eq!(loaded[0].sequence(), 1);
         assert_eq!(loaded[0].aggregate_id(), id);
+    }
+
+    #[tokio::test]
+    async fn msgpack_stream_golden_file_roundtrip() {
+        let id = agg_id(42);
+        let envelopes = vec![
+            EventEnvelope::new(
+                uuid::Uuid::from_bytes([
+                    0x01, 0x93, 0xa3, 0xe8, 0x80, 0x00, 0x7c, 0xde, 0x8f, 0x01, 0x23, 0x45, 0x67,
+                    0x89, 0xab, 0xcd,
+                ]),
+                id,
+                NonZeroU64::new(1).unwrap(),
+                fixed_timestamp(),
+                Some(uuid::Uuid::from_bytes([
+                    0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff, 0x71, 0x22, 0x83, 0x44, 0x55, 0x66, 0x77,
+                    0x88, 0x99, 0x00,
+                ])),
+                None,
+                TestEvent::Created {
+                    name: "golden-create".into(),
+                },
+            )
+            .unwrap(),
+            EventEnvelope::new(
+                uuid::Uuid::from_bytes([
+                    0x01, 0x93, 0xa3, 0xe8, 0x80, 0x01, 0x7c, 0xde, 0x8f, 0x01, 0x23, 0x45, 0x67,
+                    0x89, 0xab, 0xce,
+                ]),
+                id,
+                NonZeroU64::new(2).unwrap(),
+                fixed_timestamp(),
+                Some(uuid::Uuid::from_bytes([
+                    0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff, 0x71, 0x22, 0x83, 0x44, 0x55, 0x66, 0x77,
+                    0x88, 0x99, 0x00,
+                ])),
+                Some(uuid::Uuid::from_bytes([
+                    0x01, 0x93, 0xa3, 0xe8, 0x80, 0x00, 0x7c, 0xde, 0x8f, 0x01, 0x23, 0x45, 0x67,
+                    0x89, 0xab, 0xcd,
+                ])),
+                TestEvent::Updated {
+                    name: "golden-update".into(),
+                },
+            )
+            .unwrap(),
+        ];
+
+        let serialized = rmp_serde::encode::to_vec_named(&envelopes).unwrap();
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/fixtures/msgpack_stream_golden.msgpack");
+        if !path.exists() {
+            std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+            std::fs::write(&path, &serialized).unwrap();
+            eprintln!(
+                "Golden file written to {}. Commit this file.",
+                path.display()
+            );
+        }
+
+        let expected = std::fs::read(&path).unwrap();
+        assert_eq!(serialized, expected, "MessagePack stream fixture changed");
+
+        let dir = tempfile::tempdir().unwrap();
+        tokio::fs::write(dir.path().join("42.msgpack"), &expected)
+            .await
+            .unwrap();
+        let store = MsgpackFileStore::<TestEvent>::new(dir.path());
+        let loaded = store.load(id).await.unwrap();
+
+        assert_eq!(loaded.len(), 2);
+        assert_eq!(*loaded[0].payload(), *envelopes[0].payload());
+        assert_eq!(*loaded[1].payload(), *envelopes[1].payload());
+        assert_eq!(loaded[0].sequence(), 1);
+        assert_eq!(loaded[1].sequence(), 2);
     }
 
     // ── append ──────────────────────────────────────────────────────
@@ -1221,8 +1441,8 @@ mod tests {
 
         assert!(result.is_err());
         assert!(
-            matches!(result.unwrap_err(), StoreError::Infrastructure(_)),
-            "expected Infrastructure error for zero sequence"
+            matches!(result.unwrap_err(), StoreError::CorruptData(_)),
+            "expected CorruptData error for zero sequence"
         );
     }
 
@@ -1460,6 +1680,32 @@ mod tests {
         // The actual file should exist.
         let path = dir.path().join(format!("{}.msgpack", id.get()));
         assert!(path.exists(), "aggregate file should exist");
+    }
+
+    #[tokio::test]
+    async fn orphaned_temp_file_removed_on_next_write() {
+        let dir = tempfile::tempdir().unwrap();
+        tokio::fs::create_dir_all(dir.path()).await.unwrap();
+        let orphan = dir.path().join("1.msgpack.tmp");
+        tokio::fs::write(&orphan, b"interrupted write")
+            .await
+            .unwrap();
+
+        let store = MsgpackFileStore::new(dir.path());
+        store
+            .create(
+                vec![TestEvent::Created {
+                    name: "recover".into(),
+                }],
+                no_ctx(),
+            )
+            .await
+            .unwrap();
+
+        assert!(
+            !has_tmp_file(dir.path()).await,
+            "orphaned temp file should be removed"
+        );
     }
 
     // ── fencing ──────────────────────────────────────────────────────

@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-References: CHE-0001, CHE-0006
+References: CHE-0001, CHE-0006, COM-0025
 
 ## Context
 
@@ -24,11 +24,17 @@ R2 [10]: On rename failure clean up the temp file on a best-effort
 R3 [10]: Call File::sync_all on the temp file before rename and sync
   the parent directory after rename to guarantee data durability
   across power failure
+R4 [10]: Remove orphaned .msgpack.tmp files during MsgpackFileStore
+  startup write recovery before create or append mutates the store
 
 1. Serialize envelopes to bytes in memory.
 2. Write bytes to `{filename}.tmp` in the store directory.
 3. `rename()` the temp file to the target path.
-4. On rename failure, clean up the temp file (best-effort).
+4. `File::sync_all()` the temp file before rename.
+5. `sync_all()` the parent directory after rename.
+6. On rename failure, clean up the temp file (best-effort).
+7. On the next write after restart, remove orphaned `.msgpack.tmp`
+   files before mutating aggregate data.
 
 Temp file naming uses `{aggregate_filename}.tmp` (e.g.,
 `1.msgpack.tmp`). This is safe because:
@@ -40,8 +46,4 @@ Temp file naming uses `{aggregate_filename}.tmp` (e.g.,
 
 ## Consequences
 
-- Crash during write leaves only the temp file. No corrupt aggregate data.
-- **POSIX only:** `rename(2)` is atomic; Windows `rename` fails if destination exists.
-- Temp file safety is coupled to per-aggregate locking and sequential ID assignment.
-- Orphaned `.tmp` files from crashes accumulate; no automatic cleanup.
-- Entire history rewritten per `append` — unsuitable for long-lived aggregates.
+Crash during write leaves only the old file plus a temp file. POSIX `rename(2)` provides atomic replacement. Orphaned `.tmp` files are cleaned before the next write. Full-history rewrite remains unsuitable for long-lived aggregates.
