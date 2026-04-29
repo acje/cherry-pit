@@ -20,6 +20,7 @@
 #![forbid(unsafe_code)]
 
 mod config;
+mod containment;
 mod context;
 mod critique;
 mod guidelines;
@@ -71,17 +72,30 @@ struct Cli {
 fn main() {
     let cli = Cli::parse();
 
-    // Resolve ADR root directory (may not exist for guidelines setup mode)
+    // Resolve ADR root directory (may not exist for guidelines setup mode).
+    // The user-supplied path is canonicalized so subsequent containment
+    // checks operate against a stable, symlink-resolved root.
     let adr_root = match cli.adr_directory {
         Some(ref p) => {
-            if p.is_dir() {
-                Some(p.clone())
-            } else {
+            if !p.is_dir() {
                 eprintln!("error: {} is not a directory", p.display());
                 process::exit(1);
             }
+            match std::fs::canonicalize(p) {
+                Ok(canon) => Some(canon),
+                Err(e) => {
+                    eprintln!("error: cannot canonicalize {}: {e}", p.display());
+                    process::exit(1);
+                }
+            }
         }
-        None => resolve_adr_root_optional(),
+        None => match resolve_adr_root_optional() {
+            Ok(opt) => opt,
+            Err(e) => {
+                eprintln!("error: {e}");
+                process::exit(1);
+            }
+        },
     };
 
     // Default mode: guidelines
@@ -127,7 +141,13 @@ fn main() {
         }
     };
 
-    let domain_dirs = discover_domains(&adr_root, &config);
+    let domain_dirs = match discover_domains(&adr_root, &config) {
+        Ok(dirs) => dirs,
+        Err(e) => {
+            eprintln!("error: {e}");
+            process::exit(1);
+        }
+    };
 
     if domain_dirs.is_empty() {
         eprintln!(
@@ -143,9 +163,18 @@ fn main() {
         all_records.extend(records);
     }
 
-    // Parse stale directory
-    let stale_dir = adr_root.join(&config.stale.directory);
-    if stale_dir.is_dir() {
+    // Parse stale directory (optional — may not exist in fresh repos)
+    let stale_dir = match containment::contained_join_optional(&adr_root, &config.stale.directory)
+    {
+        Ok(opt) => opt,
+        Err(e) => {
+            eprintln!("error: stale directory in adr-forge.toml: {e}");
+            process::exit(1);
+        }
+    };
+    if let Some(stale_dir) = stale_dir
+        && stale_dir.is_dir()
+    {
         let stale_records = parser::parse_stale(&stale_dir, &config);
         all_records.extend(stale_records);
     }
@@ -154,7 +183,10 @@ fn main() {
     if let Some(ref adr_id_str) = cli.critique {
         // --critique mode
         let Some(focal_id) = parse_adr_id_from_str(adr_id_str) else {
-            eprintln!("error: '{adr_id_str}' is not a valid ADR ID (expected PREFIX-NNNN)");
+            eprintln!(
+                "error: {} is not a valid ADR ID (expected PREFIX-NNNN)",
+                adr_id_str.escape_debug()
+            );
             process::exit(1);
         };
         let blocks = match critique::critique(&focal_id, &all_records, &config, cli.depth) {
@@ -200,31 +232,53 @@ fn main() {
     }
 }
 
-/// Walk up from CWD looking for `docs/adr/`. Returns None if not found.
-fn resolve_adr_root_optional() -> Option<PathBuf> {
+/// Walk up from CWD looking for `docs/adr/GOVERNANCE.md`.
+///
+/// Returns `Ok(Some(canonical_path))` when found and canonicalized,
+/// `Ok(None)` when the marker file is not found in any ancestor,
+/// or `Err(message)` when a candidate root was found but cannot be
+/// canonicalized (permission denied, broken symlink, etc.). Errors
+/// surface as infrastructure failures per AFM-0003 R1.
+fn resolve_adr_root_optional() -> Result<Option<PathBuf>, String> {
     let Ok(cwd) = std::env::current_dir() else {
-        return None;
+        return Ok(None);
     };
     let mut dir = cwd.as_path();
     loop {
         let candidate = dir.join("docs/adr/GOVERNANCE.md");
         if candidate.is_file() {
-            return Some(dir.join("docs/adr"));
+            let target = dir.join("docs/adr");
+            return std::fs::canonicalize(&target).map(Some).map_err(|e| {
+                format!("cannot canonicalize discovered ADR root {}: {e}", target.display())
+            });
         }
         match dir.parent() {
             Some(parent) => dir = parent,
             None => break,
         }
     }
-    None
+    Ok(None)
 }
 
-/// Build domain directories from config.
-fn discover_domains(root: &Path, config: &Config) -> Vec<DomainDir> {
+/// Build domain directories from config, applying strict containment.
+///
+/// Each `domain.directory` from `adr-forge.toml` is joined to `root`
+/// via [`containment::contained_join_optional`]: absolute paths and
+/// `..` components are rejected, and the canonical target must be a
+/// descendant of the canonical ADR root. Containment failures abort
+/// the run as infrastructure errors per AFM-0003 R1.
+///
+/// A configured directory that does not exist on disk is silently
+/// skipped (returns `None` from the optional join); the caller emits
+/// a diagnostic when zero domains resolve.
+fn discover_domains(root: &Path, config: &Config) -> Result<Vec<DomainDir>, String> {
     let mut dirs = Vec::new();
     for domain in &config.domains {
-        let path = root.join(&domain.directory);
-        if path.is_dir() {
+        let resolved = containment::contained_join_optional(root, &domain.directory)
+            .map_err(|e| format!("domain '{}' directory: {e}", domain.prefix))?;
+        if let Some(path) = resolved
+            && path.is_dir()
+        {
             dirs.push(DomainDir {
                 path,
                 prefix: domain.prefix.clone(),
@@ -232,5 +286,5 @@ fn discover_domains(root: &Path, config: &Config) -> Vec<DomainDir> {
             });
         }
     }
-    dirs
+    Ok(dirs)
 }

@@ -1135,3 +1135,192 @@ fn walk_recursive(base: &std::path::Path, dir: &std::path::Path, out: &mut Vec<S
         }
     }
 }
+
+// ── path containment ───────────────────────────────────────────────
+
+/// Config with an absolute domain directory escapes the ADR root.
+const ABSOLUTE_DOMAIN_CONFIG: &str = r#"
+[stale]
+directory = "stale"
+
+[[domains]]
+prefix = "TST"
+name = "Test"
+directory = "/etc"
+description = "Malicious absolute path."
+crates = []
+"#;
+
+/// Config with a parent-traversal domain directory escapes the ADR root.
+const TRAVERSAL_DOMAIN_CONFIG: &str = r#"
+[stale]
+directory = "stale"
+
+[[domains]]
+prefix = "TST"
+name = "Test"
+directory = "../../../etc"
+description = "Malicious parent traversal."
+crates = []
+"#;
+
+/// Config with a parent-traversal stale directory.
+const TRAVERSAL_STALE_CONFIG: &str = r#"
+[stale]
+directory = "../escape"
+
+[[domains]]
+prefix = "TST"
+name = "Test"
+directory = "test"
+description = "Valid domain."
+crates = []
+"#;
+
+#[test]
+fn containment_rejects_absolute_domain_directory() {
+    let dir = setup_corpus(
+        ABSOLUTE_DOMAIN_CONFIG,
+        &[("TST-0001-valid-test-adr.md", VALID_ADR)],
+    );
+
+    adr_forge()
+        .args(["--lint", &adr_root(&dir)])
+        .assert()
+        .failure()
+        .stdout(predicate::str::is_empty())
+        .stderr(predicate::str::contains("domain 'TST'"))
+        .stderr(predicate::str::contains("absolute"));
+}
+
+/// Lexical absolute-path rejection must fire before any filesystem
+/// canonicalization is attempted. Pointing at a definitely-non-existent
+/// absolute path proves the lexical check runs first: if it didn't,
+/// the error would be `CanonicalizeFailed` ("No such file or directory")
+/// instead of `Absolute`.
+const NONEXISTENT_ABSOLUTE_CONFIG: &str = r#"
+[stale]
+directory = "stale"
+
+[[domains]]
+prefix = "TST"
+name = "Test"
+directory = "/this/path/should/never/exist/on/any/system"
+description = "Lexical-check-first guarantee."
+crates = []
+"#;
+
+#[test]
+fn containment_lexical_check_fires_before_canonicalize() {
+    let dir = setup_corpus(
+        NONEXISTENT_ABSOLUTE_CONFIG,
+        &[("TST-0001-valid-test-adr.md", VALID_ADR)],
+    );
+
+    adr_forge()
+        .args(["--lint", &adr_root(&dir)])
+        .assert()
+        .failure()
+        .stdout(predicate::str::is_empty())
+        .stderr(predicate::str::contains("is absolute"))
+        .stderr(predicate::str::contains("cannot canonicalize").not());
+}
+
+#[test]
+fn containment_rejects_parent_traversal_domain_directory() {
+    let dir = setup_corpus(
+        TRAVERSAL_DOMAIN_CONFIG,
+        &[("TST-0001-valid-test-adr.md", VALID_ADR)],
+    );
+
+    adr_forge()
+        .args(["--lint", &adr_root(&dir)])
+        .assert()
+        .failure()
+        .stdout(predicate::str::is_empty())
+        .stderr(predicate::str::contains("domain 'TST'"))
+        .stderr(predicate::str::contains("parent-traversal"));
+}
+
+#[test]
+fn containment_rejects_parent_traversal_stale_directory() {
+    let dir = setup_corpus(
+        TRAVERSAL_STALE_CONFIG,
+        &[("TST-0001-valid-test-adr.md", VALID_ADR)],
+    );
+
+    adr_forge()
+        .args(["--lint", &adr_root(&dir)])
+        .assert()
+        .failure()
+        .stdout(predicate::str::is_empty())
+        .stderr(predicate::str::contains("stale directory"))
+        .stderr(predicate::str::contains("parent-traversal"));
+}
+
+#[cfg(unix)]
+#[test]
+fn containment_rejects_symlink_escape_in_domain_directory() {
+    use std::os::unix::fs::symlink;
+
+    // Build a corpus with a domain directory that is a symlink pointing
+    // outside the ADR root. The lint must abort with an EscapesRoot error.
+    let dir = TempDir::new().expect("create tempdir");
+    let outside = dir.path().join("outside");
+    fs::create_dir(&outside).expect("create outside");
+    let adr_root_path = dir.path().join("docs/adr");
+    fs::create_dir_all(&adr_root_path).expect("create adr root");
+    fs::write(adr_root_path.join("GOVERNANCE.md"), "# Governance\n").expect("write governance");
+    fs::write(
+        adr_root_path.join("adr-forge.toml"),
+        r#"
+[stale]
+directory = "stale"
+
+[[domains]]
+prefix = "TST"
+name = "Test"
+directory = "test"
+description = "Symlink-escape domain."
+crates = []
+"#,
+    )
+    .expect("write config");
+    symlink(&outside, adr_root_path.join("test")).expect("create symlink");
+
+    adr_forge()
+        .args(["--lint", adr_root_path.to_str().expect("path utf8")])
+        .assert()
+        .failure()
+        .stdout(predicate::str::is_empty())
+        .stderr(predicate::str::contains("domain 'TST'"))
+        .stderr(predicate::str::contains("escapes the ADR root"));
+}
+
+/// Symlinks whose canonical target stays inside the ADR root are
+/// allowed — strict containment must not be over-strict. This locks
+/// the positive case so future hardening doesn't accidentally reject
+/// in-tree symlink farms.
+#[cfg(unix)]
+#[test]
+fn containment_accepts_symlink_inside_root() {
+    use std::os::unix::fs::symlink;
+
+    let dir = TempDir::new().expect("create tempdir");
+    let adr_root_path = dir.path().join("docs/adr");
+    fs::create_dir_all(&adr_root_path).expect("create adr root");
+    fs::write(adr_root_path.join("GOVERNANCE.md"), "# Governance\n").expect("write governance");
+    fs::write(adr_root_path.join("adr-forge.toml"), MINIMAL_CONFIG).expect("write config");
+
+    // Real `test/` directory at adr_root/real-test, then symlink test → real-test.
+    let real = adr_root_path.join("real-test");
+    fs::create_dir(&real).expect("create real test dir");
+    fs::write(real.join("TST-0001-valid-test-adr.md"), VALID_ADR).expect("write ADR");
+    symlink(&real, adr_root_path.join("test")).expect("create symlink");
+
+    adr_forge()
+        .args(["--lint", adr_root_path.to_str().expect("path utf8")])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("warning(s)"));
+}
