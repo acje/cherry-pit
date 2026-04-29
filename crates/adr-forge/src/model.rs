@@ -41,6 +41,19 @@ pub fn layer_to_tier(layer: u8) -> Option<Tier> {
 }
 
 /// Composite ADR identifier: prefix + number (e.g., CHE-0042).
+///
+/// # Invariants (parser-produced values only)
+///
+/// Values produced by [`parse_adr_id`] or [`parse_adr_id_from_filename_stem`]
+/// satisfy:
+/// - `prefix.len() ∈ 2..=4`
+/// - every byte of `prefix` is `b'A'..=b'Z'` (ASCII uppercase)
+/// - `number ∈ 0..=9999` (encoded as exactly 4 digits via `Display`)
+///
+/// Values produced by [`AdrRecord::default`] (and other manual
+/// construction sites) do not satisfy these invariants — `prefix`
+/// is the empty string. Manual construction is restricted to
+/// sentinel/uninitialized contexts.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct AdrId {
     pub prefix: String,
@@ -326,7 +339,7 @@ impl Status {
             "Rejected" => Self::Rejected,
             s if s.starts_with("Superseded by ") => {
                 let rest = &s["Superseded by ".len()..];
-                match parse_adr_id_from_str(rest.trim()) {
+                match parse_adr_id(rest.trim()) {
                     Some(id) => Self::SupersededBy(id),
                     None => Self::Invalid(trimmed.to_owned()),
                 }
@@ -524,22 +537,86 @@ impl fmt::Display for RelVerb {
     }
 }
 
-/// Parse an ADR ID from a string like `CHE-0042` or `PAR-0006`.
+/// Parse a strict ADR ID like `CHE-0042`.
+///
+/// Accepts exactly `^[A-Z]{2,4}-[0-9]{4}$` — uppercase ASCII prefix
+/// of 2–4 letters, dash, exactly 4 digits, nothing else. No
+/// whitespace trimming; callers must pass clean input.
+///
+/// Returns `None` for any deviation: lowercase, non-ASCII, wrong
+/// digit count, trailing text, leading/trailing whitespace.
+///
+/// Use [`parse_adr_id_from_filename_stem`] when the input is an
+/// ADR filename stem like `CHE-0042-slug-words`.
+///
+/// Implemented with byte-level checks rather than regex per
+/// AFM-0006 R1 (regex is reserved for markdown structural
+/// extraction; lexical token validation may use byte checks).
 #[must_use]
-pub fn parse_adr_id_from_str(s: &str) -> Option<AdrId> {
-    let s = s.trim();
+pub fn parse_adr_id(s: &str) -> Option<AdrId> {
     let (prefix, num_str) = s.split_once('-')?;
-    if prefix.is_empty() {
+
+    // Prefix: 2-4 uppercase ASCII letters.
+    let prefix_len = prefix.len();
+    if !(2..=4).contains(&prefix_len)
+        || !prefix.bytes().all(|b| b.is_ascii_uppercase())
+    {
         return None;
     }
 
-    // Take only leading digits (ignore trailing annotations)
-    let digits: String = num_str.chars().take_while(char::is_ascii_digit).collect();
-    if digits.is_empty() {
+    // Number: exactly 4 ASCII digits, no trailing junk.
+    if num_str.len() != 4 || !num_str.bytes().all(|b| b.is_ascii_digit()) {
+        return None;
+    }
+    let number: u16 = num_str.parse().ok()?;
+
+    Some(AdrId {
+        prefix: prefix.to_owned(),
+        number,
+    })
+}
+
+/// Parse an ADR ID from a filename stem like `CHE-0042-some-slug`.
+///
+/// Matches `^[A-Z]{2,4}-[0-9]{4}(?:-|$)` at the start of the stem
+/// and ignores everything after the trailing dash. Returns `None`
+/// if the stem does not begin with a strict ID followed by either
+/// a dash or end-of-string.
+///
+/// Specifically rejects `CHE-00012-foo` (5 digits before the dash)
+/// and `CHE-0001x` (no dash separator after digits) — both of
+/// which a naive prefix-match would silently accept.
+///
+/// The stem is the filename with `.md` already stripped by the
+/// caller. Whitespace is not trimmed.
+///
+/// See AFM-0006 R1 for the byte-level validation rationale.
+#[must_use]
+pub fn parse_adr_id_from_filename_stem(stem: &str) -> Option<AdrId> {
+    let (prefix, rest) = stem.split_once('-')?;
+
+    let prefix_len = prefix.len();
+    if !(2..=4).contains(&prefix_len)
+        || !prefix.bytes().all(|b| b.is_ascii_uppercase())
+    {
         return None;
     }
 
-    let number: u16 = digits.parse().ok()?;
+    // Take exactly 4 leading ASCII digits; reject if fewer.
+    let rest_bytes = rest.as_bytes();
+    if rest_bytes.len() < 4 || !rest_bytes[..4].iter().all(u8::is_ascii_digit) {
+        return None;
+    }
+
+    // Boundary: byte after the 4 digits must be `-` or end-of-string.
+    // Rejects "CHE-00012-foo" (digit at position 4) and "CHE-0001x"
+    // (non-dash separator).
+    if rest_bytes.len() > 4 && rest_bytes[4] != b'-' {
+        return None;
+    }
+
+    let number: u16 = rest[..4].parse().ok()?;
+
     Some(AdrId {
         prefix: prefix.to_owned(),
         number,
@@ -551,34 +628,113 @@ mod tests {
     use super::*;
 
     #[test]
-    fn parse_adr_id() {
-        let id = parse_adr_id_from_str("CHE-0042").unwrap();
+    fn parse_adr_id_strict() {
+        let id = parse_adr_id("CHE-0042").unwrap();
         assert_eq!(id.prefix, "CHE");
         assert_eq!(id.number, 42);
         assert_eq!(id.to_string(), "CHE-0042");
     }
 
     #[test]
-    fn parse_adr_id_with_trailing_text() {
-        let id = parse_adr_id_from_str("CHE-0021").unwrap();
-        assert_eq!(id.number, 21);
+    fn parse_adr_id_accepts_2_to_4_letter_prefix() {
+        assert!(parse_adr_id("AI-0001").is_some());
+        assert!(parse_adr_id("CHE-0001").is_some());
+        assert!(parse_adr_id("AFRM-0001").is_some());
     }
 
     #[test]
-    fn parse_adr_id_non_ascii_prefix() {
-        // Prefixes with multi-byte chars should still split correctly
-        let id = parse_adr_id_from_str("ÄDR-0001");
-        assert!(id.is_some());
-        let id = id.unwrap();
-        assert_eq!(id.prefix, "ÄDR");
-        assert_eq!(id.number, 1);
+    fn parse_adr_id_rejects_trailing_text() {
+        // Lenient predecessor accepted "CHE-0042-foo" → CHE-0042; strict refuses.
+        assert!(parse_adr_id("CHE-0042-foo").is_none());
+        assert!(parse_adr_id("CHE-0042 ").is_none());
+    }
+
+    #[test]
+    fn parse_adr_id_rejects_whitespace() {
+        assert!(parse_adr_id(" CHE-0042").is_none());
+        assert!(parse_adr_id("CHE-0042\n").is_none());
+    }
+
+    #[test]
+    fn parse_adr_id_rejects_non_ascii_prefix() {
+        assert!(parse_adr_id("ÄDR-0001").is_none());
+    }
+
+    #[test]
+    fn parse_adr_id_rejects_lowercase_prefix() {
+        assert!(parse_adr_id("che-0001").is_none());
+    }
+
+    #[test]
+    fn parse_adr_id_rejects_wrong_digit_count() {
+        assert!(parse_adr_id("CHE-001").is_none());
+        assert!(parse_adr_id("CHE-00001").is_none());
+        assert!(parse_adr_id("CHE-").is_none());
+    }
+
+    #[test]
+    fn parse_adr_id_rejects_short_or_long_prefix() {
+        assert!(parse_adr_id("C-0001").is_none());
+        assert!(parse_adr_id("ABCDE-0001").is_none());
     }
 
     #[test]
     fn parse_adr_id_empty_prefix_returns_none() {
-        assert!(parse_adr_id_from_str("-0001").is_none());
-        assert!(parse_adr_id_from_str("").is_none());
-        assert!(parse_adr_id_from_str("-").is_none());
+        assert!(parse_adr_id("-0001").is_none());
+        assert!(parse_adr_id("").is_none());
+        assert!(parse_adr_id("-").is_none());
+    }
+
+    #[test]
+    fn parse_adr_id_from_filename_stem_strips_slug() {
+        let id = parse_adr_id_from_filename_stem("CHE-0042-some-slug-words").unwrap();
+        assert_eq!(id.prefix, "CHE");
+        assert_eq!(id.number, 42);
+    }
+
+    #[test]
+    fn parse_adr_id_from_filename_stem_accepts_bare_id() {
+        let id = parse_adr_id_from_filename_stem("CHE-0001").unwrap();
+        assert_eq!(id.number, 1);
+    }
+
+    #[test]
+    fn parse_adr_id_from_filename_stem_rejects_short_digits() {
+        assert!(parse_adr_id_from_filename_stem("CHE-42-slug").is_none());
+        assert!(parse_adr_id_from_filename_stem("CHE-001").is_none());
+    }
+
+    #[test]
+    fn parse_adr_id_from_filename_stem_rejects_lowercase() {
+        assert!(parse_adr_id_from_filename_stem("che-0001-slug").is_none());
+    }
+
+    #[test]
+    fn parse_adr_id_from_filename_stem_rejects_non_ascii() {
+        assert!(parse_adr_id_from_filename_stem("ÄDR-0001-slug").is_none());
+    }
+
+    #[test]
+    fn parse_adr_id_from_filename_stem_rejects_five_digits() {
+        // Naive prefix-match would accept first 4 digits as 0001 and
+        // discard the rest. Strict boundary rejects.
+        assert!(parse_adr_id_from_filename_stem("CHE-00012-foo").is_none());
+    }
+
+    #[test]
+    fn parse_adr_id_from_filename_stem_rejects_non_dash_separator() {
+        // Naive match would accept "0001" and ignore "x". Strict
+        // boundary requires `-` or end-of-string after the 4 digits.
+        assert!(parse_adr_id_from_filename_stem("CHE-0001x").is_none());
+        assert!(parse_adr_id_from_filename_stem("CHE-0001_slug").is_none());
+    }
+
+    #[test]
+    fn parse_status_superseded_with_trailing_space_returns_invalid() {
+        // "Superseded by " with empty target after trim — strict
+        // parse_adr_id rejects empty input, status falls through to Invalid.
+        let s = Status::parse("Superseded by ");
+        assert!(matches!(s, Status::Invalid(_)), "got {s:?}");
     }
 
     #[test]

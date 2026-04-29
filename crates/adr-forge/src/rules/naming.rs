@@ -9,7 +9,7 @@ use std::sync::LazyLock;
 
 use regex::Regex;
 
-use crate::model::{AdrRecord, parse_adr_id_from_str};
+use crate::model::{AdrRecord, parse_adr_id_from_filename_stem};
 use crate::report::Diagnostic;
 
 /// N001: filename must match `PREFIX-NNNN-kebab-slug.md`.
@@ -41,7 +41,7 @@ pub fn check(record: &AdrRecord, domain_prefixes: &[&str], diags: &mut Vec<Diagn
     }
 
     // N002: Number in filename matches H1 ID
-    if let Some(file_id) = parse_adr_id_from_str(&file_name[..file_name.len() - 3]) {
+    if let Some(file_id) = parse_adr_id_from_filename_stem(&file_name[..file_name.len() - 3]) {
         // We need the first segment PREFIX-NNNN
         if file_id.prefix != record.id.prefix || file_id.number != record.id.number {
             diags.push(Diagnostic::warning(

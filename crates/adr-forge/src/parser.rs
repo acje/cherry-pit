@@ -23,7 +23,7 @@ use regex::Regex;
 use crate::config::Config;
 use crate::model::{
     AdrId, AdrRecord, DomainDir, RelVerb, Relationship, Status, TaggedRule, Tier,
-    parse_adr_id_from_str,
+    parse_adr_id,
 };
 use crate::report::Diagnostic;
 
@@ -294,7 +294,7 @@ fn parse_title(lines: &[&str], expected_prefix: &str) -> Option<(AdrId, String, 
         if let Some(rest) = line.strip_prefix("# ") {
             // Expected format: "PREFIX-NNNN. Title text"
             if let Some(dot_pos) = rest.find(". ")
-                && let Some(id) = parse_adr_id_from_str(&rest[..dot_pos])
+                && let Some(id) = parse_adr_id(&rest[..dot_pos])
                 && id.prefix == expected_prefix
             {
                 let title = rest[dot_pos + 2..].to_owned();
@@ -423,7 +423,7 @@ fn find_relationships(lines: &[&str]) -> (Vec<Relationship>, bool, bool) {
                     if let Some(verb) = RelVerb::parse(verb_str) {
                         for target_str in targets_str.split(", ") {
                             let clean = strip_annotation(target_str);
-                            if let Some(target_id) = parse_adr_id_from_str(clean) {
+                            if let Some(target_id) = parse_adr_id(clean) {
                                 rels.push(Relationship {
                                     verb,
                                     target: target_id,
@@ -715,10 +715,10 @@ mod tests {
         assert!(found);
         assert_eq!(rels.len(), 3);
         assert_eq!(rels[0].verb, RelVerb::References);
-        assert_eq!(rels[0].target, parse_adr_id_from_str("CHE-0006").unwrap());
-        assert_eq!(rels[1].target, parse_adr_id_from_str("CHE-0032").unwrap());
+        assert_eq!(rels[0].target, parse_adr_id("CHE-0006").unwrap());
+        assert_eq!(rels[1].target, parse_adr_id("CHE-0032").unwrap());
         assert_eq!(rels[2].verb, RelVerb::Supersedes);
-        assert_eq!(rels[2].target, parse_adr_id_from_str("CHE-0015").unwrap());
+        assert_eq!(rels[2].target, parse_adr_id("CHE-0015").unwrap());
     }
 
     #[test]
@@ -1218,6 +1218,22 @@ mod tests {
     }
 
     #[test]
+    fn parse_adr_file_h1_with_trailing_space_emits_p002() {
+        // Regression: lenient predecessor accepted "# CHE-0001 . Title"
+        // by trimming "CHE-0001 " before ID parse. Strict parse_adr_id
+        // rejects the trailing space, surfacing the malformed H1 as P002
+        // rather than silently accepting it.
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("CHE-0001-trailing-space.md");
+        fs::write(&path, "# CHE-0001 . Title\n").expect("write file");
+
+        let outcome = parse_adr_file(&path, "CHE", false).expect("read should succeed");
+        assert!(outcome.record.is_none(), "malformed H1 yields no record");
+        assert_eq!(outcome.diagnostics.len(), 1);
+        assert_eq!(outcome.diagnostics[0].rule, "P002");
+    }
+
+    #[test]
     fn parse_adr_file_valid_h1_emits_no_diagnostics() {
         let dir = tempfile::tempdir().expect("tempdir");
         let path = dir.path().join("CHE-0001-valid.md");
@@ -1448,15 +1464,15 @@ crates = []
         ];
         let (rels, found, _) = find_relationships(&lines);
         assert!(found);
-        // "Root: CHE-0001|References: CHE-0002" is treated as one segment
-        // verb_str = "Root", targets_str = "CHE-0001|References: CHE-0002"
-        // parse_adr_id_from_str("CHE-0001|References: CHE-0002") → None (trailing text)
-        // Actually parse_adr_id_from_str parses "CHE-0001|References: CHE-0002" → let's verify
-        // If it fails, rels is empty; if ID parser is lenient it might grab CHE-0001
-        // Either way this documents the boundary
+        // "Root: CHE-0001|References: CHE-0002" is treated as one segment;
+        // verb_str = "Root", targets_str = "CHE-0001|References: CHE-0002".
+        // The strict parse_adr_id rejects trailing text, so rels is empty —
+        // which is the correct outcome: malformed Related lines should not
+        // partially parse.
         assert!(
-            rels.len() <= 1,
-            "no-space pipe should not split into multiple segments"
+            rels.is_empty(),
+            "no-space pipe should not split into segments and strict ID parser \
+             rejects trailing text"
         );
     }
 

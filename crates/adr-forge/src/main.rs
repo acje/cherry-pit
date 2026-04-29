@@ -37,7 +37,7 @@ use std::process;
 use clap::Parser;
 
 use config::Config;
-use model::{DomainDir, parse_adr_id_from_str};
+use model::{DomainDir, parse_adr_id};
 
 /// ADR template and link-integrity validator for cherry-pit.
 #[derive(Parser)]
@@ -199,7 +199,7 @@ fn main() {
     // Mode dispatch
     if let Some(ref adr_id_str) = cli.critique {
         // --critique mode
-        let Some(focal_id) = parse_adr_id_from_str(adr_id_str) else {
+        let Some(focal_id) = parse_adr_id(adr_id_str) else {
             eprintln!(
                 "error: {} is not a valid ADR ID (expected PREFIX-NNNN)",
                 adr_id_str.escape_debug()
