@@ -3,7 +3,15 @@
 // Corpus: active ADRs only (docs/adr/stale excluded).
 // Layout: explicit `Root:` ADRs are anchored at the bottom; trees grow upward.
 // Layout: domain rows are capped at 5 ADRs wide and ordered Root, S, A, B, C, D.
+// Foundation domains (foundation = true in adr-fmt.toml) carry a violet, heavier cluster border.
 // Edges: `References:` relationships, geometry-routed from referenced ADR to referencing ADR.
+// Cross-domain parent edges (validated by `Parent-cross-domain:`) render bold violet with `↑ parent` label.
+// The bold-violet emphasis is applied only when all three hold:
+//   (a) the target equals the ADR's first `References:` entry,
+//   (b) the target resolves to an active ADR in the corpus,
+//   (c) the target lives in a different domain than the source.
+// Misuse (mismatch, dangling, same-domain) is silently ignored here;
+// `adr-fmt`'s L018/L019 lint rules surface those cases authoritatively.
 // Regenerate: python3 scripts/gen-adr-graph.py
 // Render:    dot -Tsvg docs/adr/adr-references.dot -o docs/adr/adr-references.svg
 
@@ -13,11 +21,56 @@ digraph adr_references {
   node  [shape=box, style="rounded,filled", fontname="Helvetica", fontsize=10];
   edge  [color="#64748b66", arrowsize=0.5, penwidth=0.7];
 
+  subgraph "cluster_GND" {
+    label="GND — Ground Domain · foundation";
+    style="rounded,filled";
+    fillcolor="#f5f3ff";
+    color="#7c3aed";
+    penwidth=2.5;
+    fontname="Helvetica";
+    fontsize=11;
+    "GND-0001" [label="GND-0001\nInformation Systems Operate Under Irreducible Uncertainty", color="#b91c1c", penwidth=2, fillcolor="white", group="GND_col_0", peripheries=2];
+    "GND-0002" [label="GND-0002\nDirectives Express Intent, Not Mechanism", color="#b91c1c", penwidth=2, fillcolor="white", group="GND_col_0"];
+    "GND-0003" [label="GND-0003\nDirectives Are Scoped Two Levels Up, No Further", color="#b91c1c", penwidth=2, fillcolor="white", group="GND_col_1"];
+    "GND-0004" [label="GND-0004\nDeviation From a Directive Is Permitted and Must Be Reported", color="#b91c1c", penwidth=2, fillcolor="white", group="GND_col_2"];
+    "GND-0005" [label="GND-0005\nEvery Directive Must Define Its Observability", color="#b91c1c", penwidth=2, fillcolor="white", group="GND_col_3"];
+    "GND-0006" [label="GND-0006\nBackbriefing Precedes Non-Trivial Action", color="#b91c1c", penwidth=2, fillcolor="white", group="GND_col_4"];
+    "GND-0007" [label="GND-0007\nDirectives Have Lifecycle; Supersession Is Mandatory Hygiene", color="#b91c1c", penwidth=2, fillcolor="white", group="GND_col_0"];
+    "GND-0008" [label="GND-0008\nFocus of Effort Is Named and Time-Boxed", color="#b91c1c", penwidth=2, fillcolor="white", group="GND_col_1"];
+    // Layout rows render bottom-to-top as Root, S, A, B, C, D; max 5 ADRs per row.
+    subgraph "rank_GND_00_root_0" {
+      rank=same;
+      "GND-0001";
+    }
+    subgraph "rank_GND_01_tier_S_0" {
+      rank=same;
+      "GND-0002";
+      "GND-0003";
+      "GND-0004";
+      "GND-0005";
+      "GND-0006";
+    }
+    "GND-0002" -> "GND-0003" [style=invis, weight=100, constraint=false];
+    "GND-0003" -> "GND-0004" [style=invis, weight=100, constraint=false];
+    "GND-0004" -> "GND-0005" [style=invis, weight=100, constraint=false];
+    "GND-0005" -> "GND-0006" [style=invis, weight=100, constraint=false];
+    subgraph "rank_GND_02_tier_S_1" {
+      rank=same;
+      "GND-0007";
+      "GND-0008";
+    }
+    "GND-0007" -> "GND-0008" [style=invis, weight=100, constraint=false];
+    "GND-0001" -> "GND-0002" [style=invis, weight=1000, minlen=2];
+    "GND-0002" -> "GND-0007" [style=invis, weight=1000, minlen=2];
+    "GND-0003" -> "GND-0008" [style=invis, weight=1000, minlen=2];
+  }
+
   subgraph "cluster_COM" {
-    label="COM — Common Domain";
+    label="COM — Common Domain · foundation";
     style="rounded,filled";
     fillcolor="#fef3c7";
-    color="#94a3b8";
+    color="#7c3aed";
+    penwidth=2.5;
     fontname="Helvetica";
     fontsize=11;
     "COM-0001" [label="COM-0001\nComplexity Budget — Strategic Investment", color="#b91c1c", penwidth=2, fillcolor="white", group="COM_col_0", peripheries=2];
@@ -54,6 +107,9 @@ digraph adr_references {
     "COM-0032" [label="COM-0032\nQuestion Every Requirement — First-Principles Justification", color="#c2410c", penwidth=2, fillcolor="white", group="COM_col_2"];
     "COM-0033" [label="COM-0033\nSingle-Threaded Ownership of Decisions and Components", color="#a16207", penwidth=2, fillcolor="white", group="COM_col_3"];
     "COM-0034" [label="COM-0034\nADR Lifecycle Feedback — Operational Signal Triggers Review", color="#a16207", penwidth=2, fillcolor="white", group="COM_col_4"];
+    "COM-0035" [label="COM-0035\nStabilization Ratchet from Signal to Standard", color="#c2410c", penwidth=2, fillcolor="white", group="COM_col_3"];
+    "COM-0036" [label="COM-0036\nBoring Defaults for Obvious-Domain Work", color="#a16207", penwidth=2, fillcolor="white", group="COM_col_0"];
+    "COM-0037" [label="COM-0037\nDeliberate Resilience Reserve", color="#a16207", penwidth=2, fillcolor="white", group="COM_col_1"];
     // Layout rows render bottom-to-top as Root, S, A, B, C, D; max 5 ADRs per row.
     subgraph "rank_COM_00_root_0" {
       rank=same;
@@ -76,9 +132,11 @@ digraph adr_references {
       "COM-0019";
       "COM-0030";
       "COM-0032";
+      "COM-0035";
     }
     "COM-0019" -> "COM-0030" [style=invis, weight=100, constraint=false];
     "COM-0030" -> "COM-0032" [style=invis, weight=100, constraint=false];
+    "COM-0032" -> "COM-0035" [style=invis, weight=100, constraint=false];
     subgraph "rank_COM_03_tier_B_0" {
       rank=same;
       "COM-0003";
@@ -139,13 +197,21 @@ digraph adr_references {
     "COM-0029" -> "COM-0031" [style=invis, weight=100, constraint=false];
     "COM-0031" -> "COM-0033" [style=invis, weight=100, constraint=false];
     "COM-0033" -> "COM-0034" [style=invis, weight=100, constraint=false];
+    subgraph "rank_COM_08_tier_B_5" {
+      rank=same;
+      "COM-0036";
+      "COM-0037";
+    }
+    "COM-0036" -> "COM-0037" [style=invis, weight=100, constraint=false];
     "COM-0001" -> "COM-0002" [style=invis, weight=1000, minlen=2];
     "COM-0002" -> "COM-0019" [style=invis, weight=1000, minlen=2];
     "COM-0012" -> "COM-0030" [style=invis, weight=1000, minlen=2];
     "COM-0018" -> "COM-0032" [style=invis, weight=1000, minlen=2];
+    "COM-0025" -> "COM-0035" [style=invis, weight=1000, minlen=2];
     "COM-0019" -> "COM-0003" [style=invis, weight=1000, minlen=2];
     "COM-0030" -> "COM-0004" [style=invis, weight=1000, minlen=2];
     "COM-0032" -> "COM-0005" [style=invis, weight=1000, minlen=2];
+    "COM-0035" -> "COM-0006" [style=invis, weight=1000, minlen=2];
     "COM-0003" -> "COM-0008" [style=invis, weight=1000, minlen=2];
     "COM-0004" -> "COM-0009" [style=invis, weight=1000, minlen=2];
     "COM-0005" -> "COM-0010" [style=invis, weight=1000, minlen=2];
@@ -166,6 +232,8 @@ digraph adr_references {
     "COM-0023" -> "COM-0031" [style=invis, weight=1000, minlen=2];
     "COM-0024" -> "COM-0033" [style=invis, weight=1000, minlen=2];
     "COM-0027" -> "COM-0034" [style=invis, weight=1000, minlen=2];
+    "COM-0028" -> "COM-0036" [style=invis, weight=1000, minlen=2];
+    "COM-0029" -> "COM-0037" [style=invis, weight=1000, minlen=2];
   }
 
   subgraph "cluster_CHE" {
@@ -173,6 +241,7 @@ digraph adr_references {
     style="rounded,filled";
     fillcolor="#fee2e2";
     color="#94a3b8";
+    penwidth=1.0;
     fontname="Helvetica";
     fontsize=11;
     "CHE-0001" [label="CHE-0001\nDesign Priority Ordering", color="#b91c1c", penwidth=2, fillcolor="white", group="CHE_col_0", peripheries=2];
@@ -384,6 +453,7 @@ digraph adr_references {
     style="rounded,filled";
     fillcolor="#dcfce7";
     color="#94a3b8";
+    penwidth=1.0;
     fontname="Helvetica";
     fontsize=11;
     "PAR-0001" [label="PAR-0001\nFiber State Machine as Inspectable Data Table", color="#a16207", penwidth=2, fillcolor="white", group="PAR_col_0", peripheries=2];
@@ -495,6 +565,7 @@ digraph adr_references {
     style="rounded,filled";
     fillcolor="#dbeafe";
     color="#94a3b8";
+    penwidth=1.0;
     fontname="Helvetica";
     fontsize=11;
     "GEN-0001" [label="GEN-0001\nSerde-Native Serialization with GenomeSafe Marker Trait", color="#b91c1c", penwidth=2, fillcolor="white", group="GEN_col_0", peripheries=2];
@@ -648,10 +719,11 @@ digraph adr_references {
   }
 
   subgraph "cluster_RST" {
-    label="RST — Rust Domain";
+    label="RST — Rust Domain · foundation";
     style="rounded,filled";
     fillcolor="#ede9fe";
-    color="#94a3b8";
+    color="#7c3aed";
+    penwidth=2.5;
     fontname="Helvetica";
     fontsize=11;
     "RST-0001" [label="RST-0001\nPinned Stable Toolchain with MSRV Contract", color="#a16207", penwidth=2, fillcolor="white", group="RST_col_0", peripheries=2];
@@ -678,10 +750,11 @@ digraph adr_references {
   }
 
   subgraph "cluster_SEC" {
-    label="SEC — Security Domain";
+    label="SEC — Security Domain · foundation";
     style="rounded,filled";
     fillcolor="#fce7f3";
-    color="#94a3b8";
+    color="#7c3aed";
+    penwidth=2.5;
     fontname="Helvetica";
     fontsize=11;
     "SEC-0001" [label="SEC-0001\nCISQ-Aligned Security Quality Framework", color="#b91c1c", penwidth=2, fillcolor="white", group="SEC_col_0", peripheries=2];
@@ -739,6 +812,7 @@ digraph adr_references {
     style="rounded,filled";
     fillcolor="#e0f2fe";
     color="#94a3b8";
+    penwidth=1.0;
     fontname="Helvetica";
     fontsize=11;
     "AFM-0001" [label="AFM-0001\nSingle Source of Truth Architecture for ADR Governance", color="#b91c1c", penwidth=2, fillcolor="white", group="AFM_col_0", peripheries=2];
@@ -755,6 +829,7 @@ digraph adr_references {
     "AFM-0016" [label="AFM-0016\nStrict Path Containment for Config-Supplied Directories", color="#a16207", penwidth=2, fillcolor="white", group="AFM_col_3"];
     "AFM-0017" [label="AFM-0017\nParser-Stage Diagnostic Namespace", color="#a16207", penwidth=2, fillcolor="white", group="AFM_col_4"];
     "AFM-0018" [label="AFM-0018\nSibling-as-Parent Heuristic for Tree Inversion Detection", color="#a16207", penwidth=2, fillcolor="white", group="AFM_col_0"];
+    "AFM-0019" [label="AFM-0019\nRule Enforcement Evidence Metadata", color="#a16207", penwidth=2, fillcolor="white", group="AFM_col_1"];
     // Layout rows render bottom-to-top as Root, S, A, B, C, D; max 5 ADRs per row.
     subgraph "rank_AFM_00_root_0" {
       rank=same;
@@ -789,7 +864,9 @@ digraph adr_references {
     subgraph "rank_AFM_04_tier_B_1" {
       rank=same;
       "AFM-0018";
+      "AFM-0019";
     }
+    "AFM-0018" -> "AFM-0019" [style=invis, weight=100, constraint=false];
     subgraph "rank_AFM_05_tier_D_0" {
       rank=same;
       "AFM-0006";
@@ -800,7 +877,9 @@ digraph adr_references {
     "AFM-0008" -> "AFM-0004" [style=invis, weight=1000, minlen=2];
     "AFM-0004" -> "AFM-0003" [style=invis, weight=1000, minlen=2];
     "AFM-0003" -> "AFM-0018" [style=invis, weight=1000, minlen=2];
+    "AFM-0014" -> "AFM-0019" [style=invis, weight=1000, minlen=2];
     "AFM-0018" -> "AFM-0006" [style=invis, weight=1000, minlen=2];
+    "AFM-0019" -> "AFM-0013" [style=invis, weight=1000, minlen=2];
   }
 
   // Explicit Root: ADRs sit on the bottom rank in the bottom-up layout.
@@ -810,6 +889,7 @@ digraph adr_references {
     "CHE-0004";
     "COM-0001";
     "GEN-0001";
+    "GND-0001";
     "PAR-0001";
     "PAR-0004";
     "RST-0001";
@@ -817,22 +897,32 @@ digraph adr_references {
   }
 
   "AFM-0001" -> "AFM-0003" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
+  "GND-0004" -> "AFM-0003" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556980", style="dotted", arrowhead="none", tailport="e", headport="w"];
   "AFM-0001" -> "AFM-0004" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
   "AFM-0004" -> "AFM-0006" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
   "AFM-0001" -> "AFM-0008" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
   "AFM-0001" -> "AFM-0009" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
   "AFM-0001" -> "AFM-0011" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
+  "GND-0008" -> "AFM-0011" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556980", style="dotted", arrowhead="none", tailport="e", headport="w"];
   "AFM-0011" -> "AFM-0012" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="e", headport="w"];
+  "GND-0005" -> "AFM-0012" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556980", style="dotted", arrowhead="none", tailport="e", headport="w"];
+  "GND-0008" -> "AFM-0012" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556980", style="dotted", arrowhead="none", tailport="e", headport="w"];
   "AFM-0001" -> "AFM-0013" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
   "AFM-0001" -> "AFM-0014" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
   "AFM-0003" -> "AFM-0014" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556999", style="dotted", arrowhead="none", tailport="e", headport="w"];
-  "AFM-0008" -> "AFM-0015" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
+  "GND-0003" -> "AFM-0015" [constraint=false, weight=0, penwidth=1.6, arrowsize=0.7, color="#7c3aedcc", style="bold", arrowhead="normal", xlabel="↑ parent", fontcolor="#7c3aed", fontsize=9, tailport="e", headport="w"];
+  "AFM-0008" -> "AFM-0015" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556999", style="dashed", arrowhead="none", tailport="e", headport="w"];
   "AFM-0003" -> "AFM-0016" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="e", headport="w"];
   "AFM-0003" -> "AFM-0017" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="e", headport="w"];
   "AFM-0006" -> "AFM-0017" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#b4530980", style="dotted", arrowhead="none", tailport="s", headport="n"];
+  "GND-0005" -> "AFM-0017" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556980", style="dotted", arrowhead="none", tailport="e", headport="w"];
   "AFM-0011" -> "AFM-0018" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
   "AFM-0012" -> "AFM-0018" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556999", style="dashed", arrowhead="none", tailport="w", headport="e"];
   "AFM-0013" -> "AFM-0018" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#b4530980", style="dotted", arrowhead="none", tailport="s", headport="n"];
+  "AFM-0012" -> "AFM-0019" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
+  "AFM-0014" -> "AFM-0019" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556999", style="dashed", arrowhead="none", tailport="e", headport="w"];
+  "COM-0017" -> "AFM-0019" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556980", style="dotted", arrowhead="none", tailport="e", headport="w"];
+  "GND-0005" -> "AFM-0019" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556980", style="dotted", arrowhead="none", tailport="e", headport="w"];
   "CHE-0001" -> "CHE-0002" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
   "CHE-0002" -> "CHE-0003" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="e", headport="w"];
   "CHE-0001" -> "CHE-0005" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
@@ -866,11 +956,14 @@ digraph adr_references {
   "CHE-0009" -> "CHE-0023" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
   "CHE-0004" -> "CHE-0024" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
   "COM-0025" -> "CHE-0024" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556980", style="dotted", arrowhead="none", tailport="e", headport="w"];
+  "GND-0001" -> "CHE-0024" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556980", style="dotted", arrowhead="none", tailport="e", headport="w"];
+  "GND-0005" -> "CHE-0024" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556980", style="dotted", arrowhead="none", tailport="e", headport="w"];
   "CHE-0018" -> "CHE-0025" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
   "CHE-0007" -> "CHE-0026" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
   "CHE-0015" -> "CHE-0027" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
   "CHE-0003" -> "CHE-0028" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
   "CHE-0005" -> "CHE-0028" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556999", style="dashed", arrowhead="none", tailport="e", headport="w"];
+  "GND-0005" -> "CHE-0028" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556980", style="dotted", arrowhead="none", tailport="e", headport="w"];
   "CHE-0001" -> "CHE-0029" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
   "CHE-0004" -> "CHE-0029" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556999", style="dashed", arrowhead="none", tailport="e", headport="w"];
   "COM-0014" -> "CHE-0029" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556980", style="dotted", arrowhead="none", tailport="e", headport="w"];
@@ -886,6 +979,7 @@ digraph adr_references {
   "CHE-0001" -> "CHE-0038" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556999", style="dashed", arrowhead="none", tailport="e", headport="w"];
   "CHE-0018" -> "CHE-0038" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556999", style="dashed", arrowhead="none", tailport="w", headport="e"];
   "CHE-0028" -> "CHE-0038" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556999", style="dashed", arrowhead="none", tailport="w", headport="e"];
+  "GND-0005" -> "CHE-0038" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556980", style="dotted", arrowhead="none", tailport="e", headport="w"];
   "CHE-0004" -> "CHE-0039" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
   "CHE-0039" -> "CHE-0040" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
   "CHE-0017" -> "CHE-0040" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556999", style="dashed", arrowhead="none", tailport="e", headport="w"];
@@ -897,10 +991,13 @@ digraph adr_references {
   "CHE-0017" -> "CHE-0041" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556999", style="dashed", arrowhead="none", tailport="e", headport="w"];
   "CHE-0033" -> "CHE-0041" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#b4530980", style="dotted", arrowhead="none", tailport="s", headport="n"];
   "CHE-0038" -> "CHE-0041" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556999", style="dotted", arrowhead="none", tailport="e", headport="w"];
+  "GND-0001" -> "CHE-0041" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556980", style="dotted", arrowhead="none", tailport="e", headport="w"];
+  "GND-0005" -> "CHE-0041" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556980", style="dotted", arrowhead="none", tailport="e", headport="w"];
   "CHE-0002" -> "CHE-0042" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
   "CHE-0039" -> "CHE-0042" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556999", style="dashed", arrowhead="none", tailport="w", headport="e"];
   "CHE-0016" -> "CHE-0042" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#b4530980", style="dotted", arrowhead="none", tailport="s", headport="n"];
   "COM-0025" -> "CHE-0042" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556980", style="dotted", arrowhead="none", tailport="e", headport="w"];
+  "GND-0005" -> "CHE-0042" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556980", style="dotted", arrowhead="none", tailport="e", headport="w"];
   "CHE-0006" -> "CHE-0043" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
   "CHE-0032" -> "CHE-0043" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556999", style="dashed", arrowhead="none", tailport="w", headport="e"];
   "CHE-0035" -> "CHE-0043" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556999", style="dashed", arrowhead="none", tailport="w", headport="e"];
@@ -915,37 +1012,52 @@ digraph adr_references {
   "CHE-0024" -> "CHE-0046" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#b4530980", style="dotted", arrowhead="none", tailport="s", headport="n"];
   "CHE-0041" -> "CHE-0046" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556999", style="dashed", arrowhead="none", tailport="w", headport="e"];
   "COM-0025" -> "CHE-0046" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556980", style="dotted", arrowhead="none", tailport="e", headport="w"];
+  "GND-0001" -> "CHE-0046" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556980", style="dotted", arrowhead="none", tailport="e", headport="w"];
+  "GND-0004" -> "CHE-0046" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556980", style="dotted", arrowhead="none", tailport="e", headport="w"];
   "CHE-0042" -> "CHE-0047" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
+  "GND-0001" -> "CHE-0047" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556980", style="dotted", arrowhead="none", tailport="e", headport="w"];
+  "GND-0004" -> "CHE-0047" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556980", style="dotted", arrowhead="none", tailport="e", headport="w"];
+  "GND-0007" -> "CHE-0047" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556980", style="dotted", arrowhead="none", tailport="e", headport="w"];
   "COM-0001" -> "COM-0002" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
   "COM-0002" -> "COM-0003" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
   "COM-0012" -> "COM-0004" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
   "COM-0002" -> "COM-0005" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
   "COM-0002" -> "COM-0006" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
   "COM-0002" -> "COM-0007" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
-  "COM-0001" -> "COM-0008" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
+  "GND-0006" -> "COM-0008" [constraint=false, weight=0, penwidth=1.6, arrowsize=0.7, color="#7c3aedcc", style="bold", arrowhead="normal", xlabel="↑ parent", fontcolor="#7c3aed", fontsize=9, tailport="e", headport="w"];
+  "COM-0001" -> "COM-0008" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556999", style="dashed", arrowhead="none", tailport="e", headport="w"];
   "COM-0001" -> "COM-0009" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
   "COM-0006" -> "COM-0010" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
   "COM-0001" -> "COM-0011" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
+  "GND-0001" -> "COM-0011" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556980", style="dotted", arrowhead="none", tailport="e", headport="w"];
   "COM-0001" -> "COM-0012" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
   "COM-0001" -> "COM-0013" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
+  "GND-0001" -> "COM-0013" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556980", style="dotted", arrowhead="none", tailport="e", headport="w"];
   "COM-0012" -> "COM-0014" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
   "COM-0006" -> "COM-0015" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
   "COM-0001" -> "COM-0016" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
   "RST-0004" -> "COM-0016" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556980", style="dotted", arrowhead="none", tailport="w", headport="e"];
   "COM-0009" -> "COM-0017" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
+  "GND-0005" -> "COM-0017" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556980", style="dotted", arrowhead="none", tailport="e", headport="w"];
   "COM-0001" -> "COM-0018" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
   "PAR-0004" -> "COM-0018" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556980", style="dotted", arrowhead="none", tailport="w", headport="e"];
   "CHE-0006" -> "COM-0018" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556980", style="dotted", arrowhead="none", tailport="w", headport="e"];
-  "COM-0001" -> "COM-0019" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
+  "GND-0005" -> "COM-0019" [constraint=false, weight=0, penwidth=1.6, arrowsize=0.7, color="#7c3aedcc", style="bold", arrowhead="normal", xlabel="↑ parent", fontcolor="#7c3aed", fontsize=9, tailport="e", headport="w"];
+  "COM-0001" -> "COM-0019" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556999", style="dashed", arrowhead="none", tailport="e", headport="w"];
   "COM-0017" -> "COM-0020" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="e", headport="w"];
   "COM-0013" -> "COM-0021" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
   "COM-0018" -> "COM-0022" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
+  "GND-0005" -> "COM-0022" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556980", style="dotted", arrowhead="none", tailport="e", headport="w"];
   "COM-0020" -> "COM-0023" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
   "COM-0012" -> "COM-0024" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
+  "GND-0005" -> "COM-0024" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556980", style="dotted", arrowhead="none", tailport="e", headport="w"];
   "COM-0018" -> "COM-0025" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="e", headport="w"];
   "COM-0017" -> "COM-0025" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#b4530980", style="dotted", arrowhead="none", tailport="s", headport="n"];
   "COM-0022" -> "COM-0025" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#b4530980", style="dotted", arrowhead="none", tailport="s", headport="n"];
-  "COM-0001" -> "COM-0026" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
+  "GND-0001" -> "COM-0025" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556980", style="dotted", arrowhead="none", tailport="e", headport="w"];
+  "GND-0005" -> "COM-0025" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556980", style="dotted", arrowhead="none", tailport="e", headport="w"];
+  "GND-0002" -> "COM-0026" [constraint=false, weight=0, penwidth=1.6, arrowsize=0.7, color="#7c3aedcc", style="bold", arrowhead="normal", xlabel="↑ parent", fontcolor="#7c3aed", fontsize=9, tailport="e", headport="w"];
+  "COM-0001" -> "COM-0026" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556999", style="dashed", arrowhead="none", tailport="e", headport="w"];
   "COM-0013" -> "COM-0026" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#b4530980", style="dotted", arrowhead="none", tailport="s", headport="n"];
   "COM-0009" -> "COM-0027" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
   "COM-0017" -> "COM-0027" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556999", style="dashed", arrowhead="none", tailport="e", headport="w"];
@@ -960,13 +1072,30 @@ digraph adr_references {
   "COM-0009" -> "COM-0030" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#b4530980", style="dotted", arrowhead="none", tailport="s", headport="n"];
   "COM-0010" -> "COM-0031" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
   "COM-0019" -> "COM-0031" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556999", style="dashed", arrowhead="none", tailport="e", headport="w"];
-  "COM-0001" -> "COM-0032" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
-  "COM-0013" -> "COM-0032" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#b4530980", style="dotted", arrowhead="none", tailport="s", headport="n"];
+  "GND-0005" -> "COM-0031" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556980", style="dotted", arrowhead="none", tailport="e", headport="w"];
+  "COM-0013" -> "COM-0032" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#b4530966", style="dotted", arrowhead="normal", tailport="s", headport="n"];
   "COM-0011" -> "COM-0032" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#b4530980", style="dotted", arrowhead="none", tailport="s", headport="n"];
+  "GND-0001" -> "COM-0032" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556980", style="dotted", arrowhead="none", tailport="e", headport="w"];
   "COM-0014" -> "COM-0033" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
   "COM-0018" -> "COM-0033" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556999", style="dashed", arrowhead="none", tailport="e", headport="w"];
-  "COM-0019" -> "COM-0034" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
+  "GND-0007" -> "COM-0033" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556980", style="dotted", arrowhead="none", tailport="e", headport="w"];
+  "GND-0007" -> "COM-0034" [constraint=false, weight=0, penwidth=1.6, arrowsize=0.7, color="#7c3aedcc", style="bold", arrowhead="normal", xlabel="↑ parent", fontcolor="#7c3aed", fontsize=9, tailport="e", headport="w"];
+  "COM-0019" -> "COM-0034" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556999", style="dashed", arrowhead="none", tailport="e", headport="w"];
   "COM-0013" -> "COM-0034" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556999", style="dashed", arrowhead="none", tailport="e", headport="w"];
+  "COM-0019" -> "COM-0035" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="e", headport="w"];
+  "COM-0017" -> "COM-0035" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#b4530980", style="dotted", arrowhead="none", tailport="s", headport="n"];
+  "COM-0034" -> "COM-0035" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#b4530980", style="dotted", arrowhead="none", tailport="s", headport="n"];
+  "GND-0005" -> "COM-0035" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556980", style="dotted", arrowhead="none", tailport="e", headport="w"];
+  "GND-0007" -> "COM-0035" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556980", style="dotted", arrowhead="none", tailport="e", headport="w"];
+  "COM-0009" -> "COM-0036" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
+  "COM-0027" -> "COM-0036" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556999", style="dashed", arrowhead="none", tailport="w", headport="e"];
+  "COM-0026" -> "COM-0036" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556999", style="dashed", arrowhead="none", tailport="w", headport="e"];
+  "GND-0002" -> "COM-0036" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556980", style="dotted", arrowhead="none", tailport="e", headport="w"];
+  "COM-0019" -> "COM-0037" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
+  "COM-0013" -> "COM-0037" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556999", style="dashed", arrowhead="none", tailport="w", headport="e"];
+  "COM-0025" -> "COM-0037" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556999", style="dashed", arrowhead="none", tailport="w", headport="e"];
+  "GND-0001" -> "COM-0037" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556980", style="dotted", arrowhead="none", tailport="e", headport="w"];
+  "GND-0004" -> "COM-0037" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556980", style="dotted", arrowhead="none", tailport="e", headport="w"];
   "GEN-0001" -> "GEN-0002" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
   "CHE-0022" -> "GEN-0002" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556980", style="dotted", arrowhead="none", tailport="e", headport="w"];
   "PAR-0002" -> "GEN-0002" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556980", style="dotted", arrowhead="none", tailport="e", headport="w"];
@@ -980,9 +1109,14 @@ digraph adr_references {
   "GEN-0003" -> "GEN-0009" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="e", headport="w"];
   "GEN-0008" -> "GEN-0010" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
   "GEN-0006" -> "GEN-0011" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
+  "GND-0005" -> "GEN-0011" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556980", style="dotted", arrowhead="none", tailport="e", headport="w"];
   "GEN-0007" -> "GEN-0012" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
   "GEN-0001" -> "GEN-0013" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
+  "GND-0001" -> "GEN-0013" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556980", style="dotted", arrowhead="none", tailport="e", headport="w"];
+  "GND-0005" -> "GEN-0013" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556980", style="dotted", arrowhead="none", tailport="e", headport="w"];
   "GEN-0013" -> "GEN-0014" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="e", headport="w"];
+  "GND-0001" -> "GEN-0014" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556980", style="dotted", arrowhead="none", tailport="e", headport="w"];
+  "GND-0005" -> "GEN-0014" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556980", style="dotted", arrowhead="none", tailport="e", headport="w"];
   "GEN-0001" -> "GEN-0015" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
   "GEN-0003" -> "GEN-0016" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
   "GEN-0007" -> "GEN-0017" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
@@ -1001,56 +1135,86 @@ digraph adr_references {
   "GEN-0001" -> "GEN-0030" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
   "GEN-0003" -> "GEN-0031" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
   "GEN-0001" -> "GEN-0032" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
+  "GND-0005" -> "GEN-0032" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556980", style="dotted", arrowhead="none", tailport="e", headport="w"];
   "GEN-0032" -> "GEN-0033" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
   "GEN-0032" -> "GEN-0034" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
   "GEN-0006" -> "GEN-0034" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556999", style="dashed", arrowhead="none", tailport="e", headport="w"];
   "GEN-0011" -> "GEN-0034" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556999", style="dashed", arrowhead="none", tailport="e", headport="w"];
   "GEN-0013" -> "GEN-0034" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556999", style="dashed", arrowhead="none", tailport="e", headport="w"];
+  "GND-0001" -> "GEN-0034" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556980", style="dotted", arrowhead="none", tailport="e", headport="w"];
+  "GND-0005" -> "GEN-0034" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556980", style="dotted", arrowhead="none", tailport="e", headport="w"];
+  "GND-0001" -> "GND-0002" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
+  "GND-0002" -> "GND-0003" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="e", headport="w"];
+  "GND-0002" -> "GND-0004" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="e", headport="w"];
+  "GND-0001" -> "GND-0005" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
+  "GND-0002" -> "GND-0006" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="e", headport="w"];
+  "GND-0001" -> "GND-0006" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556999", style="dashed", arrowhead="none", tailport="e", headport="w"];
+  "GND-0001" -> "GND-0007" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
+  "GND-0003" -> "GND-0008" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
+  "GND-0001" -> "GND-0008" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556999", style="dashed", arrowhead="none", tailport="e", headport="w"];
   "PAR-0001" -> "PAR-0002" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
   "PAR-0008" -> "PAR-0003" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
   "PAR-0004" -> "PAR-0005" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
   "PAR-0003" -> "PAR-0006" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="e", headport="w"];
   "PAR-0004" -> "PAR-0007" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
   "PAR-0004" -> "PAR-0008" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
+  "GND-0001" -> "PAR-0008" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556980", style="dotted", arrowhead="none", tailport="e", headport="w"];
   "PAR-0001" -> "PAR-0009" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
   "PAR-0001" -> "PAR-0010" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
   "PAR-0001" -> "PAR-0011" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
   "PAR-0008" -> "PAR-0012" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
+  "GND-0005" -> "PAR-0012" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556980", style="dotted", arrowhead="none", tailport="e", headport="w"];
   "PAR-0004" -> "PAR-0013" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
   "PAR-0008" -> "PAR-0014" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
+  "GND-0001" -> "PAR-0014" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556980", style="dotted", arrowhead="none", tailport="e", headport="w"];
+  "GND-0004" -> "PAR-0014" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556980", style="dotted", arrowhead="none", tailport="e", headport="w"];
   "PAR-0008" -> "PAR-0015" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
   "PAR-0007" -> "PAR-0015" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556999", style="dashed", arrowhead="none", tailport="w", headport="e"];
   "PAR-0013" -> "PAR-0015" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556999", style="dotted", arrowhead="none", tailport="e", headport="w"];
   "COM-0025" -> "PAR-0015" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556980", style="dotted", arrowhead="none", tailport="e", headport="w"];
+  "GND-0001" -> "PAR-0015" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556980", style="dotted", arrowhead="none", tailport="e", headport="w"];
+  "GND-0005" -> "PAR-0015" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556980", style="dotted", arrowhead="none", tailport="e", headport="w"];
   "PAR-0004" -> "PAR-0016" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
   "COM-0025" -> "PAR-0016" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556980", style="dotted", arrowhead="none", tailport="e", headport="w"];
   "PAR-0008" -> "PAR-0017" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="e", headport="w"];
+  "GND-0005" -> "PAR-0017" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556980", style="dotted", arrowhead="none", tailport="e", headport="w"];
   "PAR-0008" -> "PAR-0018" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
   "PAR-0007" -> "PAR-0018" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#b4530980", style="dotted", arrowhead="none", tailport="s", headport="n"];
   "PAR-0017" -> "PAR-0018" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556999", style="dashed", arrowhead="none", tailport="w", headport="e"];
+  "GND-0001" -> "PAR-0018" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556980", style="dotted", arrowhead="none", tailport="e", headport="w"];
   "PAR-0004" -> "PAR-0019" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
   "PAR-0004" -> "PAR-0020" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
   "PAR-0003" -> "PAR-0021" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
   "PAR-0007" -> "PAR-0021" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556999", style="dashed", arrowhead="none", tailport="w", headport="e"];
   "PAR-0012" -> "PAR-0021" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556999", style="dashed", arrowhead="none", tailport="e", headport="w"];
+  "GND-0005" -> "PAR-0021" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556980", style="dotted", arrowhead="none", tailport="e", headport="w"];
   "PAR-0017" -> "PAR-0022" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
   "PAR-0001" -> "PAR-0022" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556999", style="dashed", arrowhead="none", tailport="e", headport="w"];
+  "GND-0005" -> "PAR-0022" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556980", style="dotted", arrowhead="none", tailport="e", headport="w"];
   "PAR-0004" -> "PAR-0023" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
+  "GND-0005" -> "PAR-0023" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556980", style="dotted", arrowhead="none", tailport="e", headport="w"];
   "RST-0001" -> "RST-0002" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
   "COM-0013" -> "RST-0002" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556980", style="dotted", arrowhead="none", tailport="e", headport="w"];
   "RST-0001" -> "RST-0003" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
   "COM-0017" -> "RST-0003" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556980", style="dotted", arrowhead="none", tailport="e", headport="w"];
+  "GND-0005" -> "RST-0003" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556980", style="dotted", arrowhead="none", tailport="e", headport="w"];
   "RST-0001" -> "RST-0004" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
   "COM-0016" -> "RST-0004" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556980", style="dotted", arrowhead="none", tailport="e", headport="w"];
   "RST-0001" -> "RST-0005" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
   "SEC-0004" -> "RST-0005" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556980", style="dotted", arrowhead="none", tailport="w", headport="e"];
+  "GND-0002" -> "RST-0005" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556980", style="dotted", arrowhead="none", tailport="e", headport="w"];
   "SEC-0001" -> "SEC-0002" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
+  "GND-0005" -> "SEC-0002" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556980", style="dotted", arrowhead="none", tailport="e", headport="w"];
   "SEC-0001" -> "SEC-0003" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
+  "GND-0001" -> "SEC-0003" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556980", style="dotted", arrowhead="none", tailport="e", headport="w"];
+  "GND-0005" -> "SEC-0003" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556980", style="dotted", arrowhead="none", tailport="e", headport="w"];
   "SEC-0001" -> "SEC-0004" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
   "SEC-0001" -> "SEC-0005" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
+  "GND-0005" -> "SEC-0005" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556980", style="dotted", arrowhead="none", tailport="e", headport="w"];
   "SEC-0001" -> "SEC-0006" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
   "SEC-0001" -> "SEC-0007" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
   "SEC-0001" -> "SEC-0008" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
+  "GND-0007" -> "SEC-0008" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556980", style="dotted", arrowhead="none", tailport="e", headport="w"];
   "SEC-0001" -> "SEC-0009" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
   "RST-0004" -> "SEC-0009" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556980", style="dotted", arrowhead="none", tailport="e", headport="w"];
   "SEC-0007" -> "SEC-0010" [constraint=false, weight=0, penwidth=1.1, arrowsize=0.55, color="#334155b3", style="solid", arrowhead="normal", tailport="n", headport="s"];
@@ -1058,6 +1222,7 @@ digraph adr_references {
   "SEC-0005" -> "SEC-0011" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556999", style="dashed", arrowhead="none", tailport="e", headport="w"];
   "SEC-0008" -> "SEC-0011" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556999", style="dotted", arrowhead="none", tailport="e", headport="w"];
   "COM-0025" -> "SEC-0011" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556980", style="dotted", arrowhead="none", tailport="e", headport="w"];
+  "GND-0005" -> "SEC-0011" [constraint=false, weight=0, penwidth=0.75, arrowsize=0.2, color="#47556980", style="dotted", arrowhead="none", tailport="e", headport="w"];
 
   // Legend
   subgraph "cluster_legend" {
@@ -1074,5 +1239,11 @@ digraph adr_references {
     "legend_A" -> "legend_B" [style=invis];
     "legend_B" -> "legend_C" [style=invis];
     "legend_C" -> "legend_D" [style=invis];
+    "legend_foundation" [label="foundation domain\n(heavier border)", color="#7c3aed", penwidth=2.5, fillcolor="white", shape=box, style="rounded,filled"];
+    "legend_xdomain_a" [label="child", color="#475569", penwidth=1, fillcolor="white"];
+    "legend_xdomain_b" [label="cross-domain\nparent", color="#475569", penwidth=1, fillcolor="white"];
+    "legend_xdomain_b" -> "legend_xdomain_a" [style=bold, color="#7c3aedcc", penwidth=1.6, arrowsize=0.7, xlabel="↑ parent", fontcolor="#7c3aed", fontsize=9];
+    "legend_D" -> "legend_foundation" [style=invis];
+    "legend_foundation" -> "legend_xdomain_b" [style=invis];
   }
 }

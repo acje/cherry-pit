@@ -47,7 +47,12 @@ DOMAIN_COLORS = {
     "RST": "#ede9fe",
     "SEC": "#fce7f3",
     "AFM": "#e0f2fe",
+    "GND": "#f5f3ff",  # GND is the universal foundation; soft lavender
 }
+# Foundation domains carry a heavier cluster border to mark their
+# load-bearing role. Read from `foundation = true` in adr-fmt.toml.
+FOUNDATION_BORDER_COLOR = "#7c3aed"
+FOUNDATION_BORDER_WIDTH = 2.5
 
 
 def load_domains() -> list[dict]:
@@ -112,7 +117,10 @@ def load_domains() -> list[dict]:
         if value.startswith('"') and value.endswith('"') and len(value) >= 2:
             current[key] = value[1:-1]
             continue
-        # Other value shapes (lists, bools) are not needed downstream.
+        if value in ("true", "false"):
+            current[key] = value == "true"
+            continue
+        # Other value shapes (lists, numbers) are not needed downstream.
     if current is not None:
         domains.append(current)
     # Filter to entries that look like proper domain definitions.
@@ -132,12 +140,25 @@ def parse_adr(path: Path) -> dict | None:
     adr_id, title = m.group(1), m.group(2)
 
     tier = ""
+    parent_cross_domain = ""
     in_related = False
     related_lines: list[str] = []
     for line in lines[1:]:
         if not in_related and line.startswith("Tier:") and not tier:
             parts = line.split(":", 1)[1].split()
             tier = parts[0] if parts else ""
+        if not in_related and line.startswith("Parent-cross-domain:") and not parent_cross_domain:
+            payload = line.split(":", 1)[1].strip()
+            # Field shape: `PREFIX-NNNN — reason` or `PREFIX-NNNN - reason`
+            # or just `PREFIX-NNNN`. Split on em-dash or " - ", take ID.
+            id_part = payload
+            for sep in ("—", " - "):
+                if sep in id_part:
+                    id_part = id_part.split(sep, 1)[0]
+                    break
+            id_part = id_part.strip()
+            if ADR_ID_RE.match(id_part):
+                parent_cross_domain = id_part
         if RELATED_HEADER_RE.match(line):
             in_related = True
             continue
@@ -185,7 +206,15 @@ def parse_adr(path: Path) -> dict | None:
                 seen.add(tok)
                 refs.append(tok)
 
-    return {"id": adr_id, "title": title, "tier": tier, "refs": refs, "is_root": is_root, "path": path}
+    return {
+        "id": adr_id,
+        "title": title,
+        "tier": tier,
+        "refs": refs,
+        "is_root": is_root,
+        "parent_cross_domain": parent_cross_domain,
+        "path": path,
+    }
 
 
 def collect(domains: list[dict]) -> tuple[dict[str, dict], dict[str, list[str]]]:
@@ -274,15 +303,35 @@ def reference_edge_attrs(
     """Return geometry-aware rendering attributes for one References edge."""
     refs = adrs[adr_id]["refs"]
     primary = bool(refs) and refs[0] == ref
+    # Validated cross-domain parent: the first References target also
+    # matches the `Parent-cross-domain:` preamble field. These edges
+    # are the load-bearing cross-domain anchors (e.g. COM-0019 → GND-0005)
+    # and are rendered with extra emphasis so the parent-edge tree
+    # crossing domain boundaries reads at a glance.
+    cross_domain_parent = (
+        primary
+        and adrs[adr_id].get("parent_cross_domain") == ref
+        and ref in adrs
+        and adrs[ref]["domain"] != adrs[adr_id]["domain"]
+    )
     attrs: dict[str, str | int | float | bool] = {
         "constraint": False,
         "weight": 0,
-        "penwidth": 1.1 if primary else 0.75,
-        "arrowsize": 0.55 if primary else 0.2,
-        "color": "#334155b3" if primary else "#47556999",
-        "style": "solid" if primary else "dashed",
-        "arrowhead": "normal" if primary else "none",
+        "penwidth": 1.6 if cross_domain_parent else (1.1 if primary else 0.75),
+        "arrowsize": 0.7 if cross_domain_parent else (0.55 if primary else 0.2),
+        "color": "#7c3aedcc" if cross_domain_parent else ("#334155b3" if primary else "#47556999"),
+        "style": "bold" if cross_domain_parent else ("solid" if primary else "dashed"),
+        "arrowhead": "normal" if (primary or cross_domain_parent) else "none",
     }
+    if cross_domain_parent:
+        # `xlabel` is used instead of `label` because the global graph
+        # uses `splines=ortho`, which graphviz cannot combine with
+        # inline edge labels (warning emitted, label silently dropped).
+        # External labels render adjacent to the edge without breaking
+        # orthogonal routing.
+        attrs["xlabel"] = "↑ parent"
+        attrs["fontcolor"] = "#7c3aed"
+        attrs["fontsize"] = 9
 
     if ref not in adrs or ref not in layout_by_id or adr_id not in layout_by_id:
         attrs.update({"tailport": "n", "headport": "s", "style": "dotted"})
@@ -299,10 +348,17 @@ def reference_edge_attrs(
             {
                 "tailport": "e" if left_to_right else "w",
                 "headport": "w" if left_to_right else "e",
-                "style": "dashed" if primary else "dotted",
-                "color": "#33415566" if primary else "#47556980",
             }
         )
+        # Preserve the bold violet emphasis for validated cross-domain
+        # parent edges; only restyle non-parent cross-domain references.
+        if not cross_domain_parent:
+            attrs.update(
+                {
+                    "style": "dashed" if primary else "dotted",
+                    "color": "#33415566" if primary else "#47556980",
+                }
+            )
         return attrs
 
     if target_row > source_row:
@@ -347,7 +403,15 @@ def render(adrs: dict[str, dict], by_domain: dict[str, list[str]], domains: list
     lines.append("// Corpus: active ADRs only (docs/adr/stale excluded).")
     lines.append("// Layout: explicit `Root:` ADRs are anchored at the bottom; trees grow upward.")
     lines.append("// Layout: domain rows are capped at 5 ADRs wide and ordered Root, S, A, B, C, D.")
+    lines.append("// Foundation domains (foundation = true in adr-fmt.toml) carry a violet, heavier cluster border.")
     lines.append("// Edges: `References:` relationships, geometry-routed from referenced ADR to referencing ADR.")
+    lines.append("// Cross-domain parent edges (validated by `Parent-cross-domain:`) render bold violet with `↑ parent` label.")
+    lines.append("// The bold-violet emphasis is applied only when all three hold:")
+    lines.append("//   (a) the target equals the ADR's first `References:` entry,")
+    lines.append("//   (b) the target resolves to an active ADR in the corpus,")
+    lines.append("//   (c) the target lives in a different domain than the source.")
+    lines.append("// Misuse (mismatch, dangling, same-domain) is silently ignored here;")
+    lines.append("// `adr-fmt`'s L018/L019 lint rules surface those cases authoritatively.")
     lines.append("// Regenerate: python3 scripts/gen-adr-graph.py")
     lines.append("// Render:    dot -Tsvg docs/adr/adr-references.dot -o docs/adr/adr-references.svg")
     lines.append("")
@@ -382,11 +446,16 @@ def render(adrs: dict[str, dict], by_domain: dict[str, list[str]], domains: list
         }
         cluster_name = f"cluster_{prefix}"
         fill = DOMAIN_COLORS.get(prefix, "#f1f5f9")
+        is_foundation = bool(d.get("foundation"))
+        border_color = FOUNDATION_BORDER_COLOR if is_foundation else "#94a3b8"
+        border_width = FOUNDATION_BORDER_WIDTH if is_foundation else 1.0
+        label_suffix = " · foundation" if is_foundation else ""
         lines.append(f"  subgraph \"{cluster_name}\" {{")
-        lines.append(f"    label=\"{prefix} — {dot_escape(d['name'])}\";")
+        lines.append(f"    label=\"{prefix} — {dot_escape(d['name'])}{label_suffix}\";")
         lines.append("    style=\"rounded,filled\";")
         lines.append(f"    fillcolor=\"{fill}\";")
-        lines.append("    color=\"#94a3b8\";")
+        lines.append(f"    color=\"{border_color}\";")
+        lines.append(f"    penwidth={border_width};")
         lines.append("    fontname=\"Helvetica\";")
         lines.append("    fontsize=11;")
         if not ids:
@@ -475,6 +544,28 @@ def render(adrs: dict[str, dict], by_domain: dict[str, list[str]], domains: list
     pairs = list(TIER_COLORS.keys())
     for a, b in zip(pairs, pairs[1:]):
         lines.append(f"    \"legend_{a}\" -> \"legend_{b}\" [style=invis];")
+    # Foundation + cross-domain edge marker so readers can decode the
+    # violet emphasis without reading the .dot header.
+    lines.append(
+        f"    \"legend_foundation\" [label=\"foundation domain\\n(heavier border)\", "
+        f"color=\"{FOUNDATION_BORDER_COLOR}\", penwidth={FOUNDATION_BORDER_WIDTH}, "
+        f"fillcolor=\"white\", shape=box, style=\"rounded,filled\"];"
+    )
+    lines.append(
+        f"    \"legend_xdomain_a\" [label=\"child\", color=\"#475569\", "
+        f"penwidth=1, fillcolor=\"white\"];"
+    )
+    lines.append(
+        f"    \"legend_xdomain_b\" [label=\"cross-domain\\nparent\", color=\"#475569\", "
+        f"penwidth=1, fillcolor=\"white\"];"
+    )
+    lines.append(
+        f"    \"legend_xdomain_b\" -> \"legend_xdomain_a\" "
+        f"[style=bold, color=\"#7c3aedcc\", penwidth=1.6, arrowsize=0.7, "
+        f"xlabel=\"↑ parent\", fontcolor=\"#7c3aed\", fontsize=9];"
+    )
+    lines.append(f"    \"legend_{pairs[-1]}\" -> \"legend_foundation\" [style=invis];")
+    lines.append(f"    \"legend_foundation\" -> \"legend_xdomain_b\" [style=invis];")
     lines.append("  }")
 
     lines.append("}")
