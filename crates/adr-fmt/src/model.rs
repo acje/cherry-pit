@@ -110,6 +110,17 @@ pub struct AdrRecord {
     /// Tagged rules extracted from the Decision section
     /// (`RN [L]: text` pattern). Empty when no tagged rules found.
     pub decision_rules: Vec<TaggedRule>,
+    /// Cross-domain parent exception declared in the preamble via
+    /// `Parent-cross-domain: PREFIX-NNNN — reason`. When present and
+    /// matching the first `References:` target, suppresses L011
+    /// (cross-domain parent edge) for that relationship.
+    ///
+    /// The string carries the parsed target ID. The reason text is
+    /// preserved in `parent_cross_domain_reason` for output.
+    pub parent_cross_domain: Option<AdrId>,
+    /// Free-text reason accompanying `parent_cross_domain`. Empty
+    /// when the field has only the target ID with no reason.
+    pub parent_cross_domain_reason: String,
 }
 
 impl AdrRecord {
@@ -153,6 +164,8 @@ impl Default for AdrRecord {
             section_word_counts: HashMap::new(),
             crates: Vec::new(),
             decision_rules: Vec::new(),
+            parent_cross_domain: None,
+            parent_cross_domain_reason: String::new(),
         }
     }
 }

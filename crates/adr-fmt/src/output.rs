@@ -9,7 +9,7 @@ use std::fmt::Write as _;
 
 use crate::config::Config;
 use crate::model::{AdrId, AdrRecord, DomainDir, RelVerb, Tier};
-use crate::nav::ChildEntry;
+use crate::nav::{compute_parent_children, compute_parent_edges, ChildEntry};
 use crate::report::Diagnostic;
 
 // ── Output block types ─────────────────────────────────────────────
@@ -24,6 +24,13 @@ pub struct HeaderMeta {
     pub crates: Vec<String>,
     pub fan_out: Vec<String>,
     pub fan_in: Vec<String>,
+    /// `Some((parent_id, reason))` when the ADR declares a
+    /// `Parent-cross-domain:` preamble field. Rendered in the focal
+    /// header so reviewers can see the documented justification for
+    /// crossing domain boundaries without reading the source. The
+    /// reason may be empty when the preamble field listed only the
+    /// ID. `None` when no such field is declared.
+    pub cross_domain_parent: Option<(AdrId, String)>,
 }
 
 /// An output block in the Alternative 4 format.
@@ -115,8 +122,25 @@ fn render_focal_header(out: &mut String, meta: &HeaderMeta) {
     if !meta.fan_in.is_empty() {
         writeln!(out, "## Fan-in: {}", meta.fan_in.join(", ")).unwrap();
     }
+    if let Some((parent_id, reason)) = &meta.cross_domain_parent {
+        if reason.is_empty() {
+            writeln!(out, "## Cross-domain parent: {parent_id} (no reason given)").unwrap();
+        } else {
+            writeln!(out, "## Cross-domain parent: {parent_id} — {reason}").unwrap();
+        }
+    }
 }
 
+/// Render the header for a connected (transitively-reachable) ADR.
+///
+/// Note: `meta.cross_domain_parent` is intentionally NOT rendered
+/// here, even when set. The `--critique` view exists to inform the
+/// reader about the focal ADR's design context; a connected ADR's
+/// own cross-domain authoring justification is its concern, not
+/// the focal's. Surfacing it on every connected block would dilute
+/// the focal's signal and add noise the reader did not ask for.
+/// Future contributors: do not "fix" this asymmetry without
+/// reconsidering the critique view's purpose.
 fn render_connected_header(out: &mut String, meta: &HeaderMeta, path: &str) {
     let tier = meta.tier.map_or_else(|| "?".into(), |t| format!("{t}"));
     writeln!(
@@ -223,6 +247,20 @@ pub fn render_root_groups(crate_name: &str, groups: &[RootGroup]) -> String {
 // ── Tree rendering (--tree mode, domain overview) ──────────────────
 
 /// Render the domain tree with box-drawing to stdout.
+///
+/// For each domain (filtered by `domain_filter` if set), renders the
+/// parent-edge tree(s) rooted at each Root-marked ADR in that domain.
+/// Children are determined by `compute_parent_children` and restricted
+/// to same-domain ADRs (cross-domain children appear in their own
+/// domain's tree). Stale ADRs are excluded from rendering but counted.
+///
+/// Each ADR line shows: `<glyphs> ID Title [Tier] STATUS [also: X, Y]`
+/// where `also: …` lists forward citations other than the structural
+/// parent (Supersedes/Refines/etc.).
+///
+/// Per-domain orphan section lists ADRs in the domain that are not
+/// reachable from any root via parent-edge traversal (cycles or
+/// missing parent). These are rendered flat after the tree(s).
 #[must_use]
 pub fn render_tree(
     records: &[AdrRecord],
@@ -232,15 +270,11 @@ pub fn render_tree(
 ) -> String {
     let mut out = String::new();
 
-    // Group records by domain prefix
-    let mut by_prefix: HashMap<&str, Vec<&AdrRecord>> = HashMap::new();
-    for record in records {
-        if !record.is_stale {
-            by_prefix.entry(&record.id.prefix).or_default().push(record);
-        }
-    }
+    // Build parent-edge projection across full corpus
+    let parent_edges = compute_parent_edges(records);
+    let parent_children = compute_parent_children(records);
 
-    // Filter by domain if requested
+    // Filter domains
     let dirs: Vec<&DomainDir> = if let Some(filter) = domain_filter {
         domain_dirs.iter().filter(|d| d.prefix == filter).collect()
     } else {
@@ -253,6 +287,17 @@ pub fn render_tree(
         }
         return out;
     }
+
+    // Group non-stale records by domain
+    let mut by_prefix: HashMap<&str, Vec<&AdrRecord>> = HashMap::new();
+    for record in records {
+        if !record.is_stale {
+            by_prefix.entry(&record.id.prefix).or_default().push(record);
+        }
+    }
+
+    // Lookup table by ID for title/tier/status access during walk
+    let record_by_id: HashMap<&AdrId, &AdrRecord> = records.iter().map(|r| (&r.id, r)).collect();
 
     for dir in &dirs {
         let domain_name = &dir.name;
@@ -270,18 +315,73 @@ pub fn render_tree(
         )
         .unwrap();
 
-        if let Some(domain_records) = by_prefix.get(dir.prefix.as_str()) {
-            let mut sorted = domain_records.clone();
-            sorted.sort_by_key(|r| r.id.number);
+        let domain_records = by_prefix.get(dir.prefix.as_str()).cloned().unwrap_or_default();
 
-            for record in &sorted {
+        // Find roots in this domain (sorted by ADR number)
+        let mut roots: Vec<&AdrRecord> = domain_records
+            .iter()
+            .copied()
+            .filter(|r| r.is_root())
+            .collect();
+        roots.sort_by_key(|r| r.id.number);
+
+        // Track which domain ADRs are reached via tree traversal
+        let mut reached: std::collections::HashSet<AdrId> = std::collections::HashSet::new();
+
+        for root in &roots {
+            render_tree_node(
+                &mut out,
+                &root.id,
+                &parent_children,
+                &record_by_id,
+                &dir.prefix,
+                &mut reached,
+                &mut Vec::new(),
+                true,
+            );
+        }
+
+        // Orphan section: domain ADRs not reached from any root. We
+        // distinguish three subcategories so readers know whether the
+        // root cause is a missing References, a cycle, or a chain that
+        // terminates at a non-root mid-tier ADR.
+        let orphans: Vec<&&AdrRecord> = domain_records
+            .iter()
+            .filter(|r| !reached.contains(&r.id))
+            .collect();
+
+        if !orphans.is_empty() {
+            let mut sorted_orphans: Vec<&&AdrRecord> = orphans.into_iter().collect();
+            sorted_orphans.sort_by_key(|r| r.id.number);
+            writeln!(out, "  (orphans — not reachable from any root)").unwrap();
+            for record in &sorted_orphans {
                 let title = record.title.as_deref().unwrap_or("(untitled)");
                 let tier = record.tier.map_or_else(|| "?".into(), |t| format!("{t}"));
                 let status = record
                     .status
                     .as_ref()
                     .map_or_else(|| "?".into(), super::model::Status::short_display);
-                writeln!(out, "  {} {title} [{tier}] {status}", record.id).unwrap();
+                let also = format_also_references(record, &parent_edges);
+
+                // Categorize:
+                //   - no parent edge → missing first References
+                //   - chain ends in cycle (Err from walk) → cycle member
+                //   - chain ends at non-root → broken chain
+                let reason = if !parent_edges.contains_key(&record.id) {
+                    " (no References — parent missing)"
+                } else {
+                    match crate::nav::walk_parent_chain(&record.id, &parent_edges) {
+                        Ok(_) => " (chain ends at non-root)",
+                        Err(_) => " (cycle)",
+                    }
+                };
+
+                writeln!(
+                    out,
+                    "  {} {title} [{tier}] {status}{reason}{also}",
+                    record.id
+                )
+                .unwrap();
             }
         }
 
@@ -298,6 +398,144 @@ pub fn render_tree(
     }
 
     out
+}
+
+/// Recursively render a tree node and its same-domain children.
+///
+/// `prefix_stack` carries the per-level indent state: for each ancestor
+/// level, `true` means "more siblings remain at this level" (use `│  `),
+/// `false` means "last sibling" (use `   `). The current node's own
+/// connector is `├─ ` if not last, `└─ ` if last.
+#[allow(clippy::too_many_arguments)]
+fn render_tree_node(
+    out: &mut String,
+    id: &AdrId,
+    parent_children: &HashMap<AdrId, Vec<AdrId>>,
+    record_by_id: &HashMap<&AdrId, &AdrRecord>,
+    domain_prefix: &str,
+    reached: &mut std::collections::HashSet<AdrId>,
+    prefix_stack: &mut Vec<bool>,
+    is_last: bool,
+) {
+    // Cycle guard: do not re-emit
+    if !reached.insert(id.clone()) {
+        return;
+    }
+
+    let record = match record_by_id.get(id) {
+        Some(r) => *r,
+        None => return,
+    };
+
+    // Build indent string from prefix_stack
+    let mut indent = String::from("  ");
+    for &more in prefix_stack.iter() {
+        indent.push_str(if more { "│  " } else { "   " });
+    }
+    let connector = if prefix_stack.is_empty() {
+        ""
+    } else if is_last {
+        "└─ "
+    } else {
+        "├─ "
+    };
+
+    let title = record.title.as_deref().unwrap_or("(untitled)");
+    let tier = record.tier.map_or_else(|| "?".into(), |t| format!("{t}"));
+    let status = record
+        .status
+        .as_ref()
+        .map_or_else(|| "?".into(), super::model::Status::short_display);
+
+    let also = format_also_references_full(record);
+
+    writeln!(
+        out,
+        "{indent}{connector}{} {title} [{tier}] {status}{also}",
+        record.id
+    )
+    .unwrap();
+
+    // Walk same-domain children only (cross-domain children render in
+    // their own domain's tree section)
+    let children: Vec<AdrId> = parent_children
+        .get(id)
+        .cloned()
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|c| c.prefix == domain_prefix)
+        .collect();
+
+    let n = children.len();
+    for (i, child) in children.iter().enumerate() {
+        let last = i + 1 == n;
+        prefix_stack.push(!is_last);
+        render_tree_node(
+            out,
+            child,
+            parent_children,
+            record_by_id,
+            domain_prefix,
+            reached,
+            prefix_stack,
+            last,
+        );
+        prefix_stack.pop();
+    }
+}
+
+/// Format the "also references" annotation using the parent-edge map
+/// (used for orphan section where parent may be missing).
+fn format_also_references(
+    record: &AdrRecord,
+    parent_edges: &HashMap<AdrId, AdrId>,
+) -> String {
+    let parent = parent_edges.get(&record.id);
+    let mut others: Vec<String> = Vec::new();
+    for rel in &record.relationships {
+        if rel.verb.is_reverse() {
+            continue;
+        }
+        if rel.verb == RelVerb::Root && rel.target == record.id {
+            continue;
+        }
+        if Some(&rel.target) == parent {
+            continue;
+        }
+        others.push(format!("{} {}", rel.verb, rel.target));
+    }
+    if others.is_empty() {
+        String::new()
+    } else {
+        format!(" [also: {}]", others.join(", "))
+    }
+}
+
+/// Format "also references" for in-tree node. The structural parent
+/// is the first `References:` target (per `compute_parent_edges`);
+/// everything else (Supersedes, Refines, additional References) is
+/// listed as "also". Root self-reference is always excluded.
+fn format_also_references_full(record: &AdrRecord) -> String {
+    let mut parent_seen = false;
+    let mut others: Vec<String> = Vec::new();
+    for rel in &record.relationships {
+        if rel.verb.is_reverse() {
+            continue;
+        }
+        if rel.verb == RelVerb::Root && rel.target == record.id {
+            continue;
+        }
+        if !parent_seen && rel.verb == RelVerb::References {
+            parent_seen = true;
+            continue;
+        }
+        others.push(format!("{} {}", rel.verb, rel.target));
+    }
+    if others.is_empty() {
+        String::new()
+    } else {
+        format!(" [also: {}]", others.join(", "))
+    }
 }
 
 // ── Helpers ────────────────────────────────────────────────────────
@@ -347,6 +585,24 @@ pub fn build_header_meta(
         crates: record.crates.clone(),
         fan_out,
         fan_in,
+        // Cross-domain parent declaration: surface the
+        // `Parent-cross-domain:` preamble field ONLY when its ID
+        // matches the actual first References target (i.e. the
+        // structural parent edge that L011 would otherwise flag).
+        // Suppression must reference the same ID it suppresses;
+        // a mismatch is a misdeclaration that L011 will surface
+        // separately. Rendering it here without validation would
+        // mislead reviewers into thinking the declared ID is the
+        // structural parent.
+        cross_domain_parent: record.parent_cross_domain.as_ref().and_then(|declared| {
+            let first_ref_target = record
+                .relationships
+                .iter()
+                .find(|r| r.verb == RelVerb::References)
+                .map(|r| &r.target);
+            (first_ref_target == Some(declared))
+                .then(|| (declared.clone(), record.parent_cross_domain_reason.clone()))
+        }),
     }
 }
 
@@ -373,6 +629,7 @@ mod tests {
                 crates: vec!["cherry-pit-core".into()],
                 fan_out: vec!["References CHE-0001".into()],
                 fan_in: vec!["References ← CHE-0050".into()],
+                cross_domain_parent: None,
             },
             content: "# CHE-0042 · Title\n\nContent here.".into(),
         }];
@@ -383,6 +640,57 @@ mod tests {
         assert!(output.contains("cherry-pit-core"), "output:\n{output}");
         assert!(output.contains("Fan-out:"), "output:\n{output}");
         assert!(output.contains("Fan-in:"), "output:\n{output}");
+        assert!(
+            !output.contains("Cross-domain parent"),
+            "no cross-domain field set, header line must be absent"
+        );
+    }
+
+    #[test]
+    fn render_blocks_with_cross_domain_parent_and_reason() {
+        let blocks = vec![OutputBlock::Focal {
+            meta: HeaderMeta {
+                id: make_id("CHE", 42),
+                tier: Some(Tier::A),
+                status: "Accepted".into(),
+                domain: "Cherry".into(),
+                crates: vec![],
+                fan_out: vec![],
+                fan_in: vec![],
+                cross_domain_parent: Some((
+                    make_id("COM", 1),
+                    "shares foundation invariant".into(),
+                )),
+            },
+            content: "focal content".into(),
+        }];
+        let output = render_blocks(&blocks);
+        assert!(
+            output.contains("Cross-domain parent: COM-0001 — shares foundation invariant"),
+            "expected cross-domain header with reason, output:\n{output}"
+        );
+    }
+
+    #[test]
+    fn render_blocks_with_cross_domain_parent_no_reason() {
+        let blocks = vec![OutputBlock::Focal {
+            meta: HeaderMeta {
+                id: make_id("CHE", 42),
+                tier: Some(Tier::A),
+                status: "Accepted".into(),
+                domain: "Cherry".into(),
+                crates: vec![],
+                fan_out: vec![],
+                fan_in: vec![],
+                cross_domain_parent: Some((make_id("COM", 1), String::new())),
+            },
+            content: "focal content".into(),
+        }];
+        let output = render_blocks(&blocks);
+        assert!(
+            output.contains("Cross-domain parent: COM-0001 (no reason given)"),
+            "expected cross-domain header with empty-reason annotation, output:\n{output}"
+        );
     }
 
     #[test]
@@ -397,6 +705,7 @@ mod tests {
                     crates: vec![],
                     fan_out: vec![],
                     fan_in: vec![],
+                    cross_domain_parent: None,
                 },
                 content: "focal content".into(),
             },
@@ -409,6 +718,7 @@ mod tests {
                     crates: vec![],
                     fan_out: vec![],
                     fan_in: vec![],
+                    cross_domain_parent: None,
                 },
                 content: "connected content".into(),
                 path: "CHE-0042 → References → CHE-0001".into(),
@@ -420,6 +730,39 @@ mod tests {
         assert!(output.contains("---"), "output:\n{output}");
         assert!(output.contains("## ◇ CONNECTED:"), "output:\n{output}");
         assert!(output.contains("## Path:"), "output:\n{output}");
+    }
+
+    #[test]
+    fn render_blocks_connected_omits_cross_domain_parent() {
+        // Asymmetry pin: even when a connected block's HeaderMeta
+        // carries a cross_domain_parent value, the connected header
+        // must NOT render the "Cross-domain parent" line. Only the
+        // focal's authoring justification is relevant in --critique
+        // output. See render_connected_header doc-comment for the
+        // rationale.
+        let blocks = vec![OutputBlock::Connected {
+            meta: HeaderMeta {
+                id: make_id("CHE", 7),
+                tier: Some(Tier::B),
+                status: "Accepted".into(),
+                domain: "Cherry".into(),
+                crates: vec![],
+                fan_out: vec![],
+                fan_in: vec![],
+                cross_domain_parent: Some((make_id("COM", 3), "should not appear".into())),
+            },
+            content: "connected content".into(),
+            path: "CHE-0042 → References → CHE-0007".into(),
+        }];
+        let output = render_blocks(&blocks);
+        assert!(
+            !output.contains("Cross-domain parent"),
+            "connected header must suppress cross-domain parent line, output:\n{output}"
+        );
+        assert!(
+            !output.contains("should not appear"),
+            "reason must not leak into connected header, output:\n{output}"
+        );
     }
 
     #[test]

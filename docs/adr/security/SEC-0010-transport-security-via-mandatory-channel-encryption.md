@@ -7,7 +7,7 @@ Status: Proposed
 
 ## Related
 
-References: SEC-0001, SEC-0002, SEC-0005, SEC-0007
+References: SEC-0007
 
 ## Context
 

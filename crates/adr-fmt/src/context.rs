@@ -6,8 +6,8 @@
 use std::collections::{HashMap, HashSet, VecDeque};
 
 use crate::config::Config;
-use crate::model::{AdrId, AdrRecord, RelVerb, Status};
-use crate::nav::compute_children;
+use crate::model::{AdrId, AdrRecord, Status};
+use crate::nav::{compute_parent_children, compute_parent_edges, walk_parent_chain};
 use crate::output::{EmittedRule, RootGroup};
 
 /// Resolve decision rules applicable to a crate, grouped by root ADR subtree.
@@ -18,9 +18,17 @@ use crate::output::{EmittedRule, RootGroup};
 ///    to ADRs where `crate_name` ∈ `adr.crates`; else include all domain ADRs
 /// 3. Always include all ADRs from `foundation = true` domains
 ///
-/// Assignment: each ADR is assigned to the first root ADR found in its
-/// document-order reference list. ADRs not directly referencing any root
-/// are assigned via BFS proximity through the children map.
+/// Assignment uses the parent-edge tree projection: each ADR's structural
+/// parent is its first `References:` target. The parent chain is walked
+/// upward (cycle-safe via visited set) until a root is reached. Non-Accepted
+/// parents (Draft/Proposed) are advisory-only — the chain flows through them
+/// per the draft-waypoint policy. Cycle members and chains that do not
+/// terminate at any root land in the Unclaimed group.
+///
+/// Emission: for each root in deterministic order, traverse the parent-edge
+/// children downward (not the full citation graph) and emit rules from
+/// eligible ADRs assigned to this root. Secondary citations do not pull
+/// extra subtrees.
 ///
 /// Returns `RootGroup` entries: foundation roots first (by min layer, then
 /// number), then domain roots (same). An unclaimed fallback group is
@@ -103,95 +111,50 @@ pub fn context_grouped(
         }
     }
 
-    // ── Step 3: Build children map from ALL records (unfiltered) ───
+    // ── Step 3: Build parent-edge projection from ALL records ─────
+    //
+    // The tree projection includes Draft/Proposed waypoints — non-Accepted
+    // parents are advisory-only (L012) and do not break the chain. This
+    // lets descendants of a Draft mid-tier ADR still reach the root.
 
-    let children_map = compute_children(records);
+    let parent_edges = compute_parent_edges(records);
+    let parent_children = compute_parent_children(records);
 
-    // ── Step 4: Identify root ADRs in the context set ─────────────
+    // ── Step 4: Identify root ADRs ────────────────────────────────
 
-    // Build a global root index from all records (not just eligible)
     let root_index: HashSet<AdrId> = records
         .iter()
         .filter(|r| r.is_root())
         .map(|r| r.id.clone())
         .collect();
 
-    // Record lookup by ID (all records, for title resolution)
     let record_by_id: HashMap<&AdrId, &AdrRecord> = records.iter().map(|r| (&r.id, r)).collect();
 
-    // ── Step 5: Assign eligible ADRs to roots ─────────────────────
+    // ── Step 5: Assign eligible ADRs to roots via parent-chain walk ─
     //
-    // Pass 1: Direct assignment — scan each ADR's references in document
-    // order; the first target that is a root determines assignment.
-    // Pass 2: BFS fallback — unassigned ADRs inherit their nearest
-    // assigned neighbor's root via the children map.
+    // Each eligible ADR walks its parent-edge chain upward. If the chain
+    // terminates at a root, assign there. If it terminates at a non-root
+    // (orphan) or hits a cycle, the ADR remains unassigned and falls to
+    // the Unclaimed group.
 
     let mut assignment: HashMap<AdrId, AdrId> = HashMap::new();
-    let mut unassigned: Vec<AdrId> = Vec::new();
 
-    // Roots assign to themselves
     for id in &eligible {
         if root_index.contains(id) {
             assignment.insert(id.clone(), id.clone());
-        }
-    }
-
-    // Pass 1: first-root-referenced
-    for id in &eligible {
-        if assignment.contains_key(id) {
             continue;
         }
-        if let Some(record) = record_by_id.get(id) {
-            let mut assigned = false;
-            for rel in &record.relationships {
-                if rel.verb.is_reverse() {
-                    continue;
+        match walk_parent_chain(id, &parent_edges) {
+            Ok(terminal) => {
+                if root_index.contains(&terminal) {
+                    assignment.insert(id.clone(), terminal);
                 }
-                if rel.verb == RelVerb::Root && rel.target == record.id {
-                    continue;
-                }
-                if root_index.contains(&rel.target) {
-                    assignment.insert(id.clone(), rel.target.clone());
-                    assigned = true;
-                    break;
-                }
+                // else: chain ends at a non-root (broken chain) → unassigned
             }
-            if !assigned {
-                unassigned.push(id.clone());
+            Err(_) => {
+                // Cycle in parent edges → unassigned (L013 already warns)
             }
         }
-    }
-
-    // Pass 2: BFS fallback for unassigned ADRs
-    // Walk each unassigned ADR's reference targets; if any target is
-    // already assigned, inherit that root. Repeat until stable.
-    let mut changed = true;
-    while changed {
-        changed = false;
-        let mut still_unassigned = Vec::new();
-        for id in &unassigned {
-            if let Some(record) = record_by_id.get(id) {
-                let mut found = false;
-                for rel in &record.relationships {
-                    if rel.verb.is_reverse() {
-                        continue;
-                    }
-                    if rel.verb == RelVerb::Root && rel.target == record.id {
-                        continue;
-                    }
-                    if let Some(root) = assignment.get(&rel.target) {
-                        assignment.insert(id.clone(), root.clone());
-                        found = true;
-                        changed = true;
-                        break;
-                    }
-                }
-                if !found {
-                    still_unassigned.push(id.clone());
-                }
-            }
-        }
-        unassigned = still_unassigned;
     }
 
     // ── Step 6: Determine root processing order ───────────────────
@@ -244,11 +207,13 @@ pub fn context_grouped(
             .then_with(|| a.number.cmp(&b.number))
     });
 
-    // ── Step 7: BFS emission per root ─────────────────────────────
+    // ── Step 7: BFS emission per root via parent-edge children ────
     //
-    // For each root in order, BFS via children_map. Collect rules from
-    // eligible ADRs assigned to this root. Sort by layer → depth →
-    // ADR number → rule ID. Add to global claimed set.
+    // Walk parent-edge children downward from each root. Secondary
+    // citations are NOT followed — they don't pull extra subtrees.
+    // BFS visited set already provides cycle safety, but parent_edges
+    // is a forest by construction (cycle members are excluded from
+    // assignment in Step 5), so cycles cannot reach this stage.
 
     let mut claimed: HashSet<AdrId> = HashSet::new();
     let mut groups: Vec<RootGroup> = Vec::new();
@@ -256,15 +221,13 @@ pub fn context_grouped(
     for root_id in &context_roots {
         let mut rules: Vec<EmittedRule> = Vec::new();
 
-        // BFS from root
         let mut visited: HashSet<AdrId> = HashSet::new();
         let mut queue: VecDeque<(AdrId, u16)> = VecDeque::new();
         queue.push_back((root_id.clone(), 0));
         visited.insert(root_id.clone());
 
         while let Some((current_id, depth)) = queue.pop_front() {
-            // Emit rules if this ADR is eligible, assigned to this root,
-            // and not yet claimed
+            // Emit rules if eligible, assigned to this root, not yet claimed
             if eligible.contains(&current_id)
                 && assignment.get(&current_id) == Some(root_id)
                 && !claimed.contains(&current_id)
@@ -283,12 +246,12 @@ pub fn context_grouped(
                 claimed.insert(current_id.clone());
             }
 
-            // Enqueue children (ADRs that reference current_id)
-            if let Some(children) = children_map.get(&current_id) {
+            // Enqueue parent-edge children only
+            if let Some(children) = parent_children.get(&current_id) {
                 for child in children {
-                    if !visited.contains(&child.child) {
-                        visited.insert(child.child.clone());
-                        queue.push_back((child.child.clone(), depth + 1));
+                    if !visited.contains(child) {
+                        visited.insert(child.clone());
+                        queue.push_back((child.clone(), depth + 1));
                     }
                 }
             }
@@ -684,7 +647,7 @@ description = "test"
     // ── Assignment tests ───────────────────────────────────────────
 
     #[test]
-    fn first_root_referenced_wins() {
+    fn parent_chain_assigns_to_first_references_root() {
         // CHE-0002 references both CHE-0001 and CHE-0004 (roots).
         // CHE-0001 listed first → CHE-0002 assigned to CHE-0001.
         let records = vec![
@@ -739,7 +702,7 @@ description = "test"
     }
 
     #[test]
-    fn bfs_fallback_for_no_direct_root_ref() {
+    fn parent_chain_walks_through_intermediates() {
         // CHE-0003 references CHE-0002 (not a root). CHE-0002 references CHE-0001 (root).
         // CHE-0003 should be assigned to CHE-0001 via fallback.
         let records = vec![

@@ -251,6 +251,10 @@ pub fn parse_adr_file(
     // --- Crates field ---
     let crates = find_crates_field(&lines);
 
+    // --- Parent-cross-domain field ---
+    let (parent_cross_domain, parent_cross_domain_reason) =
+        find_parent_cross_domain_field(&lines);
+
     // --- Decision section content and tagged rules ---
     let decision_rules = extract_tagged_rules(&lines);
 
@@ -284,6 +288,8 @@ pub fn parse_adr_file(
         section_word_counts,
         crates,
         decision_rules,
+        parent_cross_domain,
+        parent_cross_domain_reason,
     });
     Ok(outcome)
 }
@@ -506,7 +512,52 @@ fn find_crates_field(lines: &[&str]) -> Vec<String> {
     Vec::new()
 }
 
-/// Extract tagged rules from the Decision section.
+/// Parse `Parent-cross-domain: PREFIX-NNNN — reason` from the metadata
+/// preamble. Returns `(Some(id), reason)` when a valid ID is parsed,
+/// `(None, String::new())` otherwise.
+///
+/// Accepts both em-dash (`—`) and ASCII hyphen-with-spaces (` - `) as
+/// separators between the ID and the reason. The reason is optional;
+/// the field may contain just the ID.
+fn find_parent_cross_domain_field(lines: &[&str]) -> (Option<AdrId>, String) {
+    for line in lines {
+        if line.starts_with("## ") {
+            break;
+        }
+        if let Some(value) = line.strip_prefix("Parent-cross-domain:") {
+            let value = value.trim();
+            if value.is_empty() {
+                return (None, String::new());
+            }
+            // Split on em-dash, ASCII hyphen, or whitespace boundary
+            let (id_part, reason) = split_id_and_reason(value);
+            if let Some(id) = parse_adr_id(id_part.trim()) {
+                return (Some(id), reason.trim().to_owned());
+            }
+            return (None, String::new());
+        }
+    }
+    (None, String::new())
+}
+
+/// Split a `PREFIX-NNNN — reason` string into ID and reason parts.
+fn split_id_and_reason(value: &str) -> (&str, &str) {
+    // Try em-dash first
+    if let Some(idx) = value.find('—') {
+        return (&value[..idx], &value[idx + '—'.len_utf8()..]);
+    }
+    // Try " - " (ASCII hyphen with surrounding whitespace)
+    if let Some(idx) = value.find(" - ") {
+        return (&value[..idx], &value[idx + 3..]);
+    }
+    // Try first whitespace as boundary (ID has no spaces)
+    if let Some(idx) = value.find(char::is_whitespace) {
+        return (&value[..idx], &value[idx..]);
+    }
+    (value, "")
+}
+
+
 ///
 /// Matches `RN [L]: text` pattern within the Decision section where
 /// N is the sequential rule number and L is the Meadows layer (1-12).
@@ -981,6 +1032,115 @@ mod tests {
         let lines = vec!["# CHE-0042. Title", "", "Date: 2026-04-25", "", "## Status"];
         let crates = find_crates_field(&lines);
         assert!(crates.is_empty());
+    }
+
+    #[test]
+    fn find_parent_cross_domain_em_dash() {
+        let lines = vec![
+            "# CHE-0042. Title",
+            "",
+            "Parent-cross-domain: COM-0001 — bridges principle to architecture",
+            "",
+            "## Status",
+        ];
+        let (id, reason) = find_parent_cross_domain_field(&lines);
+        assert_eq!(id.as_ref().unwrap().prefix, "COM");
+        assert_eq!(id.unwrap().number, 1);
+        assert_eq!(reason, "bridges principle to architecture");
+    }
+
+    #[test]
+    fn find_parent_cross_domain_ascii_hyphen() {
+        let lines = vec![
+            "# CHE-0042. Title",
+            "",
+            "Parent-cross-domain: COM-0001 - reason text",
+            "",
+            "## Status",
+        ];
+        let (id, reason) = find_parent_cross_domain_field(&lines);
+        assert!(id.is_some());
+        assert_eq!(reason, "reason text");
+    }
+
+    #[test]
+    fn find_parent_cross_domain_id_only() {
+        let lines = vec![
+            "# CHE-0042. Title",
+            "",
+            "Parent-cross-domain: COM-0001",
+            "",
+            "## Status",
+        ];
+        let (id, reason) = find_parent_cross_domain_field(&lines);
+        assert!(id.is_some());
+        assert_eq!(reason, "");
+    }
+
+    #[test]
+    fn find_parent_cross_domain_absent() {
+        let lines = vec!["# CHE-0042. Title", "", "Date: 2026-04-25", "", "## Status"];
+        let (id, reason) = find_parent_cross_domain_field(&lines);
+        assert!(id.is_none());
+        assert_eq!(reason, "");
+    }
+
+    #[test]
+    fn find_parent_cross_domain_invalid_id_returns_none() {
+        let lines = vec![
+            "# CHE-0042. Title",
+            "",
+            "Parent-cross-domain: not-an-id",
+            "",
+            "## Status",
+        ];
+        let (id, reason) = find_parent_cross_domain_field(&lines);
+        assert!(id.is_none());
+        assert_eq!(reason, "");
+    }
+
+    #[test]
+    fn find_parent_cross_domain_stops_at_h2() {
+        // Field appearing after first H2 is ignored
+        let lines = vec![
+            "# CHE-0042. Title",
+            "",
+            "## Status",
+            "",
+            "Parent-cross-domain: COM-0001 — late field",
+        ];
+        let (id, _) = find_parent_cross_domain_field(&lines);
+        assert!(id.is_none());
+    }
+
+    #[test]
+    fn find_parent_cross_domain_garbage_after_colon() {
+        // Completely malformed value (no recognizable ID) — must
+        // return None for the ID without panicking.
+        let lines = vec![
+            "# CHE-0042. Title",
+            "",
+            "Parent-cross-domain: !!!@@@",
+            "",
+            "## Status",
+        ];
+        let (id, reason) = find_parent_cross_domain_field(&lines);
+        assert!(id.is_none(), "garbage value must yield None ID");
+        assert_eq!(reason, "");
+    }
+
+    #[test]
+    fn find_parent_cross_domain_lowercase_prefix_rejected() {
+        // ADR ID prefixes are uppercase; lowercase is malformed.
+        let lines = vec![
+            "# CHE-0042. Title",
+            "",
+            "Parent-cross-domain: com-0001 — bad case",
+            "",
+            "## Status",
+        ];
+        let (id, _) = find_parent_cross_domain_field(&lines);
+        assert!(id.is_none(), "lowercase prefix must be rejected");
     }
 
     #[test]

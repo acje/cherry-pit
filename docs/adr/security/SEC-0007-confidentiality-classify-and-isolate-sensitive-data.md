@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-References: SEC-0001, SEC-0004, SEC-0005
+References: SEC-0001
 
 ## Context
 

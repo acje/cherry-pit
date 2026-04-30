@@ -36,6 +36,20 @@ pub struct DomainConfig {
     /// Foundation domains are included with every domain query.
     #[serde(default)]
     pub foundation: bool,
+    /// Rationale for having more than one Root ADR in this domain.
+    ///
+    /// Per the parent-edge tree model (GOVERNANCE.md §5), every domain
+    /// is expected to have exactly one Root ADR. A multi-root domain is
+    /// permitted only when the domain genuinely splits into independent
+    /// concerns; in that case this field documents why.
+    ///
+    /// **Status: parsed but inert.** The accompanying warning ("emit
+    /// when domain has >1 root and rationale is empty") is not yet
+    /// wired. Tracked as a follow-up to Step 1 of the parent-edge
+    /// migration plan in `docs/adr/adr-tree.md`.
+    #[serde(default)]
+    #[allow(dead_code)] // Wired in a future step; see rustdoc above.
+    pub multi_root_rationale: String,
 }
 
 /// Rule override entry. Only `id` is required; other fields are optional

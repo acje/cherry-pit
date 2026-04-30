@@ -1455,3 +1455,228 @@ fn parser_no_p_codes_for_valid_corpus() {
         .success()
         .stdout(predicate::str::contains("warning[P").not());
 }
+
+// ── real-corpus pin tests ─────────────────────────────────────────
+//
+// These run against the live `docs/adr/` corpus to pin the
+// parent-edge tree model. They protect against silent regressions
+// where a refactor to nav/output/links would, e.g., reintroduce
+// orphans, fire structural diagnostics on a known-clean corpus,
+// or drop ADRs from the tree view.
+
+/// Locate the workspace `docs/adr/` directory from this crate's
+/// manifest dir. Workspace layout: `<root>/crates/adr-fmt/Cargo.toml`,
+/// so the corpus is at `<root>/docs/adr/`.
+fn real_corpus_root() -> String {
+    let manifest = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let workspace = manifest
+        .parent() // crates/
+        .and_then(|p| p.parent()) // workspace root
+        .expect("workspace root exists");
+    workspace
+        .join("docs/adr")
+        .to_str()
+        .expect("valid utf-8 path")
+        .to_owned()
+}
+
+/// The real corpus must produce ZERO structural-defect diagnostics
+/// (L010/L011/L012/L013/L014/L017). L015 (root-first heuristic) and
+/// L016 (lower-tier parent) are migration-pending and may fire.
+///
+/// Failure mode: a parent-edge or cycle-detection regression makes
+/// previously-clean ADRs trip a rule that does not reflect a real
+/// authoring defect.
+#[test]
+fn real_corpus_clean_of_structural_defects() {
+    let output = adr_fmt()
+        .args(["--lint", &real_corpus_root()])
+        .output()
+        .expect("binary runs");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    for rule in ["L010", "L011", "L012", "L013", "L014", "L017"] {
+        let bracket = format!("warning[{rule}]");
+        assert!(
+            !stdout.contains(&bracket),
+            "{rule} fired against the real corpus, which should be \
+             structurally clean. Output excerpt:\n{}\n\nIf this is a \
+             genuine new defect, fix the corpus; if it is a model \
+             regression, fix the rule.",
+            stdout
+                .lines()
+                .filter(|l| l.contains(&bracket))
+                .take(5)
+                .collect::<Vec<_>>()
+                .join("\n"),
+        );
+    }
+}
+
+/// `--tree` against the real corpus must render every non-stale
+/// ADR somewhere — either as a node in a parent-edge tree OR in the
+/// per-domain orphan section (categorized as "no References", "chain
+/// ends at non-root", or "cycle"). No ADR may silently disappear.
+///
+/// Pin: count of `<PREFIX>-NNNN` ID occurrences in `--tree` stdout
+/// must be ≥ count of non-stale ADRs in the corpus. (≥ because
+/// `[also: …]` annotations and per-record orphan listings can
+/// repeat IDs; the pin is a lower bound.)
+///
+/// Counting strategy: walk `docs/adr/` directly (excluding `stale/`)
+/// rather than parsing the lint summary, which is format-coupled.
+#[test]
+fn real_corpus_tree_covers_every_adr() {
+    let root = real_corpus_root();
+
+    // Count non-stale ADR files: any `.md` file matching the ADR ID
+    // pattern in `docs/adr/<domain>/`, excluding `stale/` archive.
+    let non_stale_count = count_non_stale_adrs(&root);
+    assert!(
+        non_stale_count > 0,
+        "corpus has zero non-stale ADRs — test setup broken"
+    );
+
+    let tree_out = adr_fmt()
+        .args(["--tree", "--", &root])
+        .output()
+        .expect("binary runs");
+    let tree_stdout = String::from_utf8_lossy(&tree_out.stdout);
+
+    let ids = extract_adr_ids(&tree_stdout);
+
+    assert!(
+        ids.len() >= non_stale_count,
+        "tree output covered {} distinct ADR IDs but corpus has {} non-stale ADRs — \
+         some ADRs are silently missing from --tree output",
+        ids.len(),
+        non_stale_count,
+    );
+}
+
+/// Walk `<root>/<domain>/*.md` and count files whose basename matches
+/// the ADR-ID pattern (`<PREFIX>-NNNN-…md`). Skips the `stale/`
+/// archive subdirectory and any non-domain top-level entries.
+fn count_non_stale_adrs(root: &str) -> usize {
+    let mut count = 0;
+    let Ok(entries) = std::fs::read_dir(root) else {
+        return 0;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if !path.is_dir() {
+            continue;
+        }
+        // Skip the stale archive
+        if path.file_name().is_some_and(|n| n == "stale") {
+            continue;
+        }
+        let Ok(domain_entries) = std::fs::read_dir(&path) else {
+            continue;
+        };
+        for adr in domain_entries.flatten() {
+            let adr_path = adr.path();
+            if !adr_path.is_file() {
+                continue;
+            }
+            let Some(name) = adr_path.file_name().and_then(|n| n.to_str()) else {
+                continue;
+            };
+            if name.ends_with(".md") && parse_adr_id_prefix(name).is_some() {
+                count += 1;
+            }
+        }
+    }
+    count
+}
+
+/// Extract all ADR IDs (`<PREFIX>-NNNN` where prefix is ≥ 2 uppercase
+/// ASCII letters and number is ≥ 4 ASCII digits) from arbitrary text.
+/// Used to count IDs in `--tree` output without coupling to format.
+fn extract_adr_ids(text: &str) -> std::collections::HashSet<String> {
+    let mut out = std::collections::HashSet::new();
+    for word in text.split(|c: char| !c.is_ascii_alphanumeric() && c != '-') {
+        if let Some(id) = parse_adr_id_prefix(word) {
+            out.insert(id);
+        }
+    }
+    out
+}
+
+/// Parse `<PREFIX>-NNNN` from the start of `word`. Prefix is ≥ 2
+/// uppercase ASCII letters; number is ≥ 4 ASCII digits. Returns the
+/// matched prefix as `Some(<PREFIX>-NNNN)` (excluding any trailing
+/// chars from the input).
+fn parse_adr_id_prefix(word: &str) -> Option<String> {
+    let bytes = word.as_bytes();
+    let dash = bytes.iter().position(|&b| b == b'-')?;
+    if dash < 2 {
+        return None;
+    }
+    if !bytes[..dash].iter().all(|b| b.is_ascii_uppercase()) {
+        return None;
+    }
+    let digits_start = dash + 1;
+    let digits_end = bytes[digits_start..]
+        .iter()
+        .position(|b| !b.is_ascii_digit())
+        .map_or(bytes.len(), |p| digits_start + p);
+    let digit_count = digits_end - digits_start;
+    if digit_count < 4 {
+        return None;
+    }
+    Some(String::from_utf8_lossy(&bytes[..digits_end]).into_owned())
+}
+
+#[cfg(test)]
+mod adr_id_extraction_tests {
+    use super::{extract_adr_ids, parse_adr_id_prefix};
+
+    #[test]
+    fn three_letter_prefix() {
+        assert_eq!(parse_adr_id_prefix("CHE-0001"), Some("CHE-0001".to_owned()));
+    }
+
+    #[test]
+    fn four_letter_prefix() {
+        assert_eq!(parse_adr_id_prefix("PARD-0042"), Some("PARD-0042".to_owned()));
+    }
+
+    #[test]
+    fn two_letter_prefix() {
+        assert_eq!(parse_adr_id_prefix("XY-0001"), Some("XY-0001".to_owned()));
+    }
+
+    #[test]
+    fn one_letter_prefix_rejected() {
+        assert_eq!(parse_adr_id_prefix("X-0001"), None);
+    }
+
+    #[test]
+    fn three_digit_number_rejected() {
+        assert_eq!(parse_adr_id_prefix("CHE-001"), None);
+    }
+
+    #[test]
+    fn lowercase_prefix_rejected() {
+        assert_eq!(parse_adr_id_prefix("che-0001"), None);
+    }
+
+    #[test]
+    fn id_in_filename_truncated_at_extension() {
+        assert_eq!(
+            parse_adr_id_prefix("CHE-0001-foo.md"),
+            Some("CHE-0001".to_owned()),
+        );
+    }
+
+    #[test]
+    fn extracts_from_multiline_text() {
+        let text = "── CHE-0001\n│   └── CHE-0002 [also: COM-0003]\n";
+        let ids = extract_adr_ids(text);
+        assert_eq!(ids.len(), 3);
+        assert!(ids.contains("CHE-0001"));
+        assert!(ids.contains("CHE-0002"));
+        assert!(ids.contains("COM-0003"));
+    }
+}
+

@@ -336,21 +336,29 @@ fn print_relationships(config: &Config) {
     println!("    • Root + Supersedes may coexist");
     println!("    • Supersedes requires target status = `Superseded by PREFIX-NNNN`");
     println!();
-    println!("  Reference ordering:");
-    println!("    List references in significance order — most significant first.");
-    println!("    Significance = strength of constraint the referenced ADR places");
-    println!("    on this one. The reference whose removal would most invalidate");
-    println!("    this ADR's decision ranks first.");
+    println!("  Reference ordering — first References target = structural parent:");
+    println!("    Per the parent-edge tree model (GOVERNANCE.md §5), every");
+    println!("    non-Root ADR is anchored in the tree by the FIRST target");
+    println!("    listed in its `References:` field. Other forwards (additional");
+    println!("    References, Refines, Supersedes) are secondary citations and");
+    println!("    do not create parent edges.");
+    println!();
+    println!("    List the most specialized applicable parent first, then add");
+    println!("    foundation citations after. The reference whose removal would");
+    println!("    most invalidate this ADR's decision ranks first.");
     println!();
     println!("  Root assignment (--context):");
-    println!("    Each ADR is assigned to exactly one root subtree. Assignment");
-    println!("    uses first-root-referenced: scan references in document order;");
-    println!("    the first target that is a root ADR wins subtree assignment.");
-    println!("    Reference ordering directly controls subtree placement.");
+    println!("    Each ADR's root is found by walking the parent edge upward");
+    println!("    until a Root ADR is reached. Non-Accepted parents (Draft,");
+    println!("    Proposed) are advisory waypoints — the chain still flows");
+    println!("    through them (L012 warns). Cycles and chains terminating at");
+    println!("    a non-root land in the Unclaimed group.");
     println!();
-    println!("    ADRs not directly referencing any root are assigned via BFS");
-    println!("    proximity — they inherit the root of their nearest assigned");
-    println!("    ancestor in the reference graph.");
+    println!("  Cross-domain parents:");
+    println!("    A first References target in a different domain triggers L011.");
+    println!("    Suppress with `Parent-cross-domain: PREFIX-NNNN — reason` in");
+    println!("    the preamble. The suppression is exact-match: a stale ID will");
+    println!("    not silence L011.");
     println!();
     let foundation_prefixes: Vec<&str> = config
         .domains
@@ -397,6 +405,14 @@ fn print_link_rules() {
     println!("    L007  Stale reference — link to stale archive ADR");
     println!("    L008  Root self-reference mismatch");
     println!("    L009  Root + References coexistence");
+    println!("    L010  Missing parent — non-Root ADR has no References");
+    println!("    L011  Cross-domain parent — first References target is in another domain");
+    println!("    L012  Non-Accepted parent — first References target is Draft/Proposed (advisory)");
+    println!("    L013  Parent-edge cycle — chain forms a loop");
+    println!("    L014  Unreachable from root — chain ends at non-root");
+    println!("    L015  Root-first heuristic — first ref is Root while specialized siblings exist");
+    println!("    L016  Lower-tier parent — parent's tier is weaker leverage than child's");
+    println!("    L017  Superseded parent — first References target is Superseded by another ADR");
     println!("    T020  Reference load — tier-scaled max on References: count");
     println!();
 }
@@ -445,6 +461,16 @@ fn print_overrides(config: &Config) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Forbidden phrases from the pre-Tree-Model documentation.
+    /// Defined in the test module so they don't leak into the scan
+    /// range of `print_relationships`/`print_link_rules` source.
+    const NEGATIVE_CANARY_TERMS: &[&str] = &[
+        "first-root-referenced",
+        "BFS proximity",
+        "BFS depth",
+        "breadth-first sweep",
+    ];
 
     fn make_config() -> Config {
         toml::from_str(
@@ -519,12 +545,39 @@ crates = []
         print_governance(&config);
 
         // Structural canary: these strings appear in println! arguments
-        // in print_relationships, not just in test assertions.
+        // in print_relationships, not just in test assertions. They pin
+        // the parent-edge tree model language (GOVERNANCE.md §5).
         let src = include_str!("guidelines.rs");
-        assert!(src.contains("significance order —"));
-        assert!(src.contains("first-root-referenced:"));
-        assert!(src.contains("BFS"));
+        assert!(src.contains("first References target = structural parent"));
+        assert!(src.contains("walking the parent edge upward"));
+        assert!(src.contains("advisory waypoints"));
+        assert!(src.contains("Parent-cross-domain"));
         assert!(src.contains("Foundation roots"));
+    }
+
+    #[test]
+    fn relationships_no_stale_pre_tree_model_terms() {
+        // Negative canary: scan ONLY the print_relationships +
+        // print_link_rules source range for stale pre-Tree-Model
+        // terms. The forbidden list lives in a separate module-scope
+        // const (NEGATIVE_CANARY_TERMS) so this test's body itself
+        // does not contain the forbidden literals — eliminating the
+        // self-stripping brittleness of the previous implementation.
+        let src = include_str!("guidelines.rs");
+        let start = src
+            .find("fn print_relationships")
+            .expect("print_relationships exists");
+        let end = src
+            .find("fn print_stale")
+            .expect("print_stale exists");
+        let scan = &src[start..end];
+        for forbidden in NEGATIVE_CANARY_TERMS {
+            assert!(
+                !scan.contains(forbidden),
+                "stale pre-Tree-Model term `{forbidden}` reappeared in \
+                 print_relationships/print_link_rules source range"
+            );
+        }
     }
 
     #[test]

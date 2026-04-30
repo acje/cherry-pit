@@ -26,6 +26,7 @@ Date: YYYY-MM-DD
 Last-reviewed: YYYY-MM-DD
 Tier: S|A|B|C|D
 Status: Draft | Proposed | Accepted | Rejected | Deprecated | Superseded by PREFIX-NNNN
+Parent-cross-domain: PREFIX-NNNN — reason (optional; only when first References target is in another domain)
 
 ## Related
 
@@ -143,6 +144,33 @@ its domain. Omit it when the decision is domain-wide.
 
 ---
 
+### Parent-cross-domain (optional)
+
+```
+Parent-cross-domain: COM-0018 — concurrency model is a workspace-wide
+                                principle, no Cherry-domain analog exists yet
+```
+
+Suppresses **L011** (cross-domain parent) when this ADR's first
+`References:` target is in a different domain. The value is the
+target ADR ID followed by an em-dash (or ` - `) and a free-prose
+reason explaining why the cross-domain parent is the right
+structural choice.
+
+The suppression matches **exactly**: the field's ID must equal the
+first `References:` target. A typo or stale value will not silence
+L011.
+
+Per the parent-edge tree model (GOVERNANCE.md §5), every non-Root
+ADR's structural parent is the first `References:` target. Cross-
+domain parents are permitted but flagged by default; this field is
+the explicit acknowledgment that the choice is intentional.
+
+**Suppresses:** L011 (cross-domain parent) when this field's ID
+matches the first `References:` target.
+
+---
+
 ### Status
 
 ```
@@ -192,12 +220,18 @@ Three permitted verbs:
 | References | Soft citation | This ADR cites another for context or builds on it |
 | Supersedes | Replaces target entirely | This ADR obsoletes a previous decision |
 
-**Reference order matters.** List references in order of significance
-— most significant first. `adr-fmt --context` assigns each ADR to a
-root subtree using the **first root referenced** in document order.
-Reference ordering governs subtree assignment and communicates which
-relationships are primary constraints vs. secondary context. See
-RELATIONSHIPS section in `cargo run -p adr-fmt` output.
+**Reference order matters — the first References target is the
+structural parent.** Per the parent-edge tree model (GOVERNANCE.md
+§5), every non-Root ADR is anchored in the tree by the **first**
+target listed in its `References:` field. Other forwards —
+additional `References:`, `Refines:`, `Supersedes:` — are
+secondary citations and do not place the ADR in the tree.
+
+List the most specialized applicable parent first, then add
+foundation citations after. A `Root` first-citation followed by
+specialized siblings triggers **L015** (heuristic: consider
+promoting a sibling). A cross-domain first-citation triggers
+**L011** unless suppressed via `Parent-cross-domain:`.
 
 **Constraints:** Root and References cannot coexist (L009). Every
 ADR must have at least one relationship — no orphans (T007).
@@ -208,7 +242,13 @@ understand the decision neighbourhood. Include References to
 decisions that constrain or motivate this one — this prevents the
 agent from proposing approaches that conflict with related decisions.
 
-**Enforced by:** T007, L001, L003, L007–L009.
+**Invalidation test.** After writing the `References:` line, ask:
+*if I removed the first target, would this ADR still make sense as
+a standalone decision?* If yes, the first target is too weak — promote
+a more constraining parent. If the ADR collapses without it, the
+ordering is correct.
+
+**Enforced by:** T007, L001, L003, L007–L017.
 
 ---
 
@@ -483,6 +523,14 @@ Retirement), S006 (terminal ADR not in stale/).
 
 ## Worked Example
 
+> **Reading the `References:` line.** Per the parent-edge tree model
+> (GOVERNANCE.md §5), `CHE-0002` (the first target) is this ADR's
+> structural parent — CHE-0042 specializes the "make illegal states
+> unrepresentable" decision for envelope construction. The remaining
+> targets (CHE-0010, CHE-0016, CHE-0033, CHE-0034, CHE-0039) are
+> secondary citations that contribute argument and history without
+> placing CHE-0042 elsewhere in the tree.
+
 ```markdown
 # CHE-0042. EventEnvelope Construction Invariants
 
@@ -576,7 +624,7 @@ This is all the agent receives. Notice:
 - **Root-grouped** — rules organized by root ADR subtree, with
   foundation roots first (COM, RST) then domain roots (CHE, PAR).
   Within each group, rules sorted by Meadows layer (L1→L12),
-  then BFS depth, then ADR number
+  then parent-edge depth from the root, then ADR number
 - **Rule ID at end** — `[CHE-0042:R1:L5]` anchors traceability
   without leading the attention. The action comes first. Layer
   suffix enables tension analysis in `--critique`.

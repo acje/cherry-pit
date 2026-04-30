@@ -1,6 +1,6 @@
 # ADR Governance
 
-Last-updated: 2026-04-29
+Last-updated: 2026-04-29 (Section 5 added: Parent-Edge Tree Model)
 
 This document is the root of authority for Architecture Decision Record
 management across the cherry-pit workspace. It covers rationale, process,
@@ -69,11 +69,19 @@ governing existing structures). In software: "EventStore is a trait"
 "EventStore::load returns `Result<Vec<EventEnvelope>, StoreError>`"
 (constrains the contract — level 5).
 
-### Tree Metaphor
+### Tier as Leverage Stratification
 
-The tiers form a tree: S-tier decisions are roots — few in number,
-deepest leverage, most abstract. D-tier decisions are leaves — many
-in number, most concrete, greatest surface area with real-world code.
+Tiers are a **stratification** of decisions by systemic leverage,
+distinct from the ADR **parent-edge tree** described in Section 5.
+Tiers answer "how deep does this decision cut?"; the parent tree
+answers "which decision does this one specialize?".
+
+S-tier decisions cut deepest — few in number, most abstract, often
+Root ADRs in their domain. D-tier decisions cut shallowest — many
+in number, most concrete. A typical parent edge crosses no more
+than one tier boundary at a time (B-tier child under an A-tier
+parent is normal; D-tier child directly under an S-tier parent is
+suspicious and triggers **L016**).
 
 Higher tiers appear first in `--context` output — the agent sees
 foundational constraints before implementation details. This exploits
@@ -141,18 +149,30 @@ resolution is cross-referencing — not merging:
 - Both remain standalone with `References` links from the concrete
   ADR to the abstract one
 
+By the parent-edge model (Section 5), the concrete ADR's structural
+parent is its **first** `References:` target. When the concrete ADR
+is part of a same-domain subtree, list the same-domain parent first
+and the foundation ADR after — that keeps the ADR rooted in its own
+domain. When the concrete ADR has no same-domain parent and the
+foundation ADR is the natural parent, list the foundation ADR first
+and add `Parent-cross-domain: PREFIX-NNNN — <reason>` to suppress
+L011.
+
 Example: COM-0016 (Dependencies as Managed Liabilities) is the
 principle. RST-0004 (Cargo Dependency Governance) references it as the
 Rust-specific implementation. CHE-0026 (Correctness-first Build Config)
 references RST-0003 as the workspace-level lint governance it inherits.
 
 When pardosa or genome ADRs cover the same concern as a Cherry domain
-ADR at a different abstraction level, the same cross-referencing
-pattern applies:
+or Common-domain ADR at a different abstraction level, the same
+cross-referencing pattern applies:
 
-Example: CHE-0006 (single-writer assumption) is the Cherry domain principle.
-PAR-0004 (single-writer per stream via NATS fencing) references it as the
-concrete transport-level implementation.
+Example: COM-0025 (Distributed Failure Model) is the foundation
+principle. PAR-0016 (Timestamp Policy and Cross-Stream Ordering)
+implements time semantics consistent with that failure model. PAR-0016's
+`References:` lists the same-domain root `PAR-0004` first, then
+`COM-0025` later — keeping PAR-0016 rooted in its own domain while
+preserving the foundation citation.
 
 Merging is reserved for cases where two ADRs in the **same domain**
 genuinely cover the same decision space — then the newer ADR supersedes
@@ -160,8 +180,172 @@ the older one.
 
 ---
 
-## 5. Reference Ordering and Root Assignment
+## 5. Parent-Edge Tree Model
 
-Reference ordering mechanics and root assignment algorithm:
-`cargo run -p adr-fmt` — see RELATIONSHIPS section.
+Every ADR (other than a Root) has exactly one **structural parent**:
+the **first** target listed in its `References:` field. Other forward
+links — additional `References:`, `Refines:`, `Supersedes:` — are
+**secondary citations** that contribute to argument and history but
+do not place the ADR in the tree.
+
+This rule is mechanical, deterministic, and enforced by `adr-fmt`. It
+exists so that every ADR has an unambiguous answer to the question
+"under which decision does this one live?" — without that answer, the
+`--context` resolution cannot scope rules to a crate, the `--tree`
+view collapses into a flat list, and reviewers cannot tell at a glance
+which decisions a new ADR builds on versus merely cites.
+
+### 5.1 Roots
+
+A **Root ADR** declares itself the apex of a domain subtree by listing
+its own ID in `Root:`:
+
+```
+Root: COM-0001
+```
+
+A Root has no structural parent. Roots are typically S-tier and
+articulate a domain's organizing principle (e.g., COM-0001 *Complexity
+Budget*, CHE-0001 *Design Priority Ordering*). A domain should have
+**exactly one Root**. Multi-root domains are permitted only when the
+domain genuinely splits into independent concerns; the rationale should
+be recorded in `adr-fmt.toml` under the domain's `multi_root_rationale`
+field. (Today the field is parsed but no warning fires yet — the
+enforcement check is a planned follow-up. Cherry and Pardosa currently
+have two roots each; rationales should be filled in when the warning
+is wired.)
+
+### 5.2 Structural Parent vs. Secondary Citations
+
+The structural parent is selected by the **first References target,
+in document order**. Specifically:
+
+- `Supersedes:`, `Refines:`, and reverse verbs (`Cited-by`,
+  `Refined-by`, etc.) **do not** create parent edges.
+- `Root:` self-reference does not create a parent edge.
+- Only `References:` targets create parent edges, and only the first
+  one in the field's value list.
+
+Reorder a `References:` line and you have re-parented the ADR. This
+is intentional: the tooling treats the first reference as the
+load-bearing claim and ranks it accordingly. Specialized parents
+should appear first, foundational citations after.
+
+**Worked example.** An ADR refining single-writer concurrency would
+reference its specialized parent first, then the principle:
+
+```
+References: CHE-0006, COM-0018      ← CHE-0006 is the structural parent
+Supersedes: CHE-0027                ← does not affect parent edge
+```
+
+If you flip the order:
+
+```
+References: COM-0018, CHE-0006      ← COM-0018 becomes parent (cross-domain)
+```
+
+`adr-fmt` will emit **L011** (cross-domain parent) and the ADR will
+appear under COM in the tree view, not CHE.
+
+### 5.3 Cross-Domain Parents
+
+A structural parent in a different domain is permitted, but it must
+be explicitly justified via the preamble:
+
+```
+Parent-cross-domain: COM-0018 — concurrency model is a workspace-wide
+                                principle, no Cherry-domain analog exists yet
+```
+
+Without this field, `adr-fmt` emits **L011**. The reason text is free
+prose and is preserved through linting. If the field is present but
+points to a different ADR than the actual first References target,
+L011 still fires — the suppression must match exactly.
+
+### 5.4 Non-Accepted Parents
+
+If an ADR's structural parent is `Draft` or `Proposed`, `adr-fmt`
+emits **L012** as a warning, but the parent chain still flows
+through that ADR. This is the *advisory waypoint* policy: an ADR
+under a Draft parent is itself usable for `--context` resolution,
+but readers are warned that the parent is not yet stable and the
+relationship may need to be re-rooted when the parent is rejected
+or superseded.
+
+If the parent is `Superseded by`, `adr-fmt` emits **L017** (which
+takes precedence over L012). A superseded parent is a structural
+defect that should be repaired by re-pointing References to the
+successor.
+
+### 5.5 The Tree View
+
+`cargo run -p adr-fmt -- --tree` renders each domain's parent-edge
+forest using box-drawing. Each line shows
+`ID Title [Tier] STATUS [also: Verb Target, …]` where the `also`
+list contains every forward link other than the structural parent.
+This makes secondary citations visible without conflating them with
+the tree shape.
+
+ADRs that are unreachable from any Root via parent edges land in a
+per-domain orphan section, annotated with the reason:
+
+- `(no References — parent missing)` — non-Root ADR without any
+  `References:` field. Triggers **L010**.
+- `(chain ends at non-root)` — chain terminates at an ADR that is
+  not itself a Root. Triggers **L014**.
+- `(cycle)` — chain forms a cycle. Triggers **L013**.
+
+### 5.6 Diagnostics Reference
+
+| ID   | Severity | Trigger |
+|------|----------|---------|
+| L010 | warning  | Non-Root ADR has no `References:` (no parent) |
+| L011 | warning  | First `References:` target is in a different domain (suppress with `Parent-cross-domain`) |
+| L012 | warning  | First `References:` target is `Draft` or `Proposed` (advisory; chain still flows) |
+| L013 | warning  | Parent-edge graph contains a cycle |
+| L014 | warning  | Non-Root ADR's parent chain does not terminate at any Root |
+| L015 | warning  | First reference is a Root while later References include same-domain non-Root candidates — consider promoting one |
+| L016 | warning  | Structural parent's tier is *lower* leverage than child's (e.g., a B-tier ADR parented under a D-tier) |
+| L017 | warning  | First `References:` target is `Superseded by` another ADR (precedence over L012) |
+
+L015 and L016 are **heuristics**: they encode preferences about
+parent-shape, not strict invariants. Suppressing one is a judgment
+call, typically made via reordering the references rather than
+adding a config exception.
+
+### 5.7 Migration
+
+The parent-edge model treats the existing corpus's "References: ROOT
+first, specialized siblings after" convention as suboptimal and
+enforces the inverted ordering via L015 (see §5.6 and TEMPLATE.md
+§Reference Ordering). Migration is per-domain and manual.
+
+The migration loop for each domain:
+
+1. Run `cargo run -p adr-fmt -- --lint` and grep for `L015` warnings
+   in that domain.
+2. For each L015 finding, identify the most-specialized same-domain
+   Accepted ADR among the References. Apply the invalidation test:
+   "if I removed this ADR, would the child decision still hold?" The
+   strongest "no" is the structural parent.
+3. Reorder the `References:` lines so the structural parent is in
+   first position; the previous first reference (typically a Root)
+   becomes a later citation, or is removed entirely if the relationship
+   is already implied by ancestry.
+4. Re-run `--lint`. Confirm L015 falls to zero for the domain. If
+   reordering produces a new orphan (chain ends at non-root, see
+   §5.5), treat that orphan ADR as the next L015 target. Commit
+   the domain's migration as one PR.
+
+This sequencing prevents partial migrations from polluting the tree
+mid-flight. Foundation domains (COM, RST, SEC) are migrated last
+because they are referenced from many other domains; their reordering
+can shift the structural parent of every dependent ADR.
+
+`--tree` (without `--lint`) renders the current parent-edge view at
+any time, which is useful for sanity-checking the result of a
+migration step. ADRs whose parent chain does not terminate at a root
+appear in a per-domain orphan section, categorized as "no References",
+"chain ends at non-root", or "cycle".
 

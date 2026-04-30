@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-References: GEN-0001, GEN-0032, GEN-0004
+References: GEN-0032
 
 ## Context
 

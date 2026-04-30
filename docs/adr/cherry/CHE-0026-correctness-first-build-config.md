@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-References: CHE-0001, CHE-0007, RST-0003, RST-0001
+References: CHE-0007
 
 ## Context
 
