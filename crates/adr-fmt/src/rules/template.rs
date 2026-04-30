@@ -109,8 +109,8 @@ pub fn check(record: &AdrRecord, config: &Config, diags: &mut Vec<Diagnostic>) {
         diags,
     );
 
-    // T019: Rule-tier tension — fire when Meadows layer implies a tier >1 rank from ADR tier
-    // (>2 ranks for S-tier ADRs in foundation domains).
+    // T019: Rule-tier tension — fire when Meadows layer implies a tier
+    // >1 rank from ADR tier (>2 ranks for S-tier ADRs in foundation domains).
     check_rule_tier_tension(record, tier, config, diags);
 
     // T020: Reference load — tier-scaled limit on References: count

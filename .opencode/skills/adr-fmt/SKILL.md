@@ -130,7 +130,7 @@ Constraints:
 - Layer must be 1-12
 - Multi-line: indent continuation lines 2+ spaces
 - All statuses require tagged rules (no exemptions)
-- **Layer-tier alignment (T019):** rule layer should imply a tier within ±1 of the ADR tier. A D-tier ADR with an L5 rule (B-tier) trips T019 — split the rule into a separate B-tier ADR or adjust the layer.
+- **Layer-tier alignment (T019):** rule layer should imply a tier within ±1 of the ADR tier (±2 for S-tier ADRs in foundation domains). A D-tier ADR with an L5 rule (B-tier) trips T019 — split the rule into a separate B-tier ADR or adjust the layer.
 
 Every rule must satisfy all five criteria:
 

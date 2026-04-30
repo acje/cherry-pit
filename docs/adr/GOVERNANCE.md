@@ -109,7 +109,8 @@ changed. **First-yes-wins:** Start at S and work down.
 
 The leverage-tier mapping is operationalised by two enforcement rules:
 **T019** (rule-tier tension — rule's Meadows layer should imply a tier
-within ±1 of the ADR tier) and **T020** (reference load — `References:`
+within ±1 of the ADR tier; ±2 for S-tier ADRs in foundation domains)
+and **T020** (reference load — `References:`
 count is capped per tier). When either fires, the tier classification
 or rule layering is likely off.
 
