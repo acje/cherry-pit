@@ -4,10 +4,11 @@ Date: 2026-04-26
 Last-reviewed: 2026-04-28
 Tier: B
 Status: Accepted
+Parent-cross-domain: GND-0006 — designing-it-twice is the COM-tier expression of GND-0006's universal directive that intent be tested through backbriefing before action
 
 ## Related
 
-References: COM-0001
+References: GND-0006, COM-0001
 
 ## Context
 

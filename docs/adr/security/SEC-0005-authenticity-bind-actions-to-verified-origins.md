@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-References: SEC-0001
+References: SEC-0001, GND-0005
 
 ## Context
 

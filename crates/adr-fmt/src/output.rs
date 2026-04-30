@@ -274,12 +274,15 @@ pub fn render_tree(
     let parent_edges = compute_parent_edges(records);
     let parent_children = compute_parent_children(records);
 
-    // Filter domains
-    let dirs: Vec<&DomainDir> = if let Some(filter) = domain_filter {
+    // Filter domains. GND is rendered last (foundational stack
+    // underneath all other domain blocks); other domains keep their
+    // TOML-declared order.
+    let mut dirs: Vec<&DomainDir> = if let Some(filter) = domain_filter {
         domain_dirs.iter().filter(|d| d.prefix == filter).collect()
     } else {
         domain_dirs.iter().collect()
     };
+    dirs.sort_by_key(|d| if d.prefix == "GND" { 1 } else { 0 });
 
     if dirs.is_empty() {
         if let Some(f) = domain_filter {

@@ -7,7 +7,7 @@ Status: Draft
 
 ## Related
 
-References: COM-0014, COM-0018
+References: COM-0014, COM-0018, GND-0007
 
 ## Context
 

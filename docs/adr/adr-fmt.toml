@@ -9,6 +9,22 @@ directory = "stale"
 # ── Domain definitions ──────────────────────────────────────────────
 
 [[domains]]
+prefix = "GND"
+name = "Ground Domain"
+directory = "ground"
+description = """\
+    Universal foundations for information-systems design. \
+    Epistemic principles applicable to any information system, \
+    independent of language, runtime, or project. Establishes the \
+    irreducible uncertainty under which all directives operate and \
+    the feedback mechanisms required to close the resulting gaps \
+    between intent, action, and outcome. GND ADRs are the \
+    structural parents that domain-specific principle ADRs (COM, \
+    RST, SEC) implement in their respective vocabularies."""
+crates = []
+foundation = true
+
+[[domains]]
 prefix = "COM"
 name = "Common Domain"
 directory = "common"

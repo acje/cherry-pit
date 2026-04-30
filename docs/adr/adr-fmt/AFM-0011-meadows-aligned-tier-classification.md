@@ -8,7 +8,7 @@ Status: Accepted
 ## Related
 
 Supersedes: AFM-0010
-References: AFM-0001
+References: AFM-0001, GND-0008
 
 ## Context
 

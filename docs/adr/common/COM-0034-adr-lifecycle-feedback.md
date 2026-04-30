@@ -4,10 +4,11 @@ Date: 2026-04-30
 Last-reviewed: 2026-04-30
 Tier: B
 Status: Draft
+Parent-cross-domain: GND-0007 — operational-signal-to-ADR-review is the COM-tier expression of GND-0007's universal directive that directives have explicit lifecycle feedback
 
 ## Related
 
-References: COM-0019, COM-0013
+References: GND-0007, COM-0019, COM-0013
 
 ## Context
 

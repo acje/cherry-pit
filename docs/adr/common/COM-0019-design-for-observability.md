@@ -4,10 +4,11 @@ Date: 2026-04-28
 Last-reviewed: 2026-04-29
 Tier: A
 Status: Accepted
+Parent-cross-domain: GND-0005 — observability-as-design-constraint is the COM-tier expression of GND-0005's universal directive that intent must be observable in operation
 
 ## Related
 
-References: COM-0001
+References: GND-0005, COM-0001
 
 ## Context
 

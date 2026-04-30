@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-References: PAR-0017, PAR-0001
+References: PAR-0017, PAR-0001, GND-0005
 
 ## Context
 

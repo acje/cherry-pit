@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-References: GEN-0013
+References: GEN-0013, GND-0001, GND-0005
 
 ## Context
 

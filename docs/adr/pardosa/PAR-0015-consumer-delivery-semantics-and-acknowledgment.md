@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-References: PAR-0008, PAR-0007, PAR-0013, COM-0025
+References: PAR-0008, PAR-0007, PAR-0013, COM-0025, GND-0001, GND-0005
 
 ## Context
 

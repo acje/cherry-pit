@@ -7,7 +7,7 @@ Status: Draft
 
 ## Related
 
-References: COM-0013, COM-0011
+References: COM-0013, COM-0011, GND-0001
 
 ## Context
 

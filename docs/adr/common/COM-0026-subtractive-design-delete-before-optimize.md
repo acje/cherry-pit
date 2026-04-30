@@ -4,10 +4,11 @@ Date: 2026-04-30
 Last-reviewed: 2026-04-30
 Tier: S
 Status: Draft
+Parent-cross-domain: GND-0002 — delete-before-optimize is the COM-tier expression of GND-0002's universal directive that directives express intent rather than mechanism, by removing mechanism that does not serve intent
 
 ## Related
 
-References: COM-0013, COM-0001
+References: GND-0002, COM-0001, COM-0013
 
 ## Context
 

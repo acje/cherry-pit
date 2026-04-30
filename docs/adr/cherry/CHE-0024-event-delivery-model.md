@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-References: CHE-0004, COM-0025
+References: CHE-0004, COM-0025, GND-0001, GND-0005
 
 ## Context
 

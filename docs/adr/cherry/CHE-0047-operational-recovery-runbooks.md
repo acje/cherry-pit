@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-References: CHE-0042
+References: CHE-0042, GND-0001, GND-0004, GND-0007
 
 ## Context
 

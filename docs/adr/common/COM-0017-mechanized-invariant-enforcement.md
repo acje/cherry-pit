@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-References: COM-0009
+References: COM-0009, GND-0005
 
 ## Context
 

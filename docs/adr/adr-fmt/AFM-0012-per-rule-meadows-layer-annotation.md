@@ -7,7 +7,7 @@ Status: Accepted
 
 ## Related
 
-References: AFM-0011
+References: AFM-0011, GND-0005, GND-0008
 
 ## Context
 

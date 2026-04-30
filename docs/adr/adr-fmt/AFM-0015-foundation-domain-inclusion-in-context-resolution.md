@@ -4,10 +4,11 @@ Date: 2026-04-28
 Last-reviewed: 2026-04-28
 Tier: B
 Status: Accepted
+Parent-cross-domain: GND-0003 — foundation-domain-inclusion is the AFM-tier expression of GND-0003's universal directive that executors receive context two levels up
 
 ## Related
 
-References: AFM-0008
+References: GND-0003, AFM-0008
 
 ## Context
 
