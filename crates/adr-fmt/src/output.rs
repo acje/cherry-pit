@@ -344,6 +344,34 @@ pub fn render_tree(
             );
         }
 
+        // Cross-domain forest roots: any non-root domain ADR whose
+        // `Parent-cross-domain:` field validates against its first
+        // `References:` target. These are rendered at top level of
+        // their own domain, annotated with `↑ <PARENT-ID>` so the
+        // cross-domain edge is visible without breaking the
+        // domain-grouped layout. They also seed sub-trees: any
+        // same-domain ADRs that parent through them descend below.
+        let mut cross_domain_roots: Vec<&&AdrRecord> = domain_records
+            .iter()
+            .filter(|r| !r.is_root() && !reached.contains(&r.id))
+            .filter(|r| validated_cross_domain_parent(r).is_some())
+            .collect();
+        cross_domain_roots.sort_by_key(|r| r.id.number);
+
+        for record in &cross_domain_roots {
+            let cross_parent =
+                validated_cross_domain_parent(record).expect("filter guarantees Some");
+            render_cross_domain_tree_node(
+                &mut out,
+                &record.id,
+                &cross_parent,
+                &parent_children,
+                &record_by_id,
+                &dir.prefix,
+                &mut reached,
+            );
+        }
+
         // Orphan section: domain ADRs not reached from any root. We
         // distinguish three subcategories so readers know whether the
         // root cause is a missing References, a cycle, or a chain that
@@ -487,6 +515,97 @@ fn render_tree_node(
     }
 }
 
+/// Render a cross-domain-parented record as a top-level forest root
+/// in its own domain, annotated with `↑ <PARENT-ID>` to make the
+/// cross-domain parent edge visible. Same-domain children that
+/// parent-edge through this record descend beneath it normally.
+fn render_cross_domain_tree_node(
+    out: &mut String,
+    id: &AdrId,
+    cross_parent: &AdrId,
+    parent_children: &HashMap<AdrId, Vec<AdrId>>,
+    record_by_id: &HashMap<&AdrId, &AdrRecord>,
+    domain_prefix: &str,
+    reached: &mut std::collections::HashSet<AdrId>,
+) {
+    if !reached.insert(id.clone()) {
+        return;
+    }
+
+    let Some(record) = record_by_id.get(id) else {
+        return;
+    };
+
+    let title = record.title.as_deref().unwrap_or("(untitled)");
+    let tier = record.tier.map_or_else(|| "?".into(), |t| format!("{t}"));
+    let status = record
+        .status
+        .as_ref()
+        .map_or_else(|| "?".into(), super::model::Status::short_display);
+
+    // The first References target IS the cross-domain parent, so omit
+    // it from `also` (it's surfaced by the ↑ annotation instead).
+    let also = format_also_references_skipping_first_ref(record);
+
+    writeln!(
+        out,
+        "  {} {title} [{tier}] {status} ↑ {cross_parent}{also}",
+        record.id
+    )
+    .unwrap();
+
+    // Descend into same-domain children.
+    let children: Vec<AdrId> = parent_children
+        .get(id)
+        .cloned()
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|c| c.prefix == domain_prefix)
+        .collect();
+
+    let n = children.len();
+    let mut prefix_stack = vec![false]; // not at top level any more
+    for (i, child) in children.iter().enumerate() {
+        let last = i + 1 == n;
+        render_tree_node(
+            out,
+            child,
+            parent_children,
+            record_by_id,
+            domain_prefix,
+            reached,
+            &mut prefix_stack,
+            last,
+        );
+    }
+}
+
+/// Format the "also references" annotation for a cross-domain root,
+/// skipping the first `References:` target (which is surfaced as the
+/// `↑` cross-domain parent annotation, not as a peer "also" link).
+fn format_also_references_skipping_first_ref(record: &AdrRecord) -> String {
+    let mut first_ref_seen = false;
+    let mut others: Vec<String> = Vec::new();
+    for rel in &record.relationships {
+        if rel.verb.is_reverse() {
+            continue;
+        }
+        if rel.verb == RelVerb::Root && rel.target == record.id {
+            continue;
+        }
+        if !first_ref_seen && rel.verb == RelVerb::References {
+            first_ref_seen = true;
+            continue;
+        }
+        others.push(format!("{} {}", rel.verb, rel.target));
+    }
+    if others.is_empty() {
+        String::new()
+    } else {
+        format!(" [also: {}]", others.join(", "))
+    }
+}
+
 /// Format the "also references" annotation using the parent-edge map
 /// (used for orphan section where parent may be missing).
 fn format_also_references(
@@ -597,16 +716,31 @@ pub fn build_header_meta(
         // separately. Rendering it here without validation would
         // mislead reviewers into thinking the declared ID is the
         // structural parent.
-        cross_domain_parent: record.parent_cross_domain.as_ref().and_then(|declared| {
-            let first_ref_target = record
-                .relationships
-                .iter()
-                .find(|r| r.verb == RelVerb::References)
-                .map(|r| &r.target);
-            (first_ref_target == Some(declared))
-                .then(|| (declared.clone(), record.parent_cross_domain_reason.clone()))
-        }),
+        cross_domain_parent: validated_cross_domain_parent(record)
+            .map(|id| (id, record.parent_cross_domain_reason.clone())),
     }
+}
+
+/// Return the validated cross-domain parent ID for a record, or `None`.
+///
+/// The cross-domain parent is "validated" when:
+/// 1. The `Parent-cross-domain:` preamble field is present, AND
+/// 2. The declared ID matches the record's first `References:` target.
+///
+/// A mismatch is a misdeclaration (surfaced by L018, not here); a missing
+/// field on a cross-domain first-References is surfaced by L011. This
+/// helper returns `Some` only when the field and the structural parent
+/// edge agree, so callers can treat the result as "this ADR has a
+/// declared, structurally-honoured cross-domain parent."
+#[must_use]
+pub fn validated_cross_domain_parent(record: &AdrRecord) -> Option<AdrId> {
+    let declared = record.parent_cross_domain.as_ref()?;
+    let first_ref_target = record
+        .relationships
+        .iter()
+        .find(|r| r.verb == RelVerb::References)
+        .map(|r| &r.target)?;
+    (first_ref_target == declared).then(|| declared.clone())
 }
 
 #[cfg(test)]

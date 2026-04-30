@@ -69,3 +69,8 @@ R4 [3]: Record review outcome — reaffirmed, refined, superseded,
 - **Replaces silent drift with explicit transition.** A superseded
   directive carries forward its history; the corpus tells the truth
   about what it currently believes.
+- **Observation mechanism (per GND-0005).** Lint plus review-gate:
+  `Last-reviewed` field aging beyond a tier-specific threshold
+  flags the ADR for review; supersession is recorded in the
+  `Supersedes:` field and surfaced by `adr-fmt`'s lifecycle checks
+  so terminal-status ADRs land in the stale directory.

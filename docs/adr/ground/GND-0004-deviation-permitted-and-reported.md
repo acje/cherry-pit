@@ -61,3 +61,8 @@ R3 [3]: Treat three or more recorded deviations against the same
   data about where the directive's scope no longer matches reality.
 - **Connects to lifecycle.** The supersession trigger in GND-0007
   consumes the deviation log as one of its inputs.
+- **Observation mechanism (per GND-0005).** Review-gate checklist:
+  deviations are recorded in commit messages or ADR amendments
+  citing the directive ID; periodic corpus review correlates
+  recurring deviations against directives and feeds the GND-0007
+  lifecycle trigger.

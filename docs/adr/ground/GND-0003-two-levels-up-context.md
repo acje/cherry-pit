@@ -64,3 +64,7 @@ R3 [3]: Deliver tagged rules to the executor in order of Meadows
 - **Edge case.** When a directive's structural parent is itself
   thin, the executor may need to traverse one further. The flag
   exists for exactly this case; it is not the common path.
+- **Observation mechanism (per GND-0005).** Tooling enforcement:
+  `adr-fmt --context` implements the two-level scope mechanically
+  by default; broader scope requires an explicit flag whose
+  invocation is logged, surfacing exceptions for review.

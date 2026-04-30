@@ -60,3 +60,8 @@ R3 [3]: Adopt directed opportunism — high alignment around intent,
   feedback loops (tests, telemetry, backbriefing) are favoured.
 - **Cost.** Every ADR Context section gains a small framing burden:
   identify the gap. The cost is paid in clarity downstream.
+- **Observation mechanism (per GND-0005).** Review-gate checklist:
+  every new ADR's Context section is reviewed for explicit naming
+  of the knowledge, alignment, or effects gap it addresses; ADRs
+  that frame the problem as deterministic without naming a gap are
+  refused at acceptance.

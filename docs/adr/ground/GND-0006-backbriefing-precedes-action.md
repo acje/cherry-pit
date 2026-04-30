@@ -72,3 +72,8 @@ R4 [3]: Treat repeated backbriefing corrections against the same
 - **Connects to GND-0008.** When focus of effort is named, the
   backbriefing exchange explicitly references the current Schwerpunkt
   and confirms the proposed action serves it.
+- **Observation mechanism (per GND-0005).** Review-gate checklist:
+  non-trivial work produces a written plan (plan-mode proposal,
+  design doc, or commit-message preamble) restating intent and
+  proposed action; absence of a plan blocks merge for non-trivial
+  change.

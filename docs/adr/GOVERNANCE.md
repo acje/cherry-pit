@@ -287,6 +287,17 @@ list contains every forward link other than the structural parent.
 This makes secondary citations visible without conflating them with
 the tree shape.
 
+ADRs whose first `References:` target is in a *different* domain and
+which declare the cross-domain edge via `Parent-cross-domain:` render
+as additional top-level entries in their **own** domain's tree,
+annotated with `↑ <PARENT-ID>`. Same-domain children that parent
+through them descend beneath them as usual. The `↑` marker makes the
+cross-domain edge visible without breaking domain-grouped layout.
+A `Parent-cross-domain` declaration that does not match the first
+`References:` target is treated as a misdeclaration (rendered as
+orphan; flagged by **L018**); a declaration pointing at a
+nonexistent ADR is flagged by **L019**.
+
 ADRs that are unreachable from any Root via parent edges land in a
 per-domain orphan section, annotated with the reason:
 
@@ -308,6 +319,8 @@ per-domain orphan section, annotated with the reason:
 | L015 | warning  | First reference is a Root while later References include same-domain non-Root candidates — consider promoting one |
 | L016 | warning  | Structural parent's tier is *lower* leverage than child's (e.g., a B-tier ADR parented under a D-tier) |
 | L017 | warning  | First `References:` target is `Superseded by` another ADR (precedence over L012) |
+| L018 | warning  | `Parent-cross-domain` declared ID does not match the first `References:` target — stale or misdeclared field |
+| L019 | warning  | `Parent-cross-domain` target ADR does not exist in the corpus — dangling field |
 
 L015 and L016 are **heuristics**: they encode preferences about
 parent-shape, not strict invariants. Suppressing one is a judgment

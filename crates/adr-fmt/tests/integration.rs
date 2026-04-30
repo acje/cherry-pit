@@ -1049,6 +1049,217 @@ fn tree_unknown_domain_graceful() {
         .stdout(predicate::str::contains("No domain found"));
 }
 
+#[test]
+fn tree_renders_cross_domain_parented_adrs_with_arrow() {
+    // HR1 regression: when an ADR's first References target is in a
+    // different domain and `Parent-cross-domain:` declares it, the
+    // ADR must render as a top-level entry in its own domain with
+    // `↑ <PARENT-ID>` annotation, NOT in the orphans section. Before
+    // the fix, --tree silently dropped the cross-domain edge and
+    // marked the ADR as orphaned, while --lint stayed quiet (HR2).
+    let cross_domain_child = "\
+# TST-0002. Cross-domain child
+Date: 2026-04-27
+Last-reviewed: 2026-04-27
+Tier: B
+Status: Accepted
+Parent-cross-domain: COM-0001 — boundary ADR
+
+## Related
+
+References: COM-0001
+
+## Context
+Test fixture for cross-domain parent rendering.
+
+## Decision
+R1 [5]: This is a cross-domain-parented ADR for tree-render testing.
+
+## Consequences
+Renders under TST with ↑ COM-0001 annotation.
+";
+    let dir = setup_multi_corpus(
+        MULTI_DOMAIN_CONFIG,
+        &[
+            (
+                "common",
+                &[("COM-0001-foundation-principle.md", FOUNDATION_ADR)],
+            ),
+            (
+                "test",
+                &[("TST-0002-cross-domain-child.md", cross_domain_child)],
+            ),
+        ],
+        &[],
+    );
+
+    let out = adr_fmt()
+        .args(["--tree", "--", &adr_root(&dir)])
+        .output()
+        .expect("binary runs");
+    let stdout = String::from_utf8_lossy(&out.stdout);
+
+    assert!(
+        stdout.contains("TST-0002") && stdout.contains("↑ COM-0001"),
+        "TST-0002 must render with ↑ COM-0001 annotation, got:\n{stdout}",
+    );
+    assert!(
+        !stdout.contains("orphans"),
+        "cross-domain-parented ADR must not appear in orphans section, got:\n{stdout}",
+    );
+}
+
+#[test]
+fn tree_cross_domain_root_renders_descendants_with_correct_indent() {
+    // HR1 regression (rigormortis follow-up): cross-domain forest
+    // roots must render their same-domain descendants with the same
+    // indent/connector pattern as native-Root subtrees. This test
+    // exercises a cross-domain root with a child and a grandchild,
+    // and checks that grandchild glyphs match the depth-2 expectation
+    // (`     │  └─ ` or `     │  ├─ ` for ongoing siblings, etc.).
+    let cross_root = "\
+# TST-0002. Cross-domain root
+Date: 2026-04-27
+Last-reviewed: 2026-04-27
+Tier: B
+Status: Accepted
+Parent-cross-domain: COM-0001 — boundary ADR
+
+## Related
+
+References: COM-0001
+
+## Context
+Test fixture: cross-domain forest root with descendants.
+
+## Decision
+R1 [5]: Cross-domain root with same-domain descendants for indent tests.
+
+## Consequences
+Children render at depth 1, grandchild at depth 2.
+";
+    let child_a = "\
+# TST-0003. Child A
+Date: 2026-04-27
+Last-reviewed: 2026-04-27
+Tier: B
+Status: Accepted
+
+## Related
+
+References: TST-0002
+
+## Context
+First child of TST-0002.
+
+## Decision
+R1 [5]: First child of cross-domain root TST-0002 for indent test.
+
+## Consequences
+None.
+";
+    let child_b = "\
+# TST-0004. Child B
+Date: 2026-04-27
+Last-reviewed: 2026-04-27
+Tier: B
+Status: Accepted
+
+## Related
+
+References: TST-0002
+
+## Context
+Second child of TST-0002.
+
+## Decision
+R1 [5]: Second child of cross-domain root TST-0002 for indent test.
+
+## Consequences
+None.
+";
+    let grandchild = "\
+# TST-0005. Grandchild
+Date: 2026-04-27
+Last-reviewed: 2026-04-27
+Tier: B
+Status: Accepted
+
+## Related
+
+References: TST-0003
+
+## Context
+Grandchild via TST-0003.
+
+## Decision
+R1 [5]: Grandchild of cross-domain root via TST-0003 for indent test.
+
+## Consequences
+None.
+";
+    let dir = setup_multi_corpus(
+        MULTI_DOMAIN_CONFIG,
+        &[
+            (
+                "common",
+                &[("COM-0001-foundation-principle.md", FOUNDATION_ADR)],
+            ),
+            (
+                "test",
+                &[
+                    ("TST-0002-cross-domain-root.md", cross_root),
+                    ("TST-0003-child-a.md", child_a),
+                    ("TST-0004-child-b.md", child_b),
+                    ("TST-0005-grandchild.md", grandchild),
+                ],
+            ),
+        ],
+        &[],
+    );
+
+    let out = adr_fmt()
+        .args(["--tree", "TST", &adr_root(&dir)])
+        .output()
+        .expect("binary runs");
+    let stdout = String::from_utf8_lossy(&out.stdout);
+
+    // The cross-domain root renders at column 2 with no connector.
+    assert!(
+        stdout.contains("  TST-0002"),
+        "cross-domain root must render at column 2 without connector, got:\n{stdout}",
+    );
+    // Children render with the same depth-1 indent as native-root children.
+    // TST-0003 is the first child (not last) → ├─, TST-0004 last → └─.
+    assert!(
+        stdout.contains("     ├─ TST-0003"),
+        "first child must render with ├─ at depth 1, got:\n{stdout}",
+    );
+    assert!(
+        stdout.contains("     └─ TST-0004"),
+        "last child must render with └─ at depth 1, got:\n{stdout}",
+    );
+    // Grandchild under TST-0003: depth 2. Since TST-0003 has more
+    // siblings (TST-0004 follows), col-5 must be `│`. Grandchild is
+    // last (and only) child so it gets `└─` at col 8.
+    assert!(
+        stdout.contains("     │  └─ TST-0005"),
+        "grandchild must render with │ continuation at col 5 and └─ at col 8, got:\n{stdout}",
+    );
+    // Orphans section must not contain any of the test ADRs.
+    let orphans_section = stdout
+        .split("orphans")
+        .nth(1)
+        .unwrap_or("");
+    assert!(
+        !orphans_section.contains("TST-0002")
+            && !orphans_section.contains("TST-0003")
+            && !orphans_section.contains("TST-0004")
+            && !orphans_section.contains("TST-0005"),
+        "no test ADR may appear in orphans section, got:\n{stdout}",
+    );
+}
+
 // ── mutual exclusion ───────────────────────────────────────────────
 
 #[test]

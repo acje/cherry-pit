@@ -70,3 +70,8 @@ R4 [3]: Keep focus changes out of the directive corpus itself;
   form. A team may choose `FOCUS.md`, milestone labels, OKR
   pointers, or equivalent; the obligation is that *some* artefact
   exists and meets R1–R4.
+- **Observation mechanism (per GND-0005).** Lint enforcement: the
+  focus artefact's presence, schema conformance, period currency,
+  and resolution of in-focus directive IDs are checked by
+  `adr-fmt`'s F001–F007 lints; absence or expiry surfaces as a
+  diagnostic at every lint run.

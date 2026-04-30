@@ -29,6 +29,12 @@
 //!       than child's tier
 //! L017: Superseded parent — first `References:` target has been
 //!       superseded; redirect to the successor
+//! L018: Parent-cross-domain mismatch — declared `Parent-cross-domain`
+//!       ID does not match the first `References:` target (stale or
+//!       misdeclared field; tree-render would treat the record as
+//!       orphaned for cross-domain-parent purposes)
+//! L019: Parent-cross-domain dangling — declared `Parent-cross-domain`
+//!       target ADR does not exist in the corpus
 //!
 //! Diagnostics are independent: a single relationship may emit
 //! multiple codes (e.g. L006 + L001 for a legacy verb pointing to
@@ -77,6 +83,9 @@ pub fn check(records: &[AdrRecord], diags: &mut Vec<Diagnostic>) {
         for rel in &record.relationships {
             check_single_link(record, rel, &by_id, diags);
         }
+
+        // L018 / L019: Parent-cross-domain field consistency
+        check_parent_cross_domain_consistency(record, &by_id, diags);
     }
 
     // L003: Supersedes-status consistency (cross-file)
@@ -203,6 +212,99 @@ fn check_legacy_verb(source: &AdrRecord, rel: &Relationship, diags: &mut Vec<Dia
                 source.id, rel.verb, rel.target,
             ),
         ));
+    }
+}
+
+/// L018 / L019: Validate the `Parent-cross-domain:` preamble field
+/// against the actual References list and the corpus.
+///
+/// L018 fires when the declared cross-domain parent ID does not
+/// match the record's first `References:` target. The field exists
+/// to suppress L011 for a specific, intentional cross-domain edge;
+/// when it names a different ADR than the structural parent, it is
+/// either stale (the References were re-ordered) or misdeclared
+/// (the wrong ID was written). The render-tree treats the field as
+/// authoritative only when it matches the first reference, so a
+/// mismatch makes the cross-domain link invisible in `--tree`.
+///
+/// L019 fires when the declared target ADR is not present in the
+/// corpus. L001 (dangling link) only inspects relationship lines,
+/// not preamble fields, so a Parent-cross-domain pointing at a
+/// nonexistent ADR would otherwise pass silently.
+///
+/// Roots and ADRs without `Parent-cross-domain` declared are skipped.
+fn check_parent_cross_domain_consistency(
+    record: &AdrRecord,
+    by_id: &HashMap<&AdrId, &AdrRecord>,
+    diags: &mut Vec<Diagnostic>,
+) {
+    let Some(declared) = record.parent_cross_domain.as_ref() else {
+        return;
+    };
+
+    // L019: target must exist in the corpus.
+    if !by_id.contains_key(declared) {
+        diags.push(Diagnostic::warning(
+            "L019",
+            &record.file_path,
+            0,
+            format!(
+                "{} → {declared}: Parent-cross-domain target does not exist \
+                 in the corpus — fix the field or remove it",
+                record.id,
+            ),
+        ));
+    }
+
+    // L018: declared ID must match the first References target.
+    let first_ref_target = record
+        .relationships
+        .iter()
+        .find(|r| r.verb == RelVerb::References)
+        .map(|r| &r.target);
+
+    match first_ref_target {
+        Some(actual) if actual == declared => {} // consistent
+        Some(actual) => {
+            // Find the first References line for diagnostic location
+            let line = record
+                .relationships
+                .iter()
+                .find(|r| r.verb == RelVerb::References)
+                .map_or(0, |r| r.line);
+            diags.push(Diagnostic::warning(
+                "L018",
+                &record.file_path,
+                line,
+                format!(
+                    "{}: Parent-cross-domain declares {declared}, but first \
+                     References is {actual} — align the field with the \
+                     structural parent or re-order References to put \
+                     {declared} first",
+                    record.id,
+                ),
+            ));
+        }
+        None => {
+            // Field declared but no References at all. Either roots
+            // (which never have References) or an ADR missing them
+            // entirely — L010 covers the latter; for roots the field
+            // is meaningless, surface as L018.
+            if !record.is_root() {
+                // L010 handles the missing-References case; don't pile on.
+                return;
+            }
+            diags.push(Diagnostic::warning(
+                "L018",
+                &record.file_path,
+                0,
+                format!(
+                    "{}: Parent-cross-domain declared on a Root ADR — Roots \
+                     have no parent edge; remove the field",
+                    record.id,
+                ),
+            ));
+        }
     }
 }
 
@@ -1490,6 +1592,181 @@ mod tests {
         assert!(
             !diags.iter().any(|d| d.rule == "L015"),
             "L015 must not fire when first ref is not a Root, got: {diags:?}"
+        );
+    }
+
+    // ── L018 / L019: Parent-cross-domain field consistency ─────────
+
+    #[test]
+    fn l018_fires_on_mismatch_between_field_and_first_reference() {
+        // Field declares GND-0006 but first References is COM-0001.
+        // The render-tree treats the field as authoritative only when
+        // it matches the first reference; mismatch must surface as L018.
+        let com_root = make_record_with_rels("COM", 1, vec![(RelVerb::Root, make_id("COM", 1))]);
+        let gnd_root = make_record_with_rels("GND", 6, vec![(RelVerb::Root, make_id("GND", 6))]);
+
+        let mut child = make_record_with_rels(
+            "COM",
+            8,
+            vec![
+                (RelVerb::References, make_id("COM", 1)),
+                (RelVerb::References, make_id("GND", 6)),
+            ],
+        );
+        child.parent_cross_domain = Some(make_id("GND", 6));
+
+        let records = vec![com_root, gnd_root, child];
+        let mut diags = Vec::new();
+        check(&records, &mut diags);
+        assert!(
+            diags.iter().any(|d| d.rule == "L018"),
+            "expected L018 for mismatch, got: {diags:?}"
+        );
+    }
+
+    #[test]
+    fn l018_silent_when_field_matches_first_reference() {
+        let com_root = make_record_with_rels("COM", 1, vec![(RelVerb::Root, make_id("COM", 1))]);
+        let gnd_root = make_record_with_rels("GND", 6, vec![(RelVerb::Root, make_id("GND", 6))]);
+
+        let mut child = make_record_with_rels(
+            "COM",
+            8,
+            vec![
+                (RelVerb::References, make_id("GND", 6)),
+                (RelVerb::References, make_id("COM", 1)),
+            ],
+        );
+        child.parent_cross_domain = Some(make_id("GND", 6));
+
+        let records = vec![com_root, gnd_root, child];
+        let mut diags = Vec::new();
+        check(&records, &mut diags);
+        assert!(
+            !diags.iter().any(|d| d.rule == "L018"),
+            "L018 must be silent on consistent field, got: {diags:?}"
+        );
+    }
+
+    #[test]
+    fn l019_fires_when_declared_target_does_not_exist() {
+        // Field declares GND-0099 (nonexistent). L019 must surface
+        // because L001 inspects relationship lines, not preamble fields.
+        let com_root = make_record_with_rels("COM", 1, vec![(RelVerb::Root, make_id("COM", 1))]);
+
+        let mut child = make_record_with_rels(
+            "COM",
+            8,
+            vec![(RelVerb::References, make_id("COM", 1))],
+        );
+        child.parent_cross_domain = Some(make_id("GND", 99));
+
+        let records = vec![com_root, child];
+        let mut diags = Vec::new();
+        check(&records, &mut diags);
+        assert!(
+            diags.iter().any(|d| d.rule == "L019"),
+            "expected L019 for dangling Parent-cross-domain, got: {diags:?}"
+        );
+    }
+
+    #[test]
+    fn l019_silent_when_target_exists() {
+        let com_root = make_record_with_rels("COM", 1, vec![(RelVerb::Root, make_id("COM", 1))]);
+        let gnd_root = make_record_with_rels("GND", 6, vec![(RelVerb::Root, make_id("GND", 6))]);
+
+        let mut child = make_record_with_rels(
+            "COM",
+            8,
+            vec![(RelVerb::References, make_id("GND", 6))],
+        );
+        child.parent_cross_domain = Some(make_id("GND", 6));
+
+        let records = vec![com_root, gnd_root, child];
+        let mut diags = Vec::new();
+        check(&records, &mut diags);
+        assert!(
+            !diags.iter().any(|d| d.rule == "L019"),
+            "L019 must be silent when target exists, got: {diags:?}"
+        );
+    }
+
+    #[test]
+    fn l018_silent_when_no_field_declared() {
+        // No Parent-cross-domain field — both rules must stay silent.
+        let com_root = make_record_with_rels("COM", 1, vec![(RelVerb::Root, make_id("COM", 1))]);
+        let child = make_record_with_rels(
+            "COM",
+            8,
+            vec![(RelVerb::References, make_id("COM", 1))],
+        );
+
+        let records = vec![com_root, child];
+        let mut diags = Vec::new();
+        check(&records, &mut diags);
+        assert!(
+            !diags.iter().any(|d| matches!(&*d.rule, "L018" | "L019")),
+            "L018/L019 must not fire without Parent-cross-domain, got: {diags:?}"
+        );
+    }
+
+    #[test]
+    fn l018_fires_on_root_with_field() {
+        // A Root has no parent edge — declaring Parent-cross-domain on
+        // it is incoherent. L018 should surface this case so the field
+        // is removed.
+        let mut com_root = make_record_with_rels(
+            "COM",
+            1,
+            vec![(RelVerb::Root, make_id("COM", 1))],
+        );
+        com_root.parent_cross_domain = Some(make_id("GND", 1));
+
+        // GND-0001 must exist in the corpus or L019 will also fire,
+        // which we want to keep separate from this assertion.
+        let gnd_root = make_record_with_rels(
+            "GND",
+            1,
+            vec![(RelVerb::Root, make_id("GND", 1))],
+        );
+
+        let records = vec![com_root, gnd_root];
+        let mut diags = Vec::new();
+        check(&records, &mut diags);
+        assert!(
+            diags.iter().any(|d| d.rule == "L018"),
+            "L018 must fire when a Root declares Parent-cross-domain, got: {diags:?}"
+        );
+    }
+
+    #[test]
+    fn l018_and_l011_co_emit_on_mismatched_field() {
+        // When Parent-cross-domain declares X but first References is
+        // Y (different domain), L018 fires for the field/References
+        // disagreement AND L011 fires because the cross-domain parent
+        // edge to Y is not suppressed (suppression names X, not Y).
+        // Pin co-emission policy: both rules encode different concerns.
+        let com_root = make_record_with_rels("COM", 1, vec![(RelVerb::Root, make_id("COM", 1))]);
+        let gnd_a = make_record_with_rels("GND", 1, vec![(RelVerb::Root, make_id("GND", 1))]);
+        let gnd_b = make_record_with_rels("GND", 6, vec![(RelVerb::Root, make_id("GND", 6))]);
+
+        let mut child = make_record_with_rels(
+            "COM",
+            8,
+            vec![(RelVerb::References, make_id("GND", 1))],
+        );
+        child.parent_cross_domain = Some(make_id("GND", 6)); // names a different cross-domain parent
+
+        let records = vec![com_root, gnd_a, gnd_b, child];
+        let mut diags = Vec::new();
+        check(&records, &mut diags);
+        assert!(
+            diags.iter().any(|d| d.rule == "L018"),
+            "L018 expected on field/References mismatch, got: {diags:?}"
+        );
+        assert!(
+            diags.iter().any(|d| d.rule == "L011"),
+            "L011 expected on un-suppressed cross-domain edge, got: {diags:?}"
         );
     }
 }

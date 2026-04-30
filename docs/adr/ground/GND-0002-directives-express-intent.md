@@ -64,3 +64,8 @@ R3 [3]: Distinguish in every ADR whether the decision constrains
   types and methods to anchor attention; this remains compatible —
   the type is the bounded artifact, the rule states the intent the
   type expresses.
+- **Observation mechanism (per GND-0005).** Lint plus review-gate:
+  T016 already constrains rule shape (positive imperative, 7–60
+  words); reviewer-gate flags rules whose prose reads as procedure
+  rather than intent and refines the rule or marks the ADR as a
+  legitimate mechanism-prescribing exception.
