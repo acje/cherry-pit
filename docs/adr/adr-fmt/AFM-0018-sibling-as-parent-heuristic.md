@@ -29,38 +29,38 @@ chosen: a rule firing on Accepted ADRs needs calibration first.
 
 ## Decision
 
-Add an experimental L018 diagnostic flagging same-tier-non-root
+Add an experimental L020 diagnostic flagging same-tier-non-root
 parent edges where the child has strictly more `References:`
 targets than the parent. Gate behind `--lint-experimental` and
 calibrate against a baseline of currently-known hits before any
 promotion decision.
 
-R1 [5]: Define L018 diagnostic in `crates/adr-fmt/src/rules/links.rs`
+R1 [5]: Define L020 diagnostic in `crates/adr-fmt/src/rules/links.rs`
   alongside L016, firing when child tier equals parent tier, neither
   is S, both are in the same domain, parent is non-root, and child's
   `References:` target count exceeds parent's
 R2 [5]: Add a `--lint-experimental` boolean flag to the clap-derived
   CLI in `crates/adr-fmt/src/main.rs` per AFM-0013; the flag gates
-  L018 emission and remains off by default
-R3 [6]: Record L018 hit triage in `crates/adr-fmt/docs/l018-evaluation.md`
+  L020 emission and remains off by default
+R3 [6]: Record L020 hit triage in `crates/adr-fmt/docs/l020-evaluation.md`
   using rows of `date | adr-id | parent-id | verdict | reviewer | note`
   where verdict is one of `true-positive`, `false-positive`, or
   `borderline`; the file is the single source of calibration data
-R4 [12]: Configure L018 promotion thresholds (false-positive ceiling,
+R4 [12]: Configure L020 promotion thresholds (false-positive ceiling,
   minimum hit count, evaluation window) in the `[[rules]]` section of
   `docs/adr/adr-fmt/adr-fmt.toml` so tuning does not require an ADR edit
 R5 [6]: Triage the nine baseline hits identified during corpus
   measurement and record their verdicts in
-  `crates/adr-fmt/docs/l018-evaluation.md` before `--lint-experimental`
+  `crates/adr-fmt/docs/l020-evaluation.md` before `--lint-experimental`
   is enabled in any contributor workflow
-R6 [5]: Decide promotion or retirement of L018 via a successor ADR
+R6 [5]: Decide promotion or retirement of L020 via a successor ADR
   that cites the configured thresholds and the recorded verdicts in
-  `crates/adr-fmt/docs/l018-evaluation.md` as evidence
+  `crates/adr-fmt/docs/l020-evaluation.md` as evidence
 
 ## Consequences
 
 - **Pairs with L016.** L016 catches inversion across tier boundaries;
-  L018 catches inversion within a tier.
+  L020 catches inversion within a tier.
 - **Cost.** New flag widens CLI surface; AFM-0014 (unified output)
   still holds since `--lint-experimental` reuses stdout contract.
 - **Self-applying.** This ADR cites AFM-0011 first to avoid the
@@ -68,7 +68,7 @@ R6 [5]: Decide promotion or retirement of L018 via a successor ADR
 - **Operational ownership.** The triage file requires a curator;
   domain owner per COM-0033 fits if accepted, otherwise the
   AFM domain owner.
-- **Fallback.** If L018 retires, the recorded verdicts inform
+- **Fallback.** If L020 retires, the recorded verdicts inform
   whether a TEMPLATE.md documentation intervention fits instead.
 - **Reusable pattern.** The dedicated triage file alongside
   TOML-configured thresholds generalizes to future experimental
