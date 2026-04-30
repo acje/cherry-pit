@@ -16,7 +16,7 @@
 //! T014: Section ordering — H2 sections in canonical order
 //! T015: Section word count range — tier-scaled (configurable base)
 //! T016: Tagged rules validation — tier-scaled max count, 7–60 words each
-//! T019: Rule-tier tension — layer-derived tier >1 rank from ADR tier
+//! T019: Rule-tier tension — layer-derived tier >1 rank from ADR tier (>2 for foundation S-tier)
 //! T020: Reference load — tier-scaled max on References: count
 //! S004: Stale ADR missing Retirement section
 //! S005: Active ADR has Retirement section (location/status mismatch)
@@ -110,6 +110,7 @@ pub fn check(record: &AdrRecord, config: &Config, diags: &mut Vec<Diagnostic>) {
     );
 
     // T019: Rule-tier tension — fire when Meadows layer implies a tier >1 rank from ADR tier
+    // (>2 ranks for S-tier ADRs in foundation domains).
     check_rule_tier_tension(record, tier, config, diags);
 
     // T020: Reference load — tier-scaled limit on References: count
@@ -682,6 +683,14 @@ name = "Cherry"
 directory = "cherry"
 description = "Test"
 crates = []
+
+[[domains]]
+prefix = "GND"
+name = "Ground"
+directory = "ground"
+description = "Foundation test"
+crates = []
+foundation = true
 
 [[rules]]
 id = "T015"
@@ -1674,6 +1683,111 @@ params = { max_rules = 10, min_rule_words = 7, max_rule_words = 60 }
         assert!(
             t019.is_some(),
             "distance 2 should trigger T019, got: {diags:?}"
+        );
+    }
+
+    #[test]
+    fn t019_foundation_s_tier_distance_two_no_warning() {
+        // S-tier ADR in foundation domain (GND) gets ±2 tolerance.
+        use crate::model::TaggedRule;
+        let mut record = make_record();
+        record.id = AdrId {
+            prefix: "GND".into(),
+            number: 1,
+        };
+        record.tier = Some(Tier::S); // rank 0
+        record.decision_rules = vec![TaggedRule {
+            id: "R1".into(),
+            text: "All events must be versioned with semantic version numbers always".into(),
+            line: 10,
+            layer: 5, // B-tier layer, rank 2 → distance 2, within ±2
+        }];
+        let config = make_config();
+        let mut diags = Vec::new();
+        check(&record, &config, &mut diags);
+        let t019 = diags.iter().find(|d| d.rule == "T019");
+        assert!(
+            t019.is_none(),
+            "foundation S-tier at distance 2 must not trigger T019, got: {diags:?}"
+        );
+    }
+
+    #[test]
+    fn t019_foundation_s_tier_distance_three_warns() {
+        // Foundation tolerance is ±2, not unlimited — distance 3 still fires.
+        use crate::model::TaggedRule;
+        let mut record = make_record();
+        record.id = AdrId {
+            prefix: "GND".into(),
+            number: 1,
+        };
+        record.tier = Some(Tier::S); // rank 0
+        record.decision_rules = vec![TaggedRule {
+            id: "R1".into(),
+            text: "All events must be versioned with semantic version numbers always".into(),
+            line: 10,
+            layer: 7, // C-tier layer, rank 3 → distance 3, exceeds ±2
+        }];
+        let config = make_config();
+        let mut diags = Vec::new();
+        check(&record, &config, &mut diags);
+        let t019 = diags.iter().find(|d| d.rule == "T019");
+        assert!(
+            t019.is_some(),
+            "foundation S-tier at distance 3 must trigger T019, got: {diags:?}"
+        );
+    }
+
+    #[test]
+    fn t019_foundation_non_s_tier_uses_default_tolerance() {
+        // Foundation ±2 carve-out applies only to S-tier ADRs;
+        // an A-tier foundation ADR retains the default ±1 tolerance.
+        use crate::model::TaggedRule;
+        let mut record = make_record();
+        record.id = AdrId {
+            prefix: "GND".into(),
+            number: 1,
+        };
+        record.tier = Some(Tier::A); // rank 1
+        record.decision_rules = vec![TaggedRule {
+            id: "R1".into(),
+            text: "All events must be versioned with semantic version numbers always".into(),
+            line: 10,
+            layer: 7, // C-tier layer, rank 3 → distance 2, exceeds ±1
+        }];
+        let config = make_config();
+        let mut diags = Vec::new();
+        check(&record, &config, &mut diags);
+        let t019 = diags.iter().find(|d| d.rule == "T019");
+        assert!(
+            t019.is_some(),
+            "non-S-tier foundation ADR keeps ±1 default; distance 2 must trigger T019, got: {diags:?}"
+        );
+    }
+
+    #[test]
+    fn t019_unknown_prefix_falls_back_to_default() {
+        // Prefix not in [[domains]] → no foundation match → default ±1 applies.
+        use crate::model::TaggedRule;
+        let mut record = make_record();
+        record.id = AdrId {
+            prefix: "ZZZ".into(),
+            number: 1,
+        };
+        record.tier = Some(Tier::S); // rank 0
+        record.decision_rules = vec![TaggedRule {
+            id: "R1".into(),
+            text: "All events must be versioned with semantic version numbers always".into(),
+            line: 10,
+            layer: 5, // B-tier layer, rank 2 → distance 2, exceeds default ±1
+        }];
+        let config = make_config();
+        let mut diags = Vec::new();
+        check(&record, &config, &mut diags);
+        let t019 = diags.iter().find(|d| d.rule == "T019");
+        assert!(
+            t019.is_some(),
+            "unknown prefix must fall back to ±1 default; distance 2 must trigger T019, got: {diags:?}"
         );
     }
 

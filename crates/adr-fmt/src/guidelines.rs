@@ -230,8 +230,9 @@ fn print_template() {
     println!("          Meadows leverage point). Exceeding may indicate");
     println!("          the ADR covers multiple decisions.");
     println!("    T019  Rule-tier tension — flags rules whose Meadows layer");
-    println!("          implies a tier >1 rank from the ADR's tier. Move rule");
-    println!("          to a matching-tier ADR or adjust the layer annotation.");
+    println!("          implies a tier >1 rank from the ADR's tier (foundation");
+    println!("          S-tier ADRs: >2 ranks). Move rule to a matching-tier");
+    println!("          ADR or adjust the layer annotation.");
     println!("    T020  Reference load — tier-scaled limit on References:");
     println!("          count. Root and Supersedes are structural and don't");
     println!("          count. High reference count signals broad scope.");
@@ -300,7 +301,8 @@ fn print_tagged_rules() {
     println!("    • Each rule: 7–60 words");
     println!("    • Layer must be 1–12 (Meadows leverage points)");
     println!("    • Rule-tier tension: layer-derived tier should be within");
-    println!("      1 rank of the ADR's tier (T019)");
+    println!("      1 rank of the ADR's tier — 2 ranks for foundation");
+    println!("      S-tier ADRs (T019)");
     println!();
 
     println!("  Tier scaling (applied to max_words and max_rules base values):");

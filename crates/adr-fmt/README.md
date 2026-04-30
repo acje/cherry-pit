@@ -143,7 +143,7 @@ All rules emit warnings. `adr-fmt` is advisory per AFM-0003.
 | T016 | Decision section lacks tagged rules (`RN [L]: text`) or has non-sequential IDs. Exempt: Draft, Proposed |
 | T017 | *(reserved)* |
 | T018 | *(reserved)* |
-| T019 | Rule-tier tension: rule's Meadows layer implies a tier >1 rank from the ADR tier |
+| T019 | Rule-tier tension: rule's Meadows layer implies a tier >1 rank from the ADR tier (foundation S-tier ADRs: >2 ranks) |
 | T020 | Reference load: `References:` count exceeds tier-scaled cap (S=3, A=5, B=7, C=8, D=5) |
 
 ### Link (L001–L009)
