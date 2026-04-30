@@ -33,7 +33,7 @@ const MAX_CODE_BLOCK_LINES: usize = 20;
 const DEFAULT_MIN_WORDS: u64 = 7;
 
 /// Default maximum word count for prose sections.
-const DEFAULT_MAX_WORDS: u64 = 50;
+const DEFAULT_MAX_WORDS: u64 = 100;
 
 /// Default maximum number of tagged rules per ADR.
 const DEFAULT_MAX_RULES: u64 = 10;
@@ -110,7 +110,7 @@ pub fn check(record: &AdrRecord, config: &Config, diags: &mut Vec<Diagnostic>) {
     );
 
     // T019: Rule-tier tension — fire when Meadows layer implies a tier >1 rank from ADR tier
-    check_rule_tier_tension(record, tier, diags);
+    check_rule_tier_tension(record, tier, config, diags);
 
     // T020: Reference load — tier-scaled limit on References: count
     check_reference_load(record, tier, diags);
@@ -580,13 +580,37 @@ fn check_tagged_rules(
 }
 
 /// T019: Rule-tier tension — flag rules whose Meadows layer implies
-/// a tier more than 1 rank from the ADR's tier.
+/// a tier more than the allowed distance from the ADR's tier.
 ///
 /// A D-tier ADR with S-tier rules (or vice versa) signals the rule is
 /// at the wrong level of abstraction. Move it to a higher/lower-tier
 /// ADR or adjust the layer annotation.
-fn check_rule_tier_tension(record: &AdrRecord, adr_tier: Tier, diags: &mut Vec<Diagnostic>) {
+///
+/// **Tier-aware tolerance.** S-tier ADRs in foundation domains
+/// (per `[[domains]] foundation = true` in `adr-fmt.toml`) get
+/// a ±2 distance threshold instead of ±1. Foundation S-tier ADRs
+/// codify paradigm-level decisions whose enforcement legitimately
+/// reaches structural rules (L4–L6) — the wider tolerance reflects
+/// that intentional spread.
+fn check_rule_tier_tension(
+    record: &AdrRecord,
+    adr_tier: Tier,
+    config: &Config,
+    diags: &mut Vec<Diagnostic>,
+) {
     let adr_rank = adr_tier.rank();
+
+    // Foundation S-tier ADRs get a ±2 tolerance; all others ±1.
+    let max_distance = if adr_tier == Tier::S
+        && config
+            .domains
+            .iter()
+            .any(|d| d.foundation && d.prefix == record.id.prefix)
+    {
+        2
+    } else {
+        1
+    };
 
     for rule in &record.decision_rules {
         let Some(rule_tier) = layer_to_tier(rule.layer) else {
@@ -594,7 +618,7 @@ fn check_rule_tier_tension(record: &AdrRecord, adr_tier: Tier, diags: &mut Vec<D
         };
         let rule_rank = rule_tier.rank();
         let distance = adr_rank.abs_diff(rule_rank);
-        if distance > 1 {
+        if distance > max_distance {
             diags.push(Diagnostic::warning(
                 "T019",
                 &record.file_path,

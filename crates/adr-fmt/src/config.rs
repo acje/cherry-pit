@@ -131,7 +131,7 @@ fn emit_legacy_rule_warnings(config: &Config) {
         eprintln!("         are needed in config. Remove `category` and `description` fields.");
         eprintln!("         Example override: [[rules]]");
         eprintln!("         id = \"T015\"");
-        eprintln!("         params = {{ min_words = 7, max_words = 50 }}");
+        eprintln!("         params = {{ min_words = 7, max_words = 100 }}");
     }
 }
 

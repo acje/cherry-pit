@@ -88,7 +88,7 @@ References: PREFIX-NNNN, PREFIX-NNNN | Supersedes: PREFIX-NNNN
 
 ## Context
 
-[Problem statement — 7-50 words prose, alternatives evaluated]
+[Problem statement — 7-100 words prose, alternatives evaluated]
 
 ## Decision
 

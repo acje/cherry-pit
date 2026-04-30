@@ -34,7 +34,7 @@ References: PREFIX-NNNN, PREFIX-NNNN | Supersedes: PREFIX-NNNN
 
 ## Context
 
-[Problem statement and motivation — 7–50 words of prose, excluding
+[Problem statement and motivation — 7–100 words of prose, excluding
 code blocks.]
 
 ## Decision
@@ -46,7 +46,7 @@ R2 [N]: [Tagged rule — 7–60 words, positive imperative, unconditional]
 
 ## Consequences
 
-[Trade-offs, impact, and what becomes easier or harder — 7–50 words
+[Trade-offs, impact, and what becomes easier or harder — 7–100 words
 of prose, excluding code blocks.]
 ````
 
@@ -281,7 +281,7 @@ re-propose those rejected approaches as "improvements."
    trade-offs tipped the balance. (1–2 sentences)
 
 Code blocks illustrating the problem or alternatives are encouraged
-but don't count toward the word minimum. Keep prose between 7–50
+but don't count toward the word minimum. Keep prose between 7–100
 words (configurable via T015).
 
 **Enforced by:** T008, T015 (word count), T014 (section order).
