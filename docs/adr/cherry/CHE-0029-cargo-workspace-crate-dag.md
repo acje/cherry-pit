@@ -1,7 +1,7 @@
 # CHE-0029. Cargo Workspace with Layered Crate DAG
 
 Date: 2026-04-24
-Last-reviewed: 2026-04-28
+Last-reviewed: 2026-04-30
 Tier: B
 Status: Accepted
 
@@ -37,6 +37,15 @@ R2 [5]: Share dependency versions at workspace level via
   [workspace.dependencies]
 R3 [5]: Commit Cargo.lock to version control for reproducible
   dependency resolution across all environments
+R4 [5]: Restrict cherry-pit-core/Cargo.toml [dependencies] to the
+  pure-domain set serde, uuid, jiff so the crate stays a leaf with
+  zero transport, runtime, or filesystem dependencies
+R5 [5]: Keep async runtimes (tokio), web frameworks (axum), transport
+  clients (async-nats), and observability stacks (tracing) in adapter
+  crates such as cherry-pit-gateway, cherry-pit-web, and pardosa
+R6 [5]: Verify cherry-pit-core's transitive dependency closure in CI
+  via cargo tree -p cherry-pit-core, asserting no tokio, axum,
+  async-nats, or tracing crate appears in the resolved graph
 
 ```
 cherry-pit-core (leaf — no cherry-pit dependencies)
@@ -56,14 +65,15 @@ Workspace-level configuration:
 ## Consequences
 
 - Each crate has a single responsibility and minimal dependencies.
-- Users can depend on just `cherry-pit-core` for domain work without pulling
-  in infrastructure dependencies.
-- Workspace-level dependency versions prevent version drift across
-  crates.
-- Independent crates compile concurrently, improving build times.
-- 6 planned crates are designed on paper but unvalidated — trait
-  coherence and feature flag interactions won't surface until built.
-- `cherry-pit-agent` (binary crate, planned) will be the integration point
-  where cross-crate mismatches surface.
-- `Cargo.lock` is committed to ensure reproducible CI/test runs and
-  prepare for the eventual binary crate.
+- Users depend on `cherry-pit-core` for domain work without pulling
+  in infrastructure.
+- Workspace-level versions prevent drift; independent crates compile
+  concurrently.
+- 6 planned crates are unvalidated until built; `cherry-pit-agent`
+  will surface cross-crate mismatches.
+- `Cargo.lock` commits ensure reproducible CI and the eventual binary.
+- **De-scalability invariant.** Restricting `cherry-pit-core` to
+  `serde`, `uuid`, `jiff` means domain code compiles and tests run
+  even if every adapter crate breaks.
+- **CI enforcement closes the gap.** A `cargo tree -p cherry-pit-core`
+  check makes R4 a build error rather than a convention.

@@ -7,15 +7,17 @@ Status: Draft
 
 ## Related
 
-References: COM-0014, COM-0009
+References: COM-0012, COM-0014, COM-0009
 
 ## Context
 
 COM-0014 aligns boundaries to rate of change; COM-0009 makes
-similar things look similar. Neither states the cross-scale
+similar things look similar; COM-0012 fixes inward-only dependency
+direction. Neither of the first two states the cross-scale
 property: the same patterns — port/adapter, command/event, validate-
 then-commit, dependency inversion — should hold at function, module,
-crate, and service scale. Cherry-pit already shows partial symmetry
+crate, and service scale. This ADR generalizes COM-0012's direction
+rule to every scale. Cherry-pit already shows partial symmetry
 (hexagonal at crate and workspace scale). This ADR makes it
 normative so future structures inherit the property.
 

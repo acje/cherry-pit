@@ -349,3 +349,22 @@ migration step. ADRs whose parent chain does not terminate at a root
 appear in a per-domain orphan section, categorized as "no References",
 "chain ends at non-root", or "cycle".
 
+### 5.8 Known L015 Exceptions
+
+Some ADRs legitimately list a Root in first position with same-domain
+non-Root co-citations. L015 fires but is accepted because both
+references are body-prose direct constraints (§5.6) and the Root is
+genuinely the structural parent.
+
+| ADR | Root parent | Co-citation(s) | Rationale |
+|-----|-------------|----------------|-----------|
+| AFM-0014 | AFM-0001 | AFM-0003 | Stderr seam (R4) is constrained by AFM-0003's exit-code semantics; AFM-0001 is the SSOT root |
+| COM-0026 | COM-0001 | COM-0013 | Subtractive design *implements* the COM-0001 complexity budget; COM-0013 is contrasted, not parented |
+| COM-0032 | COM-0001 | COM-0013, COM-0011 | Requirement interrogation gates COM-0001 budget spend; COM-0013/COM-0011 cite contrasting practices |
+
+New L015 hits are not exceptions by default — they require body-prose
+justification and listing here. The lint warning persists; the table
+records why suppression-by-action (reordering) is not appropriate for
+these cases.
+
+
