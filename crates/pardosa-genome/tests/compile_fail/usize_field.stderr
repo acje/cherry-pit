@@ -1,5 +1,0 @@
-error: GenomeSafe: usize has platform-dependent size. Use u32/u64/i32/i64 for portable serialization.
- --> tests/compile_fail/usize_field.rs:5:12
-  |
-5 |     count: usize,
-  |            ^^^^^

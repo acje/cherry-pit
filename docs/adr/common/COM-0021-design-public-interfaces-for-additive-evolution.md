@@ -11,7 +11,7 @@ References: COM-0013
 
 ## Context
 
-Rich Hickey's "Spec-ulation" argues software should grow by accretion and relaxation, never breakage. Hyrum's Law warns all observable behaviors will be depended on. Kleppmann extends this to persisted schemas: forward/backward compatibility requires tagged fields, optional new fields with defaults, and never-reused field numbers. Cherry-pit's event-sourced persistence makes breakage especially costly — stored events must remain loadable indefinitely. COM-0013 addresses evolutionary design architecturally but provides no interface-level guidance. `#[non_exhaustive]` on error enums, additive event schema evolution, and Genome's compatibility contract already apply this independently.
+Rich Hickey's "Spec-ulation" argues software should grow by accretion and relaxation, never breakage. Hyrum's Law warns all observable behaviors will be depended on. Kleppmann extends this to persisted schemas: forward/backward compatibility requires tagged fields, optional new fields with defaults, and never-reused field numbers. Cherry-pit's event-sourced persistence makes breakage especially costly — stored events must remain loadable indefinitely. COM-0013 addresses evolutionary design architecturally but provides no interface-level guidance. `#[non_exhaustive]` on error enums and additive event schema evolution already apply this independently.
 
 ## Decision
 

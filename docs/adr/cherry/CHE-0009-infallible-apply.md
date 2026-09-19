@@ -41,6 +41,6 @@ R2 [4]: Panic is the only error path for truly corrupt or unknown
 
 - Event replay always succeeds — aggregate state reconstruction is guaranteed.
 - Projections can always be rebuilt from scratch.
-- Schema evolution creates pressure: new event variants force all `apply` implementations to handle them. Pardosa's planned migration-time pruning addresses this.
+- Schema evolution creates pressure: new event variants force all `apply` implementations to handle them. Migration-time pruning in a storage layer addresses this.
 - Panic is the only error path for corrupt data. The CommandBus must decide how to handle panics during replay.
 - The asymmetry between `Aggregate::apply(&Event)` and `Projection::apply(&EventEnvelope<Event>)` is intentional: projections need metadata (timestamp, aggregate_id) for time-based views.

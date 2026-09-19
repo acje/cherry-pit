@@ -32,7 +32,7 @@ conflict messages). Manual `Error::source` chains to inner errors for
 implementations.
 
 `thiserror` **is** available in the workspace for infrastructure
-crates (`cherry-pit-gateway`, `pardosa`, etc.) where dependency count is
+crates (`cherry-pit-gateway`, etc.) where dependency count is
 less critical:
 
 ```toml

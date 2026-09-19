@@ -44,7 +44,7 @@ R4 [5]: Restrict cherry-pit-core/Cargo.toml [dependencies] to the
   zero transport, runtime, or filesystem dependencies
 R5 [5]: Keep async runtimes (tokio), web frameworks (axum), transport
   clients (async-nats), and observability stacks (tracing) in adapter
-  crates such as cherry-pit-gateway, cherry-pit-web, and pardosa
+  crates such as cherry-pit-gateway and cherry-pit-web
 R6 [5]: Verify cherry-pit-core's transitive dependency closure in CI
   via cargo tree -p cherry-pit-core, asserting no tokio, axum,
   async-nats, or tracing crate appears in the resolved graph
@@ -83,8 +83,8 @@ Workspace-level configuration:
 - Workspace-level versions prevent drift; independent crates compile
   concurrently.
 - Risks/migration: reconcile existing library code before consumer pin
-  changes; legacy package cleanup is separate work, not a prerequisite
-  for this boundary. Conformance and release-pair evidence precede
+  changes; the bundled legacy packages have since been removed, leaving
+  cherry-pit-core and cherry-pit-gateway as the workspace members. Conformance and release-pair evidence precede
   application integration.
 - Review dependency metadata and consumer pins against R7-R9 before
   source integration; this amendment does not claim current source

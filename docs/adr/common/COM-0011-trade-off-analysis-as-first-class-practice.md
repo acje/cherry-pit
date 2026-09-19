@@ -13,7 +13,7 @@ References: COM-0001, GND-0001
 
 Richards and Ford (Fundamentals of Software Architecture, Ch. 2): "Everything in software architecture is a trade-off." This is distinct from COM-0001 (how much complexity is justified) — trade-off analysis addresses which qualities compete and which side this project chooses.
 
-Cherry-pit's trade-offs: correctness over performance (CHE-0028, CHE-0009, CHE-0032), simplicity over flexibility (CHE-0037, CHE-0040, GEN-0031), safety over ergonomics (CHE-0021, CHE-0007), consistency over local optimality (CHE-0015, CHE-0009, COM-0009). The ADR system documents trade-offs structurally; this ADR makes the practice mandatory.
+Cherry-pit's trade-offs: correctness over performance (CHE-0028, CHE-0009, CHE-0032), simplicity over flexibility (CHE-0037, CHE-0040), safety over ergonomics (CHE-0021, CHE-0007), consistency over local optimality (CHE-0015, CHE-0009, COM-0009). The ADR system documents trade-offs structurally; this ADR makes the practice mandatory.
 
 ## Decision
 
@@ -35,4 +35,4 @@ R5 [6]: When project scale or requirements shift, review affected
 
 ## Consequences
 
-ADR Context and Consequences sections are the enforcement — an ADR presenting only benefits without costs is incomplete. CHE-0001 (design priority ordering) becomes the standing trade-off resolution for common quality attribute conflicts. Deliberate deferrals (CHE-0037, CHE-0040, GEN-0031) are validated as explicit trade-offs with documented revisit conditions. COM-0008 (Design It Twice) becomes more productive when comparison axes are explicit. In distributed systems, the CAP theorem and PACELC model provide additional standing trade-off axes that every persistence and communication decision must address. Risk of over-analysis is mitigated by COM-0008's time-box: proportional to tier and reversibility.
+ADR Context and Consequences sections are the enforcement — an ADR presenting only benefits without costs is incomplete. CHE-0001 (design priority ordering) becomes the standing trade-off resolution for common quality attribute conflicts. Deliberate deferrals (CHE-0037, CHE-0040) are validated as explicit trade-offs with documented revisit conditions. COM-0008 (Design It Twice) becomes more productive when comparison axes are explicit. In distributed systems, the CAP theorem and PACELC model provide additional standing trade-off axes that every persistence and communication decision must address. Risk of over-analysis is mitigated by COM-0008's time-box: proportional to tier and reversibility.

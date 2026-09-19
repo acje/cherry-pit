@@ -32,8 +32,8 @@ alongside the module interface, not added after implementation.
 
 R1 [6]: Every module that absorbs, retries, or masks an error emits
   a structured trace span or metric at the decision point
-R2 [6]: State transitions in stateful components (Fiber, Dragline,
-  Aggregate) include tracing context sufficient to reconstruct the
+R2 [6]: State transitions in stateful components (Aggregate, event
+  store writers) include tracing context sufficient to reconstruct the
   transition sequence from logs alone
 R3 [4]: Observability instrumentation is reviewed alongside the trait
   interface during design, documented in interface comments
@@ -44,8 +44,8 @@ R5 [6]: Telemetry fields that may contain user data use redacted
 R6 [6]: High-cardinality telemetry labels such as aggregate_id,
   event_id, correlation_id, and causation_id stay in traces or logs
   rather than unbounded metric dimensions
-R7 [6]: Retry loops in CommandGateway, EventBus, EventStore, and
-  Pardosa consumers emit attempt count, terminal category, and
+R7 [6]: Retry loops in CommandGateway, EventBus, and EventStore
+  implementations emit attempt count, terminal category, and
   correlation_id in structured telemetry
 
 ## Consequences

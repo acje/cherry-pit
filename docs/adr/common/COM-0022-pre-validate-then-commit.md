@@ -11,7 +11,7 @@ References: COM-0018, GND-0005
 
 ## Context
 
-Database ACID transactions validate constraints before committing. Copy-on-write filesystems (ZFS, Btrfs) write new state to a fresh location and atomically commit. Greg Young's event sourcing formalizes this: command handling is a decision function (may fail), event logging is the commit, and apply is a deterministic fold (cannot fail). Cherry-pit applies pre-validate-then-commit everywhere: Dragline pre-computes values before mutation, MsgpackFileStore uses atomic temp-file-then-rename, EventEnvelope validates in the constructor. Single-writer architecture eliminates contention that makes optimistic approaches attractive.
+Database ACID transactions validate constraints before committing. Copy-on-write filesystems (ZFS, Btrfs) write new state to a fresh location and atomically commit. Greg Young's event sourcing formalizes this: command handling is a decision function (may fail), event logging is the commit, and apply is a deterministic fold (cannot fail). Cherry-pit applies pre-validate-then-commit everywhere: MsgpackFileStore uses atomic temp-file-then-rename and EventEnvelope validates in the constructor. Single-writer architecture eliminates contention that makes optimistic approaches attractive.
 
 ## Decision
 

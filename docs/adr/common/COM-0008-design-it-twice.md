@@ -14,7 +14,7 @@ References: GND-0006, COM-0001
 
 Ousterhout (Ch. 11) observes that the first design is unlikely to be the best. Sketching at least two fundamentally different approaches exposes trade-offs a single-pass design misses. The cost of exploring a second design is minutes; discovering the first was wrong costs days. This applies to module interfaces, data representations, and API boundaries — not every function body.
 
-Cherry-pit's ADR system institutionalizes this: CHE-0011 evaluated `u64`, `Uuid`, and `NonZeroU64`; CHE-0031 compared JSON, bincode, CBOR, and MessagePack; GEN-0007 evaluated Cap'n Proto, FlatBuffers, and a custom design.
+Cherry-pit's ADR system institutionalizes this: CHE-0011 evaluated `u64`, `Uuid`, and `NonZeroU64`; CHE-0031 compared JSON, bincode, CBOR, and MessagePack.
 
 ## Decision
 

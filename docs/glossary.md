@@ -27,26 +27,3 @@ Domain vocabulary used across the cherry-pit workspace. Grouped by domain.
 | **CommandGateway** | Primary entry point for dispatching commands. Outermost port on the driving side of the hexagon, adding cross-cutting concerns atop `CommandBus`. |
 | **Adapter** | A component that connects domain ports to external systems — webhooks, APIs, databases, message brokers. |
 | **DispatchError** | Errors from command dispatch: `Rejected` (business invariant violation), `AggregateNotFound`, `ConcurrencyConflict`, or `Infrastructure`. |
-
-## Fiber semantics (pardosa)
-
-| Term | Meaning |
-|------|---------|
-| **Fiber** | A single domain entity's event history — a singly linked list of immutable events interleaved in the dragline. |
-| **FiberState** | Lifecycle state of a fiber: `Undefined`, `Defined`, `Detached`, `Purged`, `Locked`. |
-| **FiberAction** | Action applied to a fiber: `Create`, `Update`, `Detach`, `Rescue`, `Migrate(policy)`. |
-| **Dragline** | The core append-only log with fiber lookup. Contains the event line, fiber index, and bookkeeping state. |
-| **Line** | The append-only sequence of events from all fibers, ordered by write time. |
-| **MigrationPolicy** | Deletion policy during schema migration: `Keep`, `Purge` (removed, key reusable), `LockAndPrune` (pruned, key not reusable). |
-| **Index** | Position in the append-only line — single `u64` (`u64::MAX` reserved as `NONE` sentinel). |
-| **DomainId** | Unique identifier for a domain entity / fiber — single `u64`. |
-
-## Binary serialization (pardosa-genome)
-
-| Term | Meaning |
-|------|---------|
-| **GenomeSafe** | Marker trait enforcing deterministic, fixed-layout binary serialization at compile time. Carries `SCHEMA_HASH` and `SCHEMA_SOURCE`. |
-| **GenomeOrd** | Marker trait for types with a deterministic total `Ord` — suitable for `BTreeMap` keys in genome-encoded data. |
-| **PageClass** | Per-message element budget stored in file headers: `Page0` (256) through `Page3` (1,048,576) via `256 × 16^N`. |
-| **SCHEMA_HASH** | xxHash64 fingerprint of a type's canonical representation. Used for schema evolution detection. |
-| **SCHEMA_SOURCE** | Human-readable Rust type definition embedded in file headers for tooling and debugging. |

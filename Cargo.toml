@@ -2,9 +2,6 @@
 resolver = "3"
 members = [
     "crates/cherry-pit-core",
-    "crates/pardosa-genome",
-    "crates/pardosa-genome-derive",
-    "crates/pardosa",
     "crates/cherry-pit-gateway",
     # "crates/cherry-pit-web",
     # "crates/cherry-pit-projection",
@@ -22,9 +19,6 @@ authors = ["Anders Jensen <anders.jensen@users.noreply.github.com>"]
 # === Internal crates ===
 cherry-pit-core = { path = "crates/cherry-pit-core" }
 cherry-pit-gateway = { path = "crates/cherry-pit-gateway" }
-pardosa-genome = { path = "crates/pardosa-genome" }
-pardosa-genome-derive = { path = "crates/pardosa-genome-derive" }
-pardosa = { path = "crates/pardosa" }
 
 # === Async runtime ===
 tokio = { version = "1", features = ["macros", "net", "rt-multi-thread", "signal", "sync", "time"] }
