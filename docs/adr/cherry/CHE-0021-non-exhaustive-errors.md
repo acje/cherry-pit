@@ -3,13 +3,19 @@
 Date: 2026-04-25
 Last-reviewed: 2026-09-19
 Tier: B
-Status: Accepted
+Status: Proposed
 
 ## Related
 
 References: CHE-0015
 
 ## Context
+
+Current behavior does not yet implement this decision: the public error
+enums in cherry-pit-core carry #[non_exhaustive] (crates/cherry-pit-core/
+src/error.rs lines 47, 111, 194, 234), and CHE-0015 remains the governing
+accepted decision until a conformance change lands. The rules below are
+therefore Proposed.
 
 Library callers need exhaustive recovery decisions. Complete public
 enum variants make an unhandled recovery state a compile-time error;

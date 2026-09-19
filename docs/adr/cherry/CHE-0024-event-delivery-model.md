@@ -15,7 +15,10 @@ EventBus is notification, not commitment. Recovery depends on the selected sourc
 
 ## Decision
 
-Persist-then-publish with non-fatal delivery:
+Persist-then-publish with non-fatal delivery. R1, R3, R6 and R7 are
+Proposed amendments, not current behavior: no adapter in this workspace
+yet distinguishes indeterminate commitment or declares batch atomicity
+as an explicit capability. R2, R4 and R5 restate the accepted base.
 
 R1 [7]: Publish committed-event notifications only after persistence
   reports known commitment; retain commit knowledge separately from
