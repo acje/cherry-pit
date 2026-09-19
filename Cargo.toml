@@ -9,7 +9,6 @@ members = [
     # "crates/cherry-pit-web",
     # "crates/cherry-pit-projection",
     # "crates/cherry-pit-agent",
-    "crates/adr-fmt",
 ]
 
 [workspace.package]
@@ -70,15 +69,9 @@ quote = "1"
 proc-macro2 = "1"
 
 # === Text processing ===
-regex = "1"
 toml = "1"
 
-# === CLI ===
-clap = { version = "4", features = ["derive"] }
-
 # === Dev dependencies ===
-assert_cmd = "2"
-predicates = "3"
 proptest = "1"
 tempfile = "3"
 tokio-test = "0.4"

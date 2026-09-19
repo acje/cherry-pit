@@ -7,7 +7,6 @@ Status: Superseded by AFM-0014
 
 ## Related
 
-Superseded-by: AFM-0014
 References: AFM-0003
 
 ## Context
