@@ -237,8 +237,11 @@ promoting a sibling). A cross-domain first-citation triggers
 ADR must have at least one relationship — no orphans (T007).
 
 **Why rejected alternatives matter here:** When an ADR References
-another, the agent can traverse the graph via `--critique` to
-understand the decision neighbourhood. Include References to
+another, the agent reads the referenced documents directly to
+understand the decision neighbourhood, walking the `References:`
+targets forward by hand; `adr-fmt --refs <ADR_ID>` lists the
+inbound citations only and is not a traversal equivalent. Include
+References to
 decisions that constrain or motivate this one — this prevents the
 agent from proposing approaches that conflict with related decisions.
 
@@ -627,7 +630,8 @@ This is all the agent receives. Notice:
   then parent-edge depth from the root, then ADR number
 - **Rule ID at end** — `[CHE-0042:R1:L5]` anchors traceability
   without leading the attention. The action comes first. Layer
-  suffix enables tension analysis in `--critique`.
+  suffix carries the Meadows layer for manual tension reading
+  against the ADR's own tier.
 - **Positive commission** — "construct through", "use", "access
   through", "call" — no prohibitions
 - **Unconditional** — no "when X" qualifiers

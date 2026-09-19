@@ -1,9 +1,9 @@
-# CHE-0021. Closed Public Error Enums
+# CHE-0021. Non-Exhaustive Error Types for Semver Safety
 
 Date: 2026-04-25
-Last-reviewed: 2026-09-19
+Last-reviewed: 2026-04-25
 Tier: B
-Status: Proposed
+Status: Accepted
 
 ## Related
 
@@ -11,33 +11,45 @@ References: CHE-0015
 
 ## Context
 
-Current behavior does not yet implement this decision: the public error
-enums in cherry-pit-core carry #[non_exhaustive] (crates/cherry-pit-core/
-src/error.rs lines 47, 111, 194, 234), and CHE-0015 remains the governing
-accepted decision until a conformance change lands. The rules below are
-therefore Proposed.
+Cherry-pit is a framework. Downstream users `match` on error types
+returned by the infrastructure ports. If a new error variant is added
+to a public enum in a minor version, all downstream `match` statements
+break — this is a semver-breaking change.
 
-Library callers need exhaustive recovery decisions. Complete public
-enum variants make an unhandled recovery state a compile-time error;
-variant evolution is an explicit breaking API change rather than a
-wildcard fallback.
+Rust provides `#[non_exhaustive]` to address this: it forces external
+callers to include a wildcard arm (`_ =>`) in their `match`, allowing
+new variants to be added without breaking compilation.
 
 ## Decision
 
-R1 [5]: Public error enums in cherry-pit-core MUST be closed
-  enumerations without #[non_exhaustive], allowing downstream callers
-  to match every represented failure state.
-R2 [5]: Treat public error variant additions, removals, and semantic
-  changes as breaking API changes with explicit consumer integration.
-R3 [5]: Keep ErrorCategory as diagnostic classification, separate from
-  commit knowledge; retry decisions MUST account for the operation
-  outcome rather than category alone.
+All public error types in `cherry-pit-core` are `#[non_exhaustive]`:
+
+- `DispatchError<E>` — enum with `Rejected`, `AggregateNotFound`,
+  `ConcurrencyConflict`, `Infrastructure` variants.
+- `StoreError` — enum with `ConcurrencyConflict`, `Infrastructure`,
+  `StoreLocked`, and `CorruptData` variants. (`StoreLocked` added by
+  CHE-0043.)
+- `BusError` — struct wrapping `Box<dyn Error>`. `#[non_exhaustive]`
+  prevents external pattern matching on the struct fields.
+- `ErrorCategory` — enum with stable `Retryable` and `Terminal`
+  categories for distributed retry decisions.
+
+New variants (e.g., `RateLimited`, `Timeout`, `SchemaVersionMismatch`)
+can be added in minor versions.
+
+R1 [5]: All public error types in cherry-pit-core are
+  #[non_exhaustive]
+R2 [5]: New error variants may be added in minor versions without
+  breaking downstream callers
+R3 [5]: Expose ErrorCategory on DispatchError, StoreError,
+  BusError, and EnvelopeError so callers distinguish retryable
+  failures from terminal failures without exhaustive matching
 
 ## Consequences
 
-+ becomes easier: downstream exhaustiveness checks expose unhandled
-  error states.
-− becomes harder: variant changes require coordinated consumer updates.
-risks/migration: replace wildcard-only recovery paths and review
-  affected consumers; this enum rule does not change opaque struct
-  construction guarantees.
+- Downstream callers must use wildcard arms in `match` on `DispatchError` and `StoreError`. Slightly less ergonomic but enables safe API evolution.
+- Distributed callers should branch on `error.category()` before
+  deciding retry, dead-letter, compensation, or operator escalation.
+- Within `cherry-pit-core`, exhaustive matching is still allowed.
+- `BusError` is a newtype with a private field; `#[non_exhaustive]` adds the constraint that external code cannot destructure it in patterns.
+- `#[derive(Debug)]` is the only derive on error types. Manual `Display` and `Error` impls are used instead of `thiserror` (CHE-0027).
