@@ -54,13 +54,7 @@ description = """\
     traits (aggregates, commands, events, policies), infrastructure \
     ports, concurrency, delivery, storage backends, workspace tooling, \
     testing strategy, and build configuration."""
-crates = [
-    "cherry-pit-core",
-    "cherry-pit-gateway",
-    "cherry-pit-web",
-    "cherry-pit-projection",
-    "cherry-pit-agent",
-]
+crates = ["cherry-pit-core", "cherry-pit-gateway"]
 
 [[domains]]
 prefix = "RST"

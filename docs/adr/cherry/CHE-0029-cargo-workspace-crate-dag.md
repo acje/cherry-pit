@@ -82,13 +82,14 @@ Workspace-level configuration:
   in infrastructure.
 - Workspace-level versions prevent drift; independent crates compile
   concurrently.
+- Workspace membership is cherry-pit-core and cherry-pit-gateway.
+  R7-R9 external adapter ownership is unchanged.
 - Risks/migration: reconcile existing library code before consumer pin
-  changes; the bundled legacy packages have since been removed, leaving
-  cherry-pit-core and cherry-pit-gateway as the workspace members. Conformance and release-pair evidence precede
-  application integration.
+  changes. Conformance and release-pair evidence precede application
+  integration.
 - Review dependency metadata and consumer pins against R7-R9 before
-  source integration; this amendment does not claim current source
-  already satisfies the target graph.
+  source integration; this ADR does not claim current source already
+  satisfies the target graph.
 - `Cargo.lock` commits ensure reproducible CI and the eventual binary.
 - **De-scalability invariant.** Restricting `cherry-pit-core` to
   `serde`, `uuid`, `jiff` means domain code compiles and tests run
