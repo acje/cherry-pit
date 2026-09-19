@@ -40,8 +40,6 @@ The domain split reflects clean architectural boundaries:
 - **Common** — *why* we design the way we do (principles)
 - **Rust** — *how* we use the Rust platform (toolchain)
 - **Cherry** — *what* the framework's architecture looks like (structure)
-- **Pardosa** — *how* events are stored and transported (infrastructure)
-- **Genome** — *how* data is serialized on the wire (format)
 - **AFM** — *how* ADR governance is enforced (tooling)
 
 Each domain has a distinct rate of change, audience, and abstraction
@@ -164,15 +162,10 @@ principle. RST-0004 (Cargo Dependency Governance) references it as the
 Rust-specific implementation. CHE-0026 (Correctness-first Build Config)
 references RST-0003 as the workspace-level lint governance it inherits.
 
-When pardosa or genome ADRs cover the same concern as a Cherry domain
-or Common-domain ADR at a different abstraction level, the same
-cross-referencing pattern applies:
-
-Example: COM-0025 (Distributed Failure Model) is the foundation
-principle. PAR-0016 (Timestamp Policy and Cross-Stream Ordering)
-implements time semantics consistent with that failure model. PAR-0016's
-`References:` lists the same-domain root `PAR-0004` first, then
-`COM-0025` later — keeping PAR-0016 rooted in its own domain while
+When a domain ADR covers the same concern as a Common-domain ADR at a
+different abstraction level, the same cross-referencing pattern
+applies: the ADR lists its same-domain root first, then the
+foundation ADR later — keeping it rooted in its own domain while
 preserving the foundation citation.
 
 Merging is reserved for cases where two ADRs in the **same domain**
@@ -212,9 +205,8 @@ Budget*, CHE-0001 *Design Priority Ordering*). A domain should have
 domain genuinely splits into independent concerns; the rationale should
 be recorded in `adr-fmt.toml` under the domain's `multi_root_rationale`
 field. (Today the field is parsed but no warning fires yet — the
-enforcement check is a planned follow-up. Cherry and Pardosa currently
-have two roots each; rationales should be filled in when the warning
-is wired.)
+enforcement check is a planned follow-up. Cherry currently has two
+roots; a rationale should be filled in when the warning is wired.)
 
 ### 5.2 Structural Parent vs. Secondary Citations
 

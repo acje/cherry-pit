@@ -13,7 +13,7 @@ References: COM-0001, GND-0001
 
 Ford, Parsons, and Kua (Building Evolutionary Architectures) define evolutionary architecture as supporting "guided, incremental change across multiple dimensions." Erder, Pureur, and Woods add: "Delay design decisions until absolutely necessary." The cost of wrong predictions compounds — abstractions built for futures that never arrive become permanent maintenance burden. Predictive anti-patterns: premature generalization, speculative infrastructure, over-abstraction.
 
-Cherry-pit practices this through deliberate deferrals with trigger conditions: CHE-0037 (no snapshots), CHE-0040 (no sagas), GEN-0031 (Rust-only), GEN-0010 (std-only). Each makes evolution guided rather than ad hoc.
+Cherry-pit practices this through deliberate deferrals with trigger conditions: CHE-0037 (no snapshots) and CHE-0040 (no sagas). Each makes evolution guided rather than ad hoc.
 
 ## Decision
 

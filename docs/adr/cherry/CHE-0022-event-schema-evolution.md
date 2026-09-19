@@ -15,7 +15,7 @@ Events are immutable facts persisted forever. Event enums grow as
 domain models evolve. Envelope-level forward compatibility is handled
 by named MessagePack encoding with `#[serde(default)]` (CHE-0031).
 Domain event evolution — adding/removing enum variants and struct
-fields — has no framework-level support. Pardosa migration is planned
+fields — has no framework-level support. Log migration is planned
 but unbuilt.
 
 ## Decision
@@ -44,13 +44,13 @@ R5 [5]: Do not use #[non_exhaustive] on domain event enums; exhaustive
 5. **`#[non_exhaustive]`**: NOT recommended on domain event enums.
    Unlike error types (CHE-0021), events require exhaustive matching
    in `apply` to maintain `state = f(events)`.
-6. **Structural migration**: deferred to Pardosa (log-to-log rewrite
+6. **Structural migration**: deferred to the storage layer (log-to-log rewrite
    with upcasters).
 
 ## Consequences
 
 - Adding a variant forces compile-time updates to every `apply` — no silent ignoring.
 - Field evolution is constrained to optional additions — required fields break deserialization.
-- No runtime migration until Pardosa is built. Removing or renaming events requires a full Pardosa log migration.
+- No runtime migration yet. Removing or renaming events requires a full log migration.
 - **Roll-forward only** — rolling back code after writing new event variants makes affected aggregates unloadable until code rolls forward. Silent data loss from ignoring unknown events is worse than a loud failure.
 - **Golden-file serde regression** (CHE-0038) catches accidental format changes from dependency updates by comparing a deterministic envelope against a committed fixture byte-for-byte.

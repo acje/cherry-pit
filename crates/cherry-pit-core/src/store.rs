@@ -42,7 +42,7 @@ use crate::event::{DomainEvent, EventEnvelope};
 ///
 /// This is a secondary (driven) port — the domain tells infrastructure
 /// when to load and persist. Concrete implementations (in-memory for
-/// testing, Pardosa-backed, PostgreSQL-backed) live in infrastructure
+/// testing, file-backed, PostgreSQL-backed) live in infrastructure
 /// crates.
 pub trait EventStore: Send + Sync + 'static {
     /// The single domain event type this store persists.

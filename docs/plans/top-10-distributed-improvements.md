@@ -1,9 +1,9 @@
-# Top 10 Distributed-Systems Improvements — Synthesis from ADR Review
+# Distributed-Systems Improvements — Synthesis from ADR Review
 
 Date: 2026-04-29
 
 Source: `docs/adr/DISTRIBUTED_SYSTEMS_ADR_REVIEW.md` (149 ADRs reviewed).
-Cross-referenced against current code state in `cherry-pit-core`, `cherry-pit-gateway`, `pardosa`, `pardosa-genome`.
+Cross-referenced against current code state in `cherry-pit-core` and `cherry-pit-gateway`.
 
 Selection rubric: (1) blast radius if wrong, (2) leverage — fixes many ADR concerns at once, (3) implementation gap — designed but not built, (4) precondition for other features.
 
@@ -11,7 +11,7 @@ Selection rubric: (1) blast radius if wrong, (2) leverage — fixes many ADR con
 
 ## 1. Durable Outbox + Publish-Then-Apply
 
-**ADR roots:** PAR-0008, CHE-0024, COM-0022, CHE-0040
+**ADR roots:** CHE-0024, COM-0022, CHE-0040
 **Current state:** `EventBus` trait exists; no outbox table, no transactional publish. `MsgpackFileStore` writes events but nothing reads them for delivery. CHE-0040 (sagas) and CHE-0024 (catch-up) both depend on this.
 
 **Why top:** Without a durable outbox, every cross-aggregate workflow, projection, and policy is fundamentally lossy under crash. This is the keystone that unlocks sagas, projections, and consumer recovery.
@@ -23,8 +23,8 @@ Selection rubric: (1) blast radius if wrong, (2) leverage — fixes many ADR con
 - Consumer-side checkpoint/cursor port so catch-up is precise.
 
 **Connected improvements:**
-- **1a. Reserved-event construction (PAR-0008):** split append into `reserve` (sequence + envelope frozen, holds lock) and `commit` (releases lock), so network publish never holds the state mutex.
-- **1b. Dead-letter queue (CHE-0040, PAR-0015):** terminal failures land in a DLQ stream with original envelope + error category + retry count; replay tool to resubmit.
+- **1a. Reserved-event construction:** split append into `reserve` (sequence + envelope frozen, holds lock) and `commit` (releases lock), so network publish never holds the state mutex.
+- **1b. Dead-letter queue (CHE-0040):** terminal failures land in a DLQ stream with original envelope + error category + retry count; replay tool to resubmit.
 - **1c. Idempotent consumer contract:** consumer trait must declare its dedup key (envelope id by default) and provide checkpoint storage; framework rejects non-idempotent consumers at compile time via marker trait.
 - **1d. Catch-up cursor protocol:** `EventBus::subscribe_from(stream, after_seq)` with explicit "missed events" recovery, replacing best-effort fan-out.
 
@@ -32,7 +32,7 @@ Selection rubric: (1) blast radius if wrong, (2) leverage — fixes many ADR con
 
 ## 2. Lease/Epoch Fencing for Single-Writer Ownership
 
-**ADR roots:** COM-0018, CHE-0006, CHE-0043, PAR-0004, SEC-0006
+**ADR roots:** COM-0018, CHE-0006, CHE-0043, SEC-0006
 **Current state:** Advisory `flock` only; works in-process, breaks across NFS, SMB, and most container restart races. No epoch in envelopes.
 
 **Why top:** Every "single-writer" claim in the corpus is structurally fragile without fencing. Stale writers + retries = silent divergence. This is correctness-critical.
@@ -45,7 +45,7 @@ Selection rubric: (1) blast radius if wrong, (2) leverage — fixes many ADR con
 
 **Connected improvements:**
 - **2a. Stale-writer rejection on read path (SEC-0006):** projections refuse to apply events from epochs lower than the latest seen for that stream — detects split-brain at consumer side.
-- **2b. NATS KV registry (PAR-0013) as authoritative lease store:** with `compare-and-swap` on `writer_epoch` value; rich metadata (writer identity, cutover timestamp, previous stream).
+- **2b. NATS KV registry as authoritative lease store:** with `compare-and-swap` on `writer_epoch` value; rich metadata (writer identity, cutover timestamp, previous stream).
 - **2c. Lease-aware `CommandGateway`:** gateway holds the lease; route commands to the holder; clean rejection (`StoreError::NotLeader { current: WriterId }`) for misrouted writes.
 
 ---
@@ -71,7 +71,7 @@ Selection rubric: (1) blast radius if wrong, (2) leverage — fixes many ADR con
 
 ## 4. Schema Evolution Protocol with Upcasters and Rollback
 
-**ADR roots:** CHE-0022, CHE-0010, COM-0021, GEN-0002 (genome takes the *opposite* stance — fixed layout)
+**ADR roots:** CHE-0022, CHE-0010, COM-0021
 **Current state:** Envelope has `#[serde(default)]` on a couple of fields; no upcaster trait, no version field, no rollback story. CHE-0031 specifies MessagePack-named encoding but doesn't address evolution.
 
 **Why top:** First "remove a field" or "split a variant" requirement will stop the world. Rolling deploys = mixed-version writers/readers reading each other's bytes. Must be designed before persisted bytes accumulate.
@@ -91,8 +91,8 @@ Selection rubric: (1) blast radius if wrong, (2) leverage — fixes many ADR con
 
 ## 5. Tamper-Evident Hash Chain on Envelopes
 
-**ADR roots:** SEC-0008, SEC-0011, GEN-0016, PAR (precursor chain has structural form already)
-**Current state:** `pardosa::Event` has a precursor *index*, but no cryptographic linkage. `cherry-pit-core::EventEnvelope` has no chain at all. SEC-0008 only claims tamper evidence via "append-only API" — which is not tamper evidence.
+**ADR roots:** SEC-0008, SEC-0011
+**Current state:** `cherry-pit-core::EventEnvelope` has no chain at all. SEC-0008 only claims tamper evidence via "append-only API" — which is not tamper evidence.
 
 **Why top:** Non-repudiation and integrity claims in SEC ADRs are currently aspirational. Adding a chain is mechanically simple, costs ~32 bytes/event, and turns audit logs into actually auditable artifacts.
 
@@ -103,16 +103,14 @@ Selection rubric: (1) blast radius if wrong, (2) leverage — fixes many ADR con
 - Anchoring port (optional): periodic publish of latest hash to external log (S3 with object-lock, transparency log, NATS subject).
 
 **Connected improvements:**
-- **5a. Authenticated checksums for genome (GEN-0016):** offer BLAKE3-keyed-MAC variant alongside xxHash64 for cross-trust-boundary transport.
-- **5b. Pardosa: cryptographic precursor (PAR-0012):** upgrade `Event::precursor` from index-based to hash-based; replay verification proves no semantic substitution, not just no missing predecessor.
 - **5c. Authenticity binding (SEC-0005):** envelope gains optional `signature: Option<Signature>` produced by writer's lease key; correlation IDs are no longer forgeable.
 
 ---
 
 ## 6. Deterministic Simulation + Fault Injection Harness
 
-**ADR roots:** COM-0017, COM-0024, CHE-0038, GEN-0034
-**Current state:** Property tests cover local invariants (envelope serde, AggregateId, dragline). No simulation, no fault injection, no concurrent-schedule exploration. Distributed correctness is currently asserted, not tested.
+**ADR roots:** COM-0017, COM-0024, CHE-0038
+**Current state:** Property tests cover local invariants (envelope serde, AggregateId). No simulation, no fault injection, no concurrent-schedule exploration. Distributed correctness is currently asserted, not tested.
 
 **Why top:** Every other improvement on this list (outbox, fencing, idempotency, schema evolution) requires adversarial-schedule testing to prove correctness. Without a simulator, these are vibes.
 
@@ -123,10 +121,9 @@ Selection rubric: (1) blast radius if wrong, (2) leverage — fixes many ADR con
 - Linearizability checker (Knossos-style): records concurrent op history and validates against sequential spec.
 
 **Connected improvements:**
-- **6a. Per-invariant fuzz targets (GEN-0034):** structured fuzzer per GEN-0011 verification check; CI tracks coverage map → invariant.
 - **6b. Loom for in-process concurrency (CHE-0035):** model-check the two-level concurrency architecture under all interleavings of cancellation + lock acquisition.
 - **6c. Madsim or shuttle integration:** swap tokio runtime in tests; run full integration suite under randomized scheduling.
-- **6d. Conformance vectors:** byte-level golden fixtures for genome, envelope, and outbox formats — ensures independent reimplementations remain compatible.
+- **6d. Conformance vectors:** byte-level golden fixtures for envelope and outbox formats — ensures independent reimplementations remain compatible.
 
 ---
 
@@ -153,15 +150,15 @@ Selection rubric: (1) blast radius if wrong, (2) leverage — fixes many ADR con
 
 ## 8. Crash-Consistency Protocol Beyond Atomic Rename
 
-**ADR roots:** CHE-0032, COM-0023, PAR-0005, PAR-0007
+**ADR roots:** CHE-0032, COM-0023
 **Current state:** `MsgpackFileStore` does atomic temp+rename+fsync(parent); `recover_temp_files` cleans orphans on first write per process. Good — but only covers one shape of crash.
 
 **Why top:** Real crash bugs hide in: directory entries created out of order, multi-file commits (event + outbox + dedup), durable phase markers for migrations. The current protocol doesn't extend to multi-resource commits.
 
 **Core implementation:**
 - `WriteAheadLog` for multi-file commits: log intent → fsync → execute → fsync → mark complete; recovery replays incomplete intents.
-- Migration state machine (PAR-0005) with durable phase markers: `{ Started, Copying, ReadyToCutover, CutoverDone, CleanupNeeded }`; idempotent resume from any phase.
-- Startup high-watermark reconciliation (PAR-0007): max envelope sequence, max writer epoch, max outbox cursor — proven consistent before accepting any writes.
+- Migration state machine with durable phase markers: `{ Started, Copying, ReadyToCutover, CutoverDone, CleanupNeeded }`; idempotent resume from any phase.
+- Startup high-watermark reconciliation: max envelope sequence, max writer epoch, max outbox cursor — proven consistent before accepting any writes.
 - Sequence monotonicity tests under wraparound and clock rollback (COM-0023).
 
 **Connected improvements:**
@@ -190,32 +187,11 @@ Selection rubric: (1) blast radius if wrong, (2) leverage — fixes many ADR con
 
 ---
 
-## 10. Genome Encoder/Decoder Implementation with Conformance Suite
-
-**ADR roots:** GEN-0001 through GEN-0034 (the entire genome corpus is design-only)
-**Current state:** Scaffold only. Schema-hash helpers and derive macro are done; encoder, decoder, two-pass writer, offset layout, verification catalog — all unimplemented. Without genome, pardosa-on-NATS has no on-wire format.
-
-**Why top:** Pardosa, NATS integration, cross-process pardosa replay all blocked. Also the highest-density invariant cluster in the corpus (34 ADRs) — building it without conformance vectors guarantees future incompatibility.
-
-**Core implementation:**
-- Two-pass encoder per GEN-0005 with idempotency assertion (size pass output deterministically equals write pass).
-- Decoder with the GEN-0011 inline check catalog as a typed pipeline; explicit fail-fast precedence.
-- Page-class resource limits enforced per `DecodeOptions`, with trust-boundary defaults (GEN-0013).
-- Canonical byte fixtures per type-shape committed to repo; cross-platform CI (big-endian QEMU emulation per GEN-0012).
-
-**Connected improvements:**
-- **10a. Reserved-field state machine (GEN-0015):** explicit reader behavior table (ignore | reject | upgrade-required) per reserved bit; tested via fuzz with reserved-bit mutations.
-- **10b. Schema-hash collision audit (GEN-0003):** CI computes hashes for representative type set; fixture-locked to detect macro/syntax-driven hash drift across rust upgrades.
-- **10c. Authenticated trailer (GEN-0025):** opt-in BLAKE3-MAC trailer for bare messages; lights up "transport-protected" claim for shared-memory and queue deployments.
-- **10d. Cross-language read-only export (GEN-0031):** start a JSON Schema or Cap'n Proto-style schema dump now as diagnostic artifact; defers full interop but locks ground truth.
-
----
-
 ## Cross-cutting themes
 
 These threads run through multiple items above and deserve their own meta-tracks:
 
-- **Compatibility matrices everywhere.** Wire, persisted, public-API, and CLI surfaces all need explicit compatibility statements (#4, #9, #10, AFM-0013).
+- **Compatibility matrices everywhere.** Wire, persisted, public-API, and CLI surfaces all need explicit compatibility statements (#4, #9, AFM-0013).
 - **Property-based + fault-injection testing as a first-class crate.** #6 is leverage for #1, #2, #3, #4, #8.
 - **Make the safe path the only path (COM-0020).** Every recovery/repair operation needs a constrained-authority tool; ad-hoc shell commands in production are how data dies (#1b, #8a, #8b).
 - **Lease as identity.** Once leases exist (#2), they become the natural carrier for authenticity (#5c), routing (#2c), and observability tagging (#7b).
@@ -229,5 +205,4 @@ These threads run through multiple items above and deserve their own meta-tracks
 5. **#7 observability** — should land alongside #1; debugging the outbox without traces is masochism.
 6. **#5 hash chain** — small, can land any time after #6.
 7. **#8 crash-consistency hardening** — informed by #6 findings.
-8. **#10 genome** — required for **#9 object store** and remote pardosa; sequenced after foundational invariants are testable.
-9. **#9 object store** — last; benefits from everything above.
+8. **#9 object store** — last; benefits from everything above.

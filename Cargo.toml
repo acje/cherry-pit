@@ -2,13 +2,7 @@
 resolver = "3"
 members = [
     "crates/cherry-pit-core",
-    "crates/pardosa-genome",
-    "crates/pardosa-genome-derive",
-    "crates/pardosa",
     "crates/cherry-pit-gateway",
-    # "crates/cherry-pit-web",
-    # "crates/cherry-pit-projection",
-    # "crates/cherry-pit-agent",
 ]
 
 [workspace.package]
@@ -22,9 +16,6 @@ authors = ["Anders Jensen <anders.jensen@users.noreply.github.com>"]
 # === Internal crates ===
 cherry-pit-core = { path = "crates/cherry-pit-core" }
 cherry-pit-gateway = { path = "crates/cherry-pit-gateway" }
-pardosa-genome = { path = "crates/pardosa-genome" }
-pardosa-genome-derive = { path = "crates/pardosa-genome-derive" }
-pardosa = { path = "crates/pardosa" }
 
 # === Async runtime ===
 tokio = { version = "1", features = ["macros", "net", "rt-multi-thread", "signal", "sync", "time"] }
@@ -40,43 +31,15 @@ jiff = { version = "0.2", features = ["serde"] }
 # === Identity ===
 uuid = { version = "1", features = ["v7", "serde"] }
 
-# === Web framework and serving ===
-axum = { version = "0.8", default-features = false, features = ["http1", "http2", "tokio", "json", "ws"] }
-tower-http = { version = "0.6", features = ["limit", "trace"] }
-
-# === Zero-copy byte buffers ===
-bytes = "1"
-
 # === Stream utilities ===
 futures-util = "0.3"
 
-# === Error handling ===
-thiserror = "2"
-
-# === Hashing ===
-sha2 = "0.11"
-
 # === Concurrency ===
-arc-swap = "1"
 scc = "3"
-
-# === NATS ===
-async-nats = "0.47"
-
-# === Proc macro support ===
-syn = { version = "2", features = ["full", "extra-traits"] }
-quote = "1"
-proc-macro2 = "1"
-
-# === Text processing ===
-toml = "1"
 
 # === Dev dependencies ===
 proptest = "1"
 tempfile = "3"
-tokio-test = "0.4"
-tokio-tungstenite = "0.29"
-reqwest = { version = "0.13", default-features = false, features = ["rustls", "http2", "json", "gzip"] }
 trybuild = "1"
 
 [profile.release]

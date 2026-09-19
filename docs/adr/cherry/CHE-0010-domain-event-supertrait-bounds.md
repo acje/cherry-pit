@@ -11,7 +11,7 @@ References: CHE-0004
 
 ## Context
 
-`DomainEvent` is the marker trait for all events. Its supertrait bounds constrain every event type in every cherry-pit system. Events cross process boundaries (file storage, NATS transport, Pardosa logs), requiring `Serialize + DeserializeOwned`. Events fan out to multiple consumers, requiring `Clone`. Events cross thread boundaries in async runtimes, requiring `Send + Sync + 'static`. `Debug` and `PartialEq` were considered but excluded to keep the bound minimal — users add them per-type as needed.
+`DomainEvent` is the marker trait for all events. Its supertrait bounds constrain every event type in every cherry-pit system. Events cross process boundaries (file storage, NATS transport, event logs), requiring `Serialize + DeserializeOwned`. Events fan out to multiple consumers, requiring `Clone`. Events cross thread boundaries in async runtimes, requiring `Send + Sync + 'static`. `Debug` and `PartialEq` were considered but excluded to keep the bound minimal — users add them per-type as needed.
 
 ## Decision
 
@@ -27,8 +27,8 @@ Every bound is load-bearing:
 
 | Bound | Required by |
 |-------|-------------|
-| `Serialize` | `EventStore::create`, `EventStore::append`, `EventBus::publish`, Pardosa logs |
-| `DeserializeOwned` | `EventStore::load`, Pardosa consumer, NATS subscriber |
+| `Serialize` | `EventStore::create`, `EventStore::append`, `EventBus::publish` |
+| `DeserializeOwned` | `EventStore::load`, NATS subscriber |
 | `Clone` | `EventBus::publish` fan-out, `EventEnvelope` derives `Clone` |
 | `Send` | Async task spawning, cross-thread event delivery |
 | `Sync` | Shared references to events across threads |

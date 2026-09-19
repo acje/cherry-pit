@@ -37,7 +37,7 @@ R4 [5]: Slugs must be lowercase kebab-case: letters, digits,
 
 ## Consequences
 
-Cross-domain references are unambiguous (`References: GEN-0007`
+Cross-domain references are unambiguous (`References: CHE-0031`
 identifies exactly one ADR). Directory listings sort chronologically
 within each domain. Adding a new domain requires only a config
 entry — no code changes. The 9,999 ADR-per-domain limit is

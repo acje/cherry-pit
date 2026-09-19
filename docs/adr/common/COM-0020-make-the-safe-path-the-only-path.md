@@ -11,7 +11,7 @@ References: COM-0017
 
 ## Context
 
-Multiple independent traditions converge: Rico Mariani's "pit of success," Alexis King's "parse, don't validate," Yaron Minsky's "make illegal states unrepresentable," and Shigeo Shingo's poka-yoke — all argue the safe path should be the only path, not merely the default. COM-0003/COM-0005/COM-0017 address related concerns but none state this constraint directly. Cherry-pit applies it across domains: EventEnvelope only via `::new()`, CorrelationContext has no Default, GenomeSafe verification is inline and mandatory. Escape hatches add expert-user friction; at the application level this tradeoff favors safety.
+Multiple independent traditions converge: Rico Mariani's "pit of success," Alexis King's "parse, don't validate," Yaron Minsky's "make illegal states unrepresentable," and Shigeo Shingo's poka-yoke — all argue the safe path should be the only path, not merely the default. COM-0003/COM-0005/COM-0017 address related concerns but none state this constraint directly. Cherry-pit applies it across domains: EventEnvelope only via `::new()`, and CorrelationContext has no Default. Escape hatches add expert-user friction; at the application level this tradeoff favors safety.
 
 ## Decision
 

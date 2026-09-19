@@ -31,14 +31,9 @@ conflict messages). Manual `Error::source` chains to inner errors for
 `StoreError` and `BusError`. See `cherry-pit-core/src/error.rs` for full
 implementations.
 
-`thiserror` **is** available in the workspace for infrastructure
-crates (`cherry-pit-gateway`, `pardosa`, etc.) where dependency count is
-less critical:
-
-```toml
-# workspace Cargo.toml
-thiserror = "2"
-```
+R2 permits `thiserror` in infrastructure crates, where dependency
+count is less critical. It is not declared in the workspace today;
+an infrastructure crate that wants it would add the declaration.
 
 ## Consequences
 

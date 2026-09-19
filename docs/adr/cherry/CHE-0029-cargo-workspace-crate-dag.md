@@ -30,8 +30,7 @@ Options:
 Cherry-pit owns the neutral framework contract. Repository ownership
 and compile-time dependencies are distinct: the framework remains an
 acyclic Cargo workspace, while its Pardosa adapter is owned and
-released outside that workspace. Existing co-located legacy packages
-do not establish dependency or release authority for the adopted seam.
+released outside that workspace.
 
 R1 [5]: Organize the canonical acje/cherry-pit framework crates as a
   Cargo workspace with an acyclic crate dependency graph
@@ -44,7 +43,7 @@ R4 [5]: Restrict cherry-pit-core/Cargo.toml [dependencies] to the
   zero transport, runtime, or filesystem dependencies
 R5 [5]: Keep async runtimes (tokio), web frameworks (axum), transport
   clients (async-nats), and observability stacks (tracing) in adapter
-  crates such as cherry-pit-gateway, cherry-pit-web, and pardosa
+  crates such as cherry-pit-gateway and cherry-pit-web
 R6 [5]: Verify cherry-pit-core's transitive dependency closure in CI
   via cargo tree -p cherry-pit-core, asserting no tokio, axum,
   async-nats, or tracing crate appears in the resolved graph
@@ -82,16 +81,18 @@ Workspace-level configuration:
   in infrastructure.
 - Workspace-level versions prevent drift; independent crates compile
   concurrently.
+- Workspace membership is cherry-pit-core and cherry-pit-gateway.
+  R7-R9 external adapter ownership is unchanged.
 - Risks/migration: reconcile existing library code before consumer pin
-  changes; legacy package cleanup is separate work, not a prerequisite
-  for this boundary. Conformance and release-pair evidence precede
-  application integration.
+  changes. Conformance and release-pair evidence precede application
+  integration.
 - Review dependency metadata and consumer pins against R7-R9 before
-  source integration; this amendment does not claim current source
-  already satisfies the target graph.
+  source integration; this ADR does not claim current source already
+  satisfies the target graph.
 - `Cargo.lock` commits ensure reproducible CI and the eventual binary.
 - **De-scalability invariant.** Restricting `cherry-pit-core` to
   `serde`, `uuid`, `jiff` means domain code compiles and tests run
   even if every adapter crate breaks.
-- **CI enforcement closes the gap.** A `cargo tree -p cherry-pit-core`
-  check makes R4 a build error rather than a convention.
+- **CI enforcement is not wired yet.** R6 specifies a
+  `cargo tree -p cherry-pit-core` check; the current workflow does not
+  run it, so R4 is upheld by review, not by the build.

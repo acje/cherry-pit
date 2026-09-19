@@ -13,7 +13,7 @@ References: COM-0012
 
 Evans (DDD, Ch. 14) introduces bounded contexts for model complexity. Skelton and Pais (Team Topologies, Ch. 6) extend this: boundaries should reflect rate of change. Kaiser (Architecture for Flow) synthesizes via Wardley Mapping — module boundaries should separate components with different change rates so evolution in one area does not force coordinated changes in another.
 
-Cherry-pit's domain taxonomy applies this: Common (COM) changes rarely, Cherry (CHE) occasionally, Pardosa (PAR) with deployment topology, Genome (GEN) with serialization requirements. Each has distinct rate of change, audience, and abstraction level. The crate DAG (CHE-0029) physically enforces these boundaries.
+Cherry-pit's domain taxonomy applies this: Common (COM) changes rarely, Cherry (CHE) occasionally, Rust (RST) with the toolchain. Each has distinct rate of change, audience, and abstraction level. The crate DAG (CHE-0029) physically enforces these boundaries.
 
 ## Decision
 

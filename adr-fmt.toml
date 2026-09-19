@@ -54,34 +54,7 @@ description = """\
     traits (aggregates, commands, events, policies), infrastructure \
     ports, concurrency, delivery, storage backends, workspace tooling, \
     testing strategy, and build configuration."""
-crates = [
-    "cherry-pit-core",
-    "cherry-pit-gateway",
-    "cherry-pit-web",
-    "cherry-pit-projection",
-    "cherry-pit-agent",
-]
-
-[[domains]]
-prefix = "PAR"
-name = "Pardosa Domain"
-directory = "pardosa"
-description = """\
-    EDA storage layer: fiber semantics, stream management, \
-    NATS/JetStream transport, migration model, backpressure, and \
-    single-writer fencing at transport level."""
-crates = ["pardosa"]
-
-[[domains]]
-prefix = "GEN"
-name = "Genome Domain"
-directory = "genome"
-description = """\
-    Binary serialization format: wire layout, schema hashing, \
-    zero-copy deserialization, compression, security limits (DoS \
-    protection, decompression bombs), type validation, and forward \
-    compatibility."""
-crates = ["pardosa-genome", "pardosa-genome-derive"]
+crates = ["cherry-pit-core", "cherry-pit-gateway"]
 
 [[domains]]
 prefix = "RST"

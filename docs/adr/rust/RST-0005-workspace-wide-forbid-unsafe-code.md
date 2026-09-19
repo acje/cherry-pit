@@ -11,8 +11,7 @@ References: RST-0001, SEC-0004, GND-0002
 
 ## Context
 
-CHE-0007 forbids unsafe code in cherry-pit-core. GEN-0006
-achieves zero-copy deserialization without unsafe. SEC-0004
+CHE-0007 forbids unsafe code in cherry-pit-core. SEC-0004
 mandates restricting capabilities by default. These independent
 decisions converge on the same principle: unsafe code is a
 liability that bypasses Rust's ownership, borrowing, and lifetime
@@ -42,8 +41,8 @@ R3 [6]: Dependencies are preferred that do not themselves use
 ## Consequences
 
 Memory safety and undefined behavior are structurally eliminated
-across the workspace, not just in individual crates. CHE-0007 and
-GEN-0006 become instances of this workspace-level policy. New
+across the workspace, not just in individual crates. CHE-0007
+becomes an instance of this workspace-level policy. New
 crates inherit the constraint automatically. The trade-off is
 that some micro-optimizations requiring unsafe are unavailable —
 acceptable for an application workspace where correctness outranks

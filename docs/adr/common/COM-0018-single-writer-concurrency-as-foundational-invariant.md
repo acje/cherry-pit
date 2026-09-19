@@ -7,14 +7,14 @@ Status: Accepted
 
 ## Related
 
-References: COM-0001, PAR-0004, CHE-0006
+References: COM-0001, CHE-0006
 
 ## Context
 
 Multiple crates independently converged on the same concurrency
-pattern: CHE-0006 mandates single-writer per aggregate, PAR-0004
-mandates single-writer per stream, SEC-0006 mandates eliminating
-race conditions by construction. Each domain discovered that
+pattern: CHE-0006 mandates single-writer per aggregate, SEC-0006
+mandates eliminating race conditions by construction. Each domain
+discovered that
 shared mutable state defended by fine-grained locks produces
 correctness bugs, subtle data races, and reasoning difficulty that
 exceeds the complexity budget (COM-0001). The pattern recurs
@@ -41,10 +41,10 @@ R3 [3]: Where shared reads are required, use read-only snapshots
   or immutable projections rather than read-write lock sharing
 R4 [3]: Document the single-writer boundary for each stateful
   component, identifying what entity owns the write path
-R5 [3]: Ownership transfer for MsgpackFileStore, Dragline, and
-  JetStream stream writers uses fencing, leases, epochs, or
+R5 [3]: Ownership transfer for MsgpackFileStore and JetStream stream
+  writers uses fencing, leases, epochs, or
   compare-and-swap before the replacement writer mutates state
 
 ## Consequences
 
-Domain crates can reason about state transitions sequentially. CHE-0006 and PAR-0004 become instances of this foundation rule. Shared-nothing architectures scale horizontally but require explicit fencing for failover and explicit coordination for cross-partition operations.
+Domain crates can reason about state transitions sequentially. CHE-0006 becomes an instance of this foundation rule. Shared-nothing architectures scale horizontally but require explicit fencing for failover and explicit coordination for cross-partition operations.

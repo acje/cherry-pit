@@ -58,11 +58,7 @@ What cannot compile:
 
 Active development. `cherry-pit-core` traits are implemented and stable.
 `cherry-pit-gateway` provides a working `MsgpackFileStore` event store with
-atomic writes, process-level fencing, and optimistic concurrency. `pardosa`
-has a complete fiber state machine and dragline (append-only log with fiber
-lookup). `pardosa-genome` has the crate scaffold — traits (`GenomeSafe`,
-`GenomeOrd`), binary format constants, error catalog, and derive macro — but
-the serializer and deserializer are not yet implemented. Remaining
+atomic writes, process-level fencing, and optimistic concurrency. Remaining
 infrastructure crates (`cherry-pit-web`, `cherry-pit-projection`) are planned.
 
 ## Components
@@ -71,9 +67,6 @@ infrastructure crates (`cherry-pit-web`, `cherry-pit-projection`) are planned.
 |----------------|-------------|-----------------------------------------------------|
 | **cherry-pit-core**   | implemented | Aggregate, command, event, policy, projection traits. Port traits: CommandGateway, CommandBus, EventStore, EventBus |
 | **cherry-pit-gateway**| implemented | `MsgpackFileStore` event store with atomic writes, process fencing, optimistic concurrency |
-| **pardosa**    | implemented | Fiber state machine, dragline (append-only log), CRUD + migration operations. Persistence and NATS integration not yet built |
-| **pardosa-genome** | scaffold | `GenomeSafe`/`GenomeOrd` traits, binary format constants, error catalog. Serializer and deserializer not yet implemented |
-| **pardosa-genome-derive** | implemented | `#[derive(GenomeSafe)]` proc macro with compile-time serde attribute validation |
 | **cherry-pit-web**    | planned     | Web serving adapter (axum)                          |
 | **cherry-pit-projection** | planned | Read model storage and query serving                |
 
@@ -83,10 +76,7 @@ infrastructure crates (`cherry-pit-web`, `cherry-pit-projection`) are planned.
 cherry-pit/
 ├── crates/
 │   ├── cherry-pit-core/       # Aggregate, command, event, port traits
-│   ├── cherry-pit-gateway/    # EventStore implementations
-│   ├── pardosa/               # EDA storage layer (fiber semantics)
-│   ├── pardosa-genome/        # Binary serialization format
-│   └── pardosa-genome-derive/ # GenomeSafe derive macro
+│   └── cherry-pit-gateway/    # EventStore implementations
 ├── docs/
 │   ├── adr/                   # Architecture decision records (governed by the canonical adr-fmt CLI)
 │   ├── plans/                 # Ephemeral working drafts (consumed into code and ADRs)

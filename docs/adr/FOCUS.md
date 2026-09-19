@@ -3,6 +3,13 @@
 Last-updated: 2026-04-30
 Status: Active
 
+## Supported Scope
+
+The workspace supports exactly two packages: `cherry-pit-core` (domain
+traits, pure serde/uuid/jiff leaf) and `cherry-pit-gateway`
+(`MsgpackFileStore` adapter). External adapters are owned outside this
+repository per CHE-0029 R7-R9.
+
 ## Period
 
 Start: 2026-04-30
@@ -39,13 +46,9 @@ promoted to Accepted or explicitly rejected.
 
 ## Out-of-Focus Domains
 
-- **`pardosa-genome` codec implementation** — scaffold-only state stays;
-  no serializer / deserializer work this period despite GEN-0001..0034
-  being fully specified
-- **`pardosa` Phase 2+** — NATS persistence, KV lease, registry: not now
-- **`cherry-pit-web`, `cherry-pit-projection`, `cherry-pit-agent`** —
-  workspace comments remain commented; no crate creation
-- **SEC and GEN domain ADR additions** — corpus is exhaustive enough;
+- **Crates beyond the supported scope** — the workspace supports
+  `cherry-pit-core` and `cherry-pit-gateway`; no new crate creation
+- **SEC domain ADR additions** — corpus is exhaustive enough;
   no new entries unless surfaced by GND directive work
 - **New COM principles** — moratorium on COM-0038+; finish promoting or
   rejecting COM-0034..0037 first
@@ -67,8 +70,3 @@ period from becoming pure text production. The FOCUS.md lint checks
 F001–F007 (in flight) qualify; a `--backbrief` mode in adr-fmt would
 also qualify. Recursive ADR authoring without one such artefact does
 not.
-
-Pardosa distributed-systems ADRs (PAR-0017..0023) added 2026-04-30 are
-out-of-focus *for implementation* this period but in-focus *as written
-intent*: their existence does not signal pardosa-runtime work has
-restarted.
