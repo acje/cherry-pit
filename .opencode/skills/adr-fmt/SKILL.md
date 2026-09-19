@@ -1,21 +1,30 @@
 ---
 name: adr-fmt
-description: Run adr-fmt to lint ADRs, extract crate-scoped architecture rules via --context, critique decision neighborhoods, view domain trees, and author new ADRs conforming to the cherry-pit MADR template. Use when working with architecture decision records, writing or editing ADRs, or needing architecture constraints for a specific crate.
+description: Run the canonical adr-fmt CLI to lint ADRs, extract crate-scoped architecture rules via --context, list inbound citations via --refs, view domain trees, and author new ADRs conforming to the cherry-pit MADR template. Use when working with architecture decision records, writing or editing ADRs, or needing architecture constraints for a specific crate.
 ---
 
 # adr-fmt
 
-Read-only ADR governance tool for cherry-pit. Never modifies files.
+Read-only ADR governance tool. The binary is owned canonically by
+[Mattilsynet/adr-fmt](https://github.com/Mattilsynet/adr-fmt) and is not a
+member of this workspace. Install it with the tool's own pinned toolchain:
+
+```bash
+cargo +1.98.0 install --git https://github.com/Mattilsynet/adr-fmt \
+  --rev ec9f833b13affdd448862b48668dd74ec0234750 --locked adr-fmt
+```
+
+Never modifies files.
 
 ## Invocation
 
 Run from the **workspace root** (where `Cargo.toml` lives):
 
 ```bash
-cargo run -p adr-fmt -- <args>
+adr-fmt <args>
 ```
 
-Auto-discovers `docs/adr/` by walking up from CWD looking for `docs/adr/GOVERNANCE.md`. No path argument needed when running from workspace root.
+Discovers the corpus through the workspace-root `adr-fmt.toml` marker, whose `[corpus] root` points at `docs/adr`. No path argument needed when running from workspace root.
 
 **Exit codes:**
 
@@ -27,7 +36,7 @@ Auto-discovers `docs/adr/` by walking up from CWD looking for `docs/adr/GOVERNAN
 ### Guidelines (default — no flags)
 
 ```bash
-cargo run -p adr-fmt
+adr-fmt
 ```
 
 Prints the complete generated ADR governance reference combining code invariants and configuration. Use this to understand all enforced rules and their parameters.
@@ -35,7 +44,7 @@ Prints the complete generated ADR governance reference combining code invariants
 ### Lint
 
 ```bash
-cargo run -p adr-fmt -- --lint
+adr-fmt --lint
 ```
 
 Validates all ADRs across every domain. All findings are advisory warnings (per AFM-0003). Outputs diagnostics in `warning[RULE_ID] file:line: message` format with a `## Diagnostics: N warning(s) across M ADR(s)` header. Exit 0 always when analysis completes — parse stdout for warnings. Exit 1 only for infrastructure errors (missing config, unreadable directories, path containment violations).
@@ -43,29 +52,28 @@ Validates all ADRs across every domain. All findings are advisory warnings (per 
 ### Context
 
 ```bash
-cargo run -p adr-fmt -- --context <CRATE>
+adr-fmt --context <CRATE>
 ```
 
 Extracts tagged decision rules applicable to a specific crate. Foundation domains (COM, RST) are always included. Output is tier-sorted (S first, D last) with rule IDs and layer at end of each line (e.g., `[CHE-0042:R1:L5]`). Exits 1 if the crate is not found in any domain.
 
 Use `--context` to retrieve architecture constraints before writing code for a crate.
 
-### Critique
+### Refs
 
 ```bash
-cargo run -p adr-fmt -- --critique <ADR_ID>
-cargo run -p adr-fmt -- --critique <ADR_ID> --depth 3
+adr-fmt --refs <ADR_ID>
 ```
 
-BFS transitive closure around a focal ADR. Follows fan-out (forward relationships) and fan-in (reverse/children). Default depth is 1. Increase `--depth N` for broader neighborhood exploration. Output uses `◆ FOCAL`, `◇ CONNECTED` markers. Focal block includes tension analysis showing per-rule tier-distance from the ADR's tier.
-
-Use `--critique` when editing an ADR to understand its decision neighborhood and avoid conflicting with related decisions.
+Lists the ADRs that cite the target through `References:` or `Supersedes:`.
+Use it when editing an ADR to find the inbound citations that a change would
+affect. The canonical CLI has no `--critique` mode.
 
 ### Tree
 
 ```bash
-cargo run -p adr-fmt -- --tree
-cargo run -p adr-fmt -- --tree CHE
+adr-fmt --tree
+adr-fmt --tree CHE
 ```
 
 Domain dependency tree with ADR listings. Optional domain prefix filter. Shows stale counts per domain.
@@ -186,15 +194,15 @@ Prefix must match a domain in `adr-fmt.toml`. Number is zero-padded 4 digits. Sl
 
 After creating or editing any ADR:
 
-1. Run `cargo run -p adr-fmt -- --lint` — parse stdout for diagnostics
+1. Run `adr-fmt --lint` — parse stdout for diagnostics
 2. Fix reported issues
 3. Re-run to confirm clean output
-4. Run `cargo run -p adr-fmt -- --context <CRATE>` to verify extracted rules read well in isolation
+4. Run `adr-fmt --context <CRATE>` to verify extracted rules read well in isolation
 5. Commit
 
 ## Configuration
 
-`docs/adr/adr-fmt.toml` defines:
+`adr-fmt.toml` defines:
 
 - **Domains** — prefix, name, directory, description, crate mappings, foundation flag
 - **Rule parameters** — overrides for configurable rule thresholds (e.g., T015 word counts)

@@ -74,7 +74,6 @@ infrastructure crates (`cherry-pit-web`, `cherry-pit-projection`) are planned.
 | **pardosa**    | implemented | Fiber state machine, dragline (append-only log), CRUD + migration operations. Persistence and NATS integration not yet built |
 | **pardosa-genome** | scaffold | `GenomeSafe`/`GenomeOrd` traits, binary format constants, error catalog. Serializer and deserializer not yet implemented |
 | **pardosa-genome-derive** | implemented | `#[derive(GenomeSafe)]` proc macro with compile-time serde attribute validation |
-| **adr-fmt**    | implemented | ADR governance CLI: advisory linting, crate-scoped decision rule extraction, decision-neighborhood critique, domain trees |
 | **cherry-pit-web**    | planned     | Web serving adapter (axum)                          |
 | **cherry-pit-projection** | planned | Read model storage and query serving                |
 
@@ -87,12 +86,12 @@ cherry-pit/
 │   ├── cherry-pit-gateway/    # EventStore implementations
 │   ├── pardosa/               # EDA storage layer (fiber semantics)
 │   ├── pardosa-genome/        # Binary serialization format
-│   ├── pardosa-genome-derive/ # GenomeSafe derive macro
-│   └── adr-fmt/               # ADR governance tool
+│   └── pardosa-genome-derive/ # GenomeSafe derive macro
 ├── docs/
-│   ├── adr/                   # Architecture decision records (governed by adr-fmt)
+│   ├── adr/                   # Architecture decision records (governed by the canonical adr-fmt CLI)
 │   ├── plans/                 # Ephemeral working drafts (consumed into code and ADRs)
 │   └── glossary.md            # Domain vocabulary across all crates
+├── adr-fmt.toml               # Corpus/domain config for the canonical adr-fmt CLI
 └── Cargo.toml                 # Workspace manifest (edition 2024, rust 1.95+)
 ```
 

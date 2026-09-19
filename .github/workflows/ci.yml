@@ -39,8 +39,16 @@ jobs:
       - name: Run tests
         run: cargo test --workspace --all-targets
 
+      - name: Install adr-fmt build toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.98.0
+
       - name: Verify ADR corpus
-        run: cargo run -p adr-fmt -- --lint
+        run: |
+          cargo +1.98.0 install --git https://github.com/Mattilsynet/adr-fmt \
+            --rev ec9f833b13affdd448862b48668dd74ec0234750 --locked adr-fmt
+          adr-fmt --lint
 
       - name: Verify release profile invariants
         run: |

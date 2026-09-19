@@ -1,7 +1,13 @@
 # adr-fmt configuration
 #
-# Domain definitions, crate mappings, and stale directory config.
-# Rules are hardcoded in the binary — only parameter overrides go here.
+# This file is the workspace-root SSOT discovery marker for the
+# canonical adr-fmt CLI (https://github.com/Mattilsynet/adr-fmt).
+# Domain definitions, crate mappings, corpus location, and stale
+# directory live here. Rules are hardcoded in the binary — only
+# parameter overrides go here.
+
+[corpus]
+root = "docs/adr"
 
 [stale]
 directory = "stale"
@@ -112,8 +118,11 @@ description = """\
     markdown parsing strategy, diagnostic output, safe-write \
     semantics, naming conventions, relationship vocabulary, tier \
     classification, and domain management. Covers the adr-fmt \
-    binary's own architectural decisions as a Rust CLI tool."""
-crates = ["adr-fmt"]
+    binary's own architectural decisions as a Rust CLI tool. \
+    The adr-fmt binary is owned canonically by Mattilsynet/adr-fmt; \
+    this workspace retains the historical records only, with no \
+    corresponding crate."""
+crates = []
 
 # ── Rule parameter overrides ────────────────────────────────────────
 #

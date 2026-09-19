@@ -651,8 +651,8 @@ the layer-annotated format (`R1 [N]: text`). To migrate:
 4. Eliminate any conditional framing ("when X, do Y")
 5. Ensure every rule names at least one concrete type, method, or file
 6. Distill each into a tagged rule (`R1 [N]: text`)
-7. Run `cargo run -p adr-fmt -- --lint` — T016 should stop firing
-8. Run `cargo run -p adr-fmt -- --context <CRATE>` to verify the
+7. Run `adr-fmt --lint` — T016 should stop firing
+8. Run `adr-fmt --context <CRATE>` to verify the
    extracted rules read well in isolation
 
 **Prioritize migration by tier:** S-tier ADRs first (they appear
