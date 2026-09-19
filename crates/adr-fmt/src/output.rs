@@ -9,7 +9,7 @@ use std::fmt::Write as _;
 
 use crate::config::Config;
 use crate::model::{AdrId, AdrRecord, DomainDir, RelVerb, Tier};
-use crate::nav::{compute_parent_children, compute_parent_edges, ChildEntry};
+use crate::nav::{ChildEntry, compute_parent_children, compute_parent_edges};
 use crate::report::Diagnostic;
 
 // ── Output block types ─────────────────────────────────────────────
@@ -190,9 +190,8 @@ pub fn render_diagnostics(diagnostics: &[Diagnostic], record_count: usize) -> St
         )
         .unwrap();
     } else {
-        let header = format!(
-            "## Diagnostics: {warnings} warning(s) across {record_count} ADR(s)\n\n"
-        );
+        let header =
+            format!("## Diagnostics: {warnings} warning(s) across {record_count} ADR(s)\n\n");
         out.insert_str(0, &header);
     }
 
@@ -318,7 +317,10 @@ pub fn render_tree(
         )
         .unwrap();
 
-        let domain_records = by_prefix.get(dir.prefix.as_str()).cloned().unwrap_or_default();
+        let domain_records = by_prefix
+            .get(dir.prefix.as_str())
+            .cloned()
+            .unwrap_or_default();
 
         // Find roots in this domain (sorted by ADR number)
         let mut roots: Vec<&AdrRecord> = domain_records
@@ -608,10 +610,7 @@ fn format_also_references_skipping_first_ref(record: &AdrRecord) -> String {
 
 /// Format the "also references" annotation using the parent-edge map
 /// (used for orphan section where parent may be missing).
-fn format_also_references(
-    record: &AdrRecord,
-    parent_edges: &HashMap<AdrId, AdrId>,
-) -> String {
+fn format_also_references(record: &AdrRecord, parent_edges: &HashMap<AdrId, AdrId>) -> String {
     let parent = parent_edges.get(&record.id);
     let mut others: Vec<String> = Vec::new();
     for rel in &record.relationships {

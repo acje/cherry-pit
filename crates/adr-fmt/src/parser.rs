@@ -22,8 +22,7 @@ use regex::Regex;
 
 use crate::config::Config;
 use crate::model::{
-    AdrId, AdrRecord, DomainDir, RelVerb, Relationship, Status, TaggedRule, Tier,
-    parse_adr_id,
+    AdrId, AdrRecord, DomainDir, RelVerb, Relationship, Status, TaggedRule, Tier, parse_adr_id,
 };
 use crate::report::Diagnostic;
 
@@ -252,8 +251,7 @@ pub fn parse_adr_file(
     let crates = find_crates_field(&lines);
 
     // --- Parent-cross-domain field ---
-    let (parent_cross_domain, parent_cross_domain_reason) =
-        find_parent_cross_domain_field(&lines);
+    let (parent_cross_domain, parent_cross_domain_reason) = find_parent_cross_domain_field(&lines);
 
     // --- Decision section content and tagged rules ---
     let decision_rules = extract_tagged_rules(&lines);
@@ -556,7 +554,6 @@ fn split_id_and_reason(value: &str) -> (&str, &str) {
     }
     (value, "")
 }
-
 
 ///
 /// Matches `RN [L]: text` pattern within the Decision section where
@@ -1355,7 +1352,9 @@ mod tests {
         assert_eq!(outcome.diagnostics.len(), 1);
         assert_eq!(outcome.diagnostics[0].rule, "P002");
         assert!(
-            outcome.diagnostics[0].message.contains("missing or malformed"),
+            outcome.diagnostics[0]
+                .message
+                .contains("missing or malformed"),
             "message should mention malformed title"
         );
     }

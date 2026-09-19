@@ -364,7 +364,10 @@ mod tests {
             make_record("CHE", 3, vec![(RelVerb::Informs, make_id("CHE", 1))]),
         ];
         let edges = compute_parent_edges(&records);
-        assert!(edges.is_empty(), "legacy/reverse verbs are not parent edges");
+        assert!(
+            edges.is_empty(),
+            "legacy/reverse verbs are not parent edges"
+        );
     }
 
     #[test]

@@ -173,8 +173,7 @@ fn main() {
     }
 
     // Parse stale directory (optional — may not exist in fresh repos)
-    let stale_dir = match containment::contained_join_optional(&adr_root, &config.stale.directory)
-    {
+    let stale_dir = match containment::contained_join_optional(&adr_root, &config.stale.directory) {
         Ok(opt) => opt,
         Err(e) => {
             eprintln!("error: stale directory in adr-fmt.toml: {e}");
@@ -270,7 +269,10 @@ fn resolve_adr_root_optional() -> Result<Option<PathBuf>, String> {
         if candidate.is_file() {
             let target = dir.join("docs/adr");
             return std::fs::canonicalize(&target).map(Some).map_err(|e| {
-                format!("cannot canonicalize discovered ADR root {}: {e}", target.display())
+                format!(
+                    "cannot canonicalize discovered ADR root {}: {e}",
+                    target.display()
+                )
             });
         }
         match dir.parent() {

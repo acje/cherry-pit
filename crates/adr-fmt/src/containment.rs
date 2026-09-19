@@ -93,18 +93,16 @@ pub fn contained_join(root: &Path, segment: &str) -> Result<PathBuf, Containment
     lexical_check(segment)?;
 
     let joined = root.join(segment);
-    let canonical_target = std::fs::canonicalize(&joined).map_err(|e| {
-        ContainmentError::CanonicalizeFailed {
+    let canonical_target =
+        std::fs::canonicalize(&joined).map_err(|e| ContainmentError::CanonicalizeFailed {
             segment: segment.to_owned(),
             reason: e.to_string(),
-        }
-    })?;
-    let canonical_root = std::fs::canonicalize(root).map_err(|e| {
-        ContainmentError::CanonicalizeFailed {
+        })?;
+    let canonical_root =
+        std::fs::canonicalize(root).map_err(|e| ContainmentError::CanonicalizeFailed {
             segment: segment.to_owned(),
             reason: format!("ADR root {}: {e}", root.display()),
-        }
-    })?;
+        })?;
 
     if !canonical_target.starts_with(&canonical_root) {
         return Err(ContainmentError::EscapesRoot {

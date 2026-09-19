@@ -1247,10 +1247,7 @@ None.
         "grandchild must render with │ continuation at col 5 and └─ at col 8, got:\n{stdout}",
     );
     // Orphans section must not contain any of the test ADRs.
-    let orphans_section = stdout
-        .split("orphans")
-        .nth(1)
-        .unwrap_or("");
+    let orphans_section = stdout.split("orphans").nth(1).unwrap_or("");
     assert!(
         !orphans_section.contains("TST-0002")
             && !orphans_section.contains("TST-0003")
@@ -1849,7 +1846,10 @@ mod adr_id_extraction_tests {
 
     #[test]
     fn four_letter_prefix() {
-        assert_eq!(parse_adr_id_prefix("PARD-0042"), Some("PARD-0042".to_owned()));
+        assert_eq!(
+            parse_adr_id_prefix("PARD-0042"),
+            Some("PARD-0042".to_owned())
+        );
     }
 
     #[test]
@@ -1890,4 +1890,3 @@ mod adr_id_extraction_tests {
         assert!(ids.contains("COM-0003"));
     }
 }
-

@@ -409,7 +409,9 @@ fn print_link_rules() {
     println!("    L009  Root + References coexistence");
     println!("    L010  Missing parent — non-Root ADR has no References");
     println!("    L011  Cross-domain parent — first References target is in another domain");
-    println!("    L012  Non-Accepted parent — first References target is Draft/Proposed (advisory)");
+    println!(
+        "    L012  Non-Accepted parent — first References target is Draft/Proposed (advisory)"
+    );
     println!("    L013  Parent-edge cycle — chain forms a loop");
     println!("    L014  Unreachable from root — chain ends at non-root");
     println!("    L015  Root-first heuristic — first ref is Root while specialized siblings exist");
@@ -569,9 +571,7 @@ crates = []
         let start = src
             .find("fn print_relationships")
             .expect("print_relationships exists");
-        let end = src
-            .find("fn print_stale")
-            .expect("print_stale exists");
+        let end = src.find("fn print_stale").expect("print_stale exists");
         let scan = &src[start..end];
         for forbidden in NEGATIVE_CANARY_TERMS {
             assert!(
