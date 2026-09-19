@@ -52,10 +52,12 @@ R3 [5]: Feature flags gate serialization dependencies so users opt in
    `cherry-pit-gateway` mandates MessagePack only for its own
    `MsgpackFileStore`. External adapters (CHE-0029 R8) choose
    independently; alternative `EventStore` implementations coexist.
-3. **Feature flags gate optional serialization dependencies.** Where a
-   crate offers more than one encoding, each extra backend sits behind
-   its own feature so users opt in explicitly. `cherry-pit-gateway`
-   offers one encoding today and gates nothing.
+3. **Feature flags gate serialization dependencies.** R3 applies to
+   every serialization dependency, unqualified: each sits behind its
+   own feature so users opt in explicitly. Current implementation gap
+   — `cherry-pit-gateway` depends on `rmp-serde` unconditionally and
+   gates nothing. That is a known nonconformance with R3, recorded
+   here rather than resolved by narrowing the rule.
 4. **Event envelope wire format is store-specific.** The `EventEnvelope`
    schema (CHE-0016, CHE-0042) is serialised by the store implementation,
    not by the domain. Different stores may use different encodings for

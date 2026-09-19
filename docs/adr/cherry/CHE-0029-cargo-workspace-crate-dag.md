@@ -30,8 +30,7 @@ Options:
 Cherry-pit owns the neutral framework contract. Repository ownership
 and compile-time dependencies are distinct: the framework remains an
 acyclic Cargo workspace, while its Pardosa adapter is owned and
-released outside that workspace. Existing co-located legacy packages
-do not establish dependency or release authority for the adopted seam.
+released outside that workspace.
 
 R1 [5]: Organize the canonical acje/cherry-pit framework crates as a
   Cargo workspace with an acyclic crate dependency graph
@@ -94,5 +93,6 @@ Workspace-level configuration:
 - **De-scalability invariant.** Restricting `cherry-pit-core` to
   `serde`, `uuid`, `jiff` means domain code compiles and tests run
   even if every adapter crate breaks.
-- **CI enforcement closes the gap.** A `cargo tree -p cherry-pit-core`
-  check makes R4 a build error rather than a convention.
+- **CI enforcement is not wired yet.** R6 specifies a
+  `cargo tree -p cherry-pit-core` check; the current workflow does not
+  run it, so R4 is upheld by review, not by the build.

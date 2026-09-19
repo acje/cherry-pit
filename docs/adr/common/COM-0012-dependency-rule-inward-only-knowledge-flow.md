@@ -30,7 +30,9 @@ R2 [2]: Data crossing boundaries is converted to the inner layer's
 R3 [2]: Domain logic must not reference infrastructure concerns —
   serialization libraries, database clients, network protocols,
   or file system operations
-R4 [3]: The Cargo crate DAG makes dependency violations a compile
+R4 [3]: The Cargo crate DAG and each crate's declared dependency set
+  bound inter-crate dependencies; an inward dependency added to an
+  inner crate is a reviewable violation, not an automatic compile
   error; logical layering within a crate uses module visibility
 R5 [2]: When an inner layer needs an outer capability, define a
   trait in the inner layer and implement it in the outer layer

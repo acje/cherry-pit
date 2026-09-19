@@ -11,8 +11,7 @@ References: RST-0001, SEC-0004, GND-0002
 
 ## Context
 
-CHE-0007 forbids unsafe code in cherry-pit-core. That decision
-achieves zero-copy deserialization without unsafe. SEC-0004
+CHE-0007 forbids unsafe code in cherry-pit-core. SEC-0004
 mandates restricting capabilities by default. These independent
 decisions converge on the same principle: unsafe code is a
 liability that bypasses Rust's ownership, borrowing, and lifetime
