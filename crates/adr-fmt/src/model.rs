@@ -571,9 +571,7 @@ pub fn parse_adr_id(s: &str) -> Option<AdrId> {
 
     // Prefix: 2-4 uppercase ASCII letters.
     let prefix_len = prefix.len();
-    if !(2..=4).contains(&prefix_len)
-        || !prefix.bytes().all(|b| b.is_ascii_uppercase())
-    {
+    if !(2..=4).contains(&prefix_len) || !prefix.bytes().all(|b| b.is_ascii_uppercase()) {
         return None;
     }
 
@@ -609,9 +607,7 @@ pub fn parse_adr_id_from_filename_stem(stem: &str) -> Option<AdrId> {
     let (prefix, rest) = stem.split_once('-')?;
 
     let prefix_len = prefix.len();
-    if !(2..=4).contains(&prefix_len)
-        || !prefix.bytes().all(|b| b.is_ascii_uppercase())
-    {
+    if !(2..=4).contains(&prefix_len) || !prefix.bytes().all(|b| b.is_ascii_uppercase()) {
         return None;
     }
 
