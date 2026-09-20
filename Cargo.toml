@@ -3,6 +3,7 @@ resolver = "3"
 members = [
     "crates/cherry-pit-core",
     "crates/cherry-pit-gateway",
+    "crates/cherry-pit-storage",
 ]
 
 [workspace.package]
@@ -16,6 +17,7 @@ authors = ["Anders Jensen <anders.jensen@users.noreply.github.com>"]
 # === Internal crates ===
 cherry-pit-core = { path = "crates/cherry-pit-core" }
 cherry-pit-gateway = { path = "crates/cherry-pit-gateway" }
+cherry-pit-storage = { path = "crates/cherry-pit-storage" }
 
 # === Async runtime ===
 tokio = { version = "1", features = ["macros", "net", "rt-multi-thread", "signal", "sync", "time"] }
@@ -33,6 +35,13 @@ uuid = { version = "1", features = ["v7", "serde"] }
 
 # === Stream utilities ===
 futures-util = "0.3"
+
+# === Storage primitives (CHE-0051 canonical import) ===
+thiserror = "2"
+tracing = "0.1"
+sha2 = "0.11"
+gethostname = "1"
+rustix = { version = "1.1.4", default-features = false, features = ["fs", "process", "std"] }
 
 # === Concurrency ===
 scc = "3"
