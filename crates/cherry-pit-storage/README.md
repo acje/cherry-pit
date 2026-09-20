@@ -16,4 +16,8 @@ for the design and CHE-0051:R3 for the enumerated re-export set.
 Originally authored by Anders Jensen (acje) and contributed via
 `Mattilsynet/gh-report`, where it is offered under `Apache-2.0 OR MIT`.
 Canonical cherry-pit takes the **MIT** arm of that existing dual grant;
-no relicensing occurred. See the repository `LICENSE`.
+no relicensing occurred.
+
+The donor's MIT copyright and permission notice is retained verbatim at
+[`LICENSE-MIT`](LICENSE-MIT) in this crate directory, as that notice
+requires. It applies alongside the repository `LICENSE`.
