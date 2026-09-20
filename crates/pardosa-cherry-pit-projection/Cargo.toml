@@ -1,0 +1,28 @@
+[package]
+name = "pardosa-cherry-pit-projection"
+version = "0.1.0"
+description = "Pardosa-backed persistent projection storage for cherry-pit read models"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+homepage = "https://github.com/acje/cherry-pit/tree/main/crates/pardosa-cherry-pit-projection"
+
+[lints]
+workspace = true
+
+[dependencies]
+cherry-pit-core = { workspace = true }
+cherry-pit-projection = { workspace = true }
+pardosa = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }
+uuid = { workspace = true }
+
+[dev-dependencies]
+cherry-pit-core = { workspace = true, features = ["testing"] }
+pardosa-cherry-pit-test-support = { path = "../pardosa-cherry-pit-test-support" }
+tempfile = { workspace = true }
+tokio = { workspace = true, features = ["fs", "macros", "rt-multi-thread", "sync"] }

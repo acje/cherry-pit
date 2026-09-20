@@ -4,6 +4,7 @@
 /// Passed explicitly through `CommandGateway` → `CommandBus` →
 /// `EventStore`. The store stamps these values onto every
 /// [`EventEnvelope`](crate::EventEnvelope) it creates.
+/// (CHE-0039: correlation context propagation.)
 ///
 /// # Design rationale
 ///
@@ -11,6 +12,7 @@
 /// [`none()`](Self::none), [`correlated()`](Self::correlated), or
 /// [`new()`](Self::new). The name communicates intent: forgetting
 /// correlation is a conscious omission, not an accidental default.
+/// (CHE-0039 R2: no `Default` impl.)
 ///
 /// # Nil UUIDs
 ///
@@ -19,7 +21,25 @@
 /// ID is semantically valid (albeit unusual) — it is the caller's
 /// responsibility to pass meaningful IDs. Typically these are UUID
 /// v7 values generated at command dispatch time.
-#[derive(Debug, Clone, PartialEq, Eq)]
+///
+/// # Examples
+///
+/// ```
+/// use cherry_pit_core::CorrelationContext;
+///
+/// // User-initiated command — no correlation.
+/// let ctx = CorrelationContext::none();
+/// assert!(ctx.correlation_id().is_none());
+/// assert!(ctx.causation_id().is_none());
+///
+/// // Policy-initiated — full correlation chain.
+/// let corr = uuid::Uuid::now_v7();
+/// let cause = uuid::Uuid::now_v7();
+/// let ctx = CorrelationContext::new(corr, cause);
+/// assert_eq!(ctx.correlation_id(), Some(corr));
+/// assert_eq!(ctx.causation_id(), Some(cause));
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct CorrelationContext {
     /// Groups related events into a single logical operation.
     /// Propagated through policies and sagas.

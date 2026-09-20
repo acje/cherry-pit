@@ -3,18 +3,18 @@
 //! Synchronous filesystem primitives for cherry-pit consumers: crash-safe
 //! atomic file writes, an RAII run-lock with TTL-based stale detection, and
 //! canonical-JSON SHA-256 content signatures. Flat public API over private
-//! modules (CHE-0051:R3).
+//! modules (CHE-0053:R3).
 //!
 //! ## Crash-safety
 //!
 //! Atomic writes use temp-file + fsync + rename + parent-dir-fsync, per
-//! CHE-0051:R2. Dropping the parent-dir fsync is a SemVer-major break
-//! (CHE-0051:R2).
+//! CHE-0032:R3. Dropping the parent-dir fsync is a SemVer-major break
+//! (CHE-0053:R6).
 //!
 //! ## Synchronous-only
 //!
-//! No `async fn`, tokio, or futures-util in the public surface (CHE-0051:R4).
-//! Wrap calls in `tokio::task::spawn_blocking` for async I/O (CHE-0051:R4).
+//! No `async fn`, tokio, or futures-util in the public surface (CHE-0053:R4).
+//! Wrap calls in `tokio::task::spawn_blocking` for async I/O (CHE-0053:R7).
 //!
 //! ## Examples
 //!
@@ -48,9 +48,9 @@
 //! // Drop releases the lock automatically; or call `lock.release()` explicitly.
 //! ```
 //!
-//! Governing ADR: [CHE-0051].
+//! Governing ADR: [CHE-0053].
 //!
-//! [CHE-0051]: https://github.com/acje/cherry-pit/blob/main/docs/adr/cherry/CHE-0051-cherry-pit-storage-canonical-import.md
+//! [CHE-0053]: https://github.com/Mattilsynet/gh-report/blob/c8507377b2748a015148751ce288be2bad9ec708/docs/adr/cherry/CHE-0053-cherry-pit-storage-design.md
 
 #![forbid(unsafe_code)]
 #![cfg_attr(not(test), deny(clippy::unwrap_used))]

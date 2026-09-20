@@ -66,7 +66,7 @@ pub enum PersistenceError {
 ///
 /// Two-way classification, mirroring the intent of
 /// `cherry_pit_core::ErrorCategory` and `DispatchError::category()`
-/// without depending on `cherry-pit-core` (CHE-0051:R1 forbids a
+/// without depending on `cherry-pit-core` (CHE-0053:R1/R8 forbid a
 /// cherry-pit-core dependency in this crate).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RetryClass {

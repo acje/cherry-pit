@@ -175,9 +175,7 @@ proptest! {
             drop(lock);
         }
 
-        let released = lock_path(dir.path(), DEFAULT_LOCK_FILENAME);
-        prop_assert!(released.exists());
-        prop_assert_eq!(std::fs::metadata(&released).unwrap().len(), 0);
+        prop_assert!(!lock_path(dir.path(), DEFAULT_LOCK_FILENAME).exists());
     }
 
     #[test]
@@ -224,6 +222,5 @@ fn lock_acquire_release_drops_file_smoke() {
         .unwrap();
         lock.path().to_path_buf()
     };
-    assert!(path.exists(), "coordination inode is never unlinked");
-    assert_eq!(std::fs::metadata(&path).unwrap().len(), 0);
+    assert!(!path.exists());
 }

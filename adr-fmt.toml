@@ -1,120 +1,19 @@
-# adr-fmt configuration
-#
-# This file is the workspace-root SSOT discovery marker for the
-# canonical adr-fmt CLI (https://github.com/Mattilsynet/adr-fmt).
-# Domain definitions, crate mappings, corpus location, and stale
-# directory live here. Rules are hardcoded in the binary — only
-# parameter overrides go here.
-
+# Source references under docs/adr are link landings, not local ADR records.
+# See docs/governance.md for the immutable source corpus and rule scope.
 [corpus]
-root = "docs/adr"
+root = "docs/decisions"
 
 [stale]
 directory = "stale"
 
-# ── Domain definitions ──────────────────────────────────────────────
-
 [[domains]]
-prefix = "GND"
-name = "Ground Domain"
-directory = "ground"
-description = """\
-    Universal foundations for information-systems design. \
-    Epistemic principles applicable to any information system, \
-    independent of language, runtime, or project. Establishes the \
-    irreducible uncertainty under which all directives operate and \
-    the feedback mechanisms required to close the resulting gaps \
-    between intent, action, and outcome. GND ADRs are the \
-    structural parents that domain-specific principle ADRs (COM, \
-    RST, SEC) implement in their respective vocabularies."""
-crates = []
-foundation = true
-
-[[domains]]
-prefix = "COM"
-name = "Common Domain"
-directory = "common"
-description = """\
-    Cross-cutting software design principles informed by Ousterhout's \
-    A Philosophy of Software Design and complementary works on \
-    software architecture, evolutionary design, and organizational \
-    alignment. Technology-agnostic guidance on module depth, \
-    complexity management, error design, abstraction layering, \
-    trade-off analysis, and structural communication. Distinct from \
-    Cherry's crate-specific architecture decisions."""
-crates = []
-foundation = true
-
-[[domains]]
-prefix = "CHE"
-name = "Cherry Domain"
-directory = "cherry"
-description = """\
-    Design philosophy, EDA/DDD/hexagonal architecture, domain model \
-    traits (aggregates, commands, events, policies), infrastructure \
-    ports, concurrency, delivery, storage backends, workspace tooling, \
-    testing strategy, and build configuration."""
-crates = ["cherry-pit-core", "cherry-pit-gateway", "cherry-pit-storage"]
-
-[[domains]]
-prefix = "RST"
-name = "Rust Domain"
-directory = "rust"
-description = """\
-    Rust language and toolchain governance: toolchain pinning, \
-    MSRV policy, edition strategy, workspace lint and format \
-    configuration, dependency management, supply chain security, \
-    and conservative feature adoption. Platform-specific decisions \
-    that apply to all Rust crates in the workspace."""
-crates = []
-foundation = true
-
-[[domains]]
-prefix = "SEC"
-name = "Security Domain"
-directory = "security"
-description = """\
-    CISQ-aligned security qualities: integrity at trust boundaries, \
-    availability via resource bounding, control via capability \
-    restriction, authenticity via provenance binding. Composed \
-    qualities cover TOCTOU prevention, confidentiality, and \
-    non-repudiation. Foundation domain applying to all crates."""
-crates = []
-foundation = true
-
-[[domains]]
-prefix = "AFM"
-name = "adr-fmt Domain"
-directory = "adr-fmt"
-description = """\
-    ADR governance tooling: CLI design, MADR template enforcement, \
-    markdown parsing strategy, diagnostic output, safe-write \
-    semantics, naming conventions, relationship vocabulary, tier \
-    classification, and domain management. Covers the adr-fmt \
-    binary's own architectural decisions as a Rust CLI tool. \
-    The adr-fmt binary is owned canonically by Mattilsynet/adr-fmt; \
-    this workspace retains the historical records only, with no \
-    corresponding crate."""
-crates = []
-
-# ── Rule parameter overrides ────────────────────────────────────────
-#
-# Only declare rules whose defaults you want to change.
-# Hardcoded defaults: T015 min_words=7, max_words=100
-#                     T016 max_rules=10, min_rule_words=7, max_rule_words=60
-#                     T019 asymmetric leverage bound: fires iff rule_rank < adr_rank
-#                          (no distance threshold, no domain carve-outs; not configurable)
-#                     T020 max_refs per tier: S=3 A=5 B=7 C=8 D=5 (not configurable)
-#
-# T015 and T016 limits are scaled by tier factor (S=1.5 A=1.2 B=1.0 C=0.8 D=0.6).
-# All four are signals, not gates. Exceeding the limit flags
-# an ADR for review — it may be overloaded or genuinely need the
-# space. A warning here is interesting, not necessarily wrong.
-
-[[rules]]
-id = "T015"
-params = { min_words = 7, max_words = 100 }
-
-[[rules]]
-id = "T016"
-params = { max_rules = 10, min_rule_words = 7, max_rule_words = 60 }
+prefix = "CPP"
+name = "Cherry-pit producer"
+directory = "."
+description = "Standalone producer placement decisions; source CHE/RST identifiers remain qualified references."
+crates = [
+    "cherry-pit-core", "cherry-pit-gateway", "cherry-pit-storage",
+    "cherry-pit-wq", "cherry-pit-merger", "cherry-pit-projection",
+    "cherry-pit-web", "cherry-pit-app", "pardosa-cherry-pit-projection",
+    "pardosa-cherry-pit-test-support",
+]

@@ -7,6 +7,11 @@ rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 authors.workspace = true
+homepage = "https://github.com/acje/cherry-pit/tree/main/crates/cherry-pit-gateway"
+documentation = "https://docs.rs/cherry-pit-gateway"
+keywords = ["event-sourcing", "event-store", "msgpack", "cqrs"]
+categories = ["data-structures", "filesystem"]
+readme = "README.md"
 
 [lints]
 workspace = true
@@ -14,13 +19,14 @@ workspace = true
 [dependencies]
 cherry-pit-core = { workspace = true }
 serde = { workspace = true }
-rmp-serde = { workspace = true }
 scc = { workspace = true }
-tokio = { workspace = true, features = ["fs"] }
+tokio = { workspace = true, features = ["fs", "sync", "rt"] }
 uuid = { workspace = true }
 jiff = { workspace = true }
 
 [dev-dependencies]
+cherry-pit-core = { workspace = true, features = ["testing"] }
+pardosa-cherry-pit-test-support = { path = "../pardosa-cherry-pit-test-support" }
 proptest = { workspace = true }
 tempfile = { workspace = true }
 futures-util = { workspace = true }
