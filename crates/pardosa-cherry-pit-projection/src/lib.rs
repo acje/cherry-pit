@@ -3,7 +3,7 @@
 use std::marker::PhantomData;
 use std::num::NonZeroU64;
 use std::path::Path;
-use std::sync::Mutex;
+use std::sync::{Mutex, MutexGuard};
 
 use cherry_pit_core::AggregateId;
 use cherry_pit_core::ProjectionCheckpoint;
@@ -60,8 +60,94 @@ fn to_bounded_name(name: &str) -> ProjectionResult<ProjectionNameStr> {
     ProjectionNameStr::new(name).map_err(|e| ProjectionError::Infrastructure(Box::new(e)))
 }
 
+#[derive(Debug)]
+enum WriteDiagnostic {
+    Undetermined {
+        carried_epoch: u64,
+    },
+    RetainedUncertainty {
+        carried_epoch: u64,
+        diagnostic: String,
+    },
+    SnapshotLanded(Box<dyn std::error::Error + Send + Sync>),
+    CheckpointLanded(Box<dyn std::error::Error + Send + Sync>),
+    CheckpointRemoved(Box<dyn std::error::Error + Send + Sync>),
+    SnapshotRemoved(Box<dyn std::error::Error + Send + Sync>),
+}
+
+impl std::fmt::Display for WriteDiagnostic {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Undetermined { carried_epoch } => {
+                write!(f, "write landing undetermined at epoch {carried_epoch}")
+            }
+            Self::RetainedUncertainty {
+                carried_epoch,
+                diagnostic,
+            } => write!(
+                f,
+                "session uncertain at epoch {carried_epoch}: {diagnostic}"
+            ),
+            Self::SnapshotLanded(source) => write!(f, "snapshot landed before failure: {source}"),
+            Self::CheckpointLanded(source) => {
+                write!(f, "checkpoint landed before failure: {source}")
+            }
+            Self::CheckpointRemoved(source) => {
+                write!(f, "checkpoint removal landed before failure: {source}")
+            }
+            Self::SnapshotRemoved(source) => {
+                write!(f, "snapshot removal landed before failure: {source}")
+            }
+        }
+    }
+}
+
+impl std::error::Error for WriteDiagnostic {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Undetermined { .. } | Self::RetainedUncertainty { .. } => None,
+            Self::SnapshotLanded(source)
+            | Self::CheckpointLanded(source)
+            | Self::CheckpointRemoved(source)
+            | Self::SnapshotRemoved(source) => Some(source.as_ref()),
+        }
+    }
+}
+
+fn require_landed<T>(verdict: WriteLandingVerdict<T>) -> ProjectionResult<T> {
+    match verdict {
+        WriteLandingVerdict::Landed(value) => Ok(value),
+        WriteLandingVerdict::Undetermined { carried_epoch } => Err(ProjectionError::Indeterminate(
+            Box::new(WriteDiagnostic::Undetermined { carried_epoch }),
+        )),
+    }
+}
+
 fn clear_component_if_removable(path: &Path) {
     drop(std::fs::remove_file(path));
+}
+
+fn expected_descriptor() -> ProjectionResult<AdmittedDescriptor> {
+    AdmittedDescriptor::try_from_descriptor(SchemaDescriptor::new(
+        PardosaProjectionRecord::SCHEMA_VERSION,
+        PardosaProjectionRecord::schema_descriptor(),
+    ))
+    .map_err(to_infra)
+}
+
+fn validate_descriptor(
+    recorded: Option<&SchemaDescriptor>,
+    expected: &AdmittedDescriptor,
+) -> ProjectionResult<()> {
+    match recorded {
+        Some(descriptor) if descriptor == expected.descriptor() => Ok(()),
+        _ => Err(ProjectionError::CorruptData(Box::new(
+            OperationFailure::new(
+                FailureCondition::SchemaMismatch,
+                "projection codec/schema version mismatch",
+            ),
+        ))),
+    }
 }
 
 fn encode_snapshot<P: Serialize>(projection: &P) -> ProjectionResult<SnapshotBytesDto> {
@@ -134,26 +220,45 @@ fn default_claim(epoch: u64) -> OwnershipClaimRecord {
 /// ```
 pub struct PardosaProjectionStore<P> {
     session: Mutex<FileWriterSession>,
-    projection_name: String,
+    projection_name: ProjectionNameStr,
     _projection: PhantomData<fn() -> P>,
 }
 
 impl<P> PardosaProjectionStore<P> {
+    fn ready_session(&self) -> ProjectionResult<MutexGuard<'_, FileWriterSession>> {
+        let session = self
+            .session
+            .lock()
+            .map_err(|_| ProjectionError::Infrastructure("session mutex poisoned".into()))?;
+        match session.uncertain_diagnostic() {
+            Some(diagnostic) => Err(ProjectionError::Indeterminate(Box::new(
+                WriteDiagnostic::RetainedUncertainty {
+                    carried_epoch: session.carried_epoch(),
+                    diagnostic: diagnostic.to_owned(),
+                },
+            ))),
+            None => Ok(session),
+        }
+    }
+
     /// Create a fresh `.pgno`-backed store, truncating any existing file.
     ///
     /// # Errors
     ///
     /// Returns [`ProjectionError::Infrastructure`] when pardosa cannot
-    /// create the backing container.
+    /// create the backing container, the schema is inadmissible, or the name
+    /// exceeds 128 UTF-8 bytes. Validation precedes removal of existing files.
     pub fn create_pgno(path: &Path, projection_name: impl Into<String>) -> ProjectionResult<Self> {
+        let projection_name = to_bounded_name(&projection_name.into())?;
+        let descriptor = expected_descriptor()?;
         let adapter = FileStorageAdapter::new(path);
         clear_component_if_removable(adapter.meta_path());
         clear_component_if_removable(adapter.pgno_path());
         let claim = default_claim(1);
-        let session = adapter.create(&claim).map_err(to_infra)?;
+        let session = adapter.create(&claim, &descriptor).map_err(to_infra)?;
         Ok(Self {
             session: Mutex::new(session),
-            projection_name: projection_name.into(),
+            projection_name,
             _projection: PhantomData,
         })
     }
@@ -163,14 +268,20 @@ impl<P> PardosaProjectionStore<P> {
     /// # Errors
     ///
     /// Returns [`ProjectionError::Infrastructure`] when pardosa cannot open
-    /// or fold the backing container.
+    /// or fold the backing container, or the name exceeds 128 UTF-8 bytes.
+    /// Returns [`ProjectionError::CorruptData`] for a different codec schema or version.
     pub fn open_pgno(path: &Path, projection_name: impl Into<String>) -> ProjectionResult<Self> {
+        let projection_name = to_bounded_name(&projection_name.into())?;
         let adapter = FileStorageAdapter::new(path);
+        let expected = expected_descriptor()?;
+        let meta = adapter.read_meta_records().map_err(to_infra)?;
+        validate_descriptor(meta.schema_descriptor.as_ref(), &expected)?;
         let epoch = adapter.current_epoch().map_err(to_infra)?;
         let session = adapter.open_write(epoch).map_err(to_infra)?;
+        validate_descriptor(session.schema_descriptor(), &expected)?;
         Ok(Self {
             session: Mutex::new(session),
-            projection_name: projection_name.into(),
+            projection_name,
             _projection: PhantomData,
         })
     }
@@ -178,7 +289,7 @@ impl<P> PardosaProjectionStore<P> {
     /// Stable projection identity used as part of every record key.
     #[must_use]
     pub fn projection_name(&self) -> &str {
-        &self.projection_name
+        self.projection_name.as_str()
     }
 }
 
@@ -195,6 +306,12 @@ where
     /// failures or oversized snapshot encodings. Returns
     /// [`ProjectionError::CheckpointRegression`] (CHE-0097:R1) when
     /// `last_sequence` is lower than the existing checkpoint.
+    /// Indeterminate writes require reconciliation; a diagnostic retains any
+    /// snapshot or checkpoint already known to have landed.
+    ///
+    /// Each snapshot admits at most 262144 serialized bytes. Serialization
+    /// allocates before admission; allocation capacity, concurrent callers and
+    /// aggregate process memory are not bounded by this limit.
     #[expect(
         clippy::unused_async,
         reason = "preserves the async API over synchronous Pardosa IO"
@@ -209,7 +326,8 @@ where
         projection: &P,
         last_sequence: NonZeroU64,
     ) -> ProjectionResult<()> {
-        let projection_name = to_bounded_name(&self.projection_name)?;
+        drop(self.ready_session()?);
+        let projection_name = self.projection_name.clone();
         let bytes = encode_snapshot(projection)?;
         let snapshot = PardosaProjectionRecord::Snapshot {
             aggregate_id: aggregate_id.get(),
@@ -220,7 +338,7 @@ where
         snapshot
             .encode_payload(&mut snapshot_payload)
             .map_err(to_infra)?;
-        let snap_key = snapshot_key(aggregate_id, &self.projection_name);
+        let snap_key = snapshot_key(aggregate_id, self.projection_name());
         let snap_fid = derive_fiber_id(&snap_key);
         let event_id_1 = *uuid::Uuid::now_v7().as_bytes();
 
@@ -233,14 +351,11 @@ where
         checkpoint
             .encode_payload(&mut checkpoint_payload)
             .map_err(to_infra)?;
-        let check_key = checkpoint_key(aggregate_id, &self.projection_name);
+        let check_key = checkpoint_key(aggregate_id, self.projection_name());
         let check_fid = derive_fiber_id(&check_key);
         let event_id_2 = *uuid::Uuid::now_v7().as_bytes();
 
-        let mut session = self
-            .session
-            .lock()
-            .map_err(|_| ProjectionError::Infrastructure("session mutex poisoned".into()))?;
+        let mut session = self.ready_session()?;
 
         if let Some(existing) = self.load_checkpoint_from_session(&session, aggregate_id)?
             && last_sequence < existing.last_sequence()
@@ -252,38 +367,51 @@ where
         }
 
         let snap_handle = session.fiber(snap_fid).map_err(to_infra)?;
-        if snap_handle.is_detached() {
+        let verdict = if snap_handle.is_detached() {
             session
                 .rescue_fiber(snap_fid, event_id_1, snapshot_payload)
-                .map_err(to_infra)?;
+                .map_err(to_infra)?
         } else {
             session
                 .append_to_fiber(snap_fid, event_id_1, snapshot_payload)
-                .map_err(to_infra)?;
-        }
+                .map_err(to_infra)?
+        };
+        require_landed(verdict)?;
         tracing::info!(
             target: "cherry_pit_projection",
             boundary = "snapshot_written",
             "pardosa snapshot persisted",
         );
 
-        let check_handle = session.fiber(check_fid).map_err(to_infra)?;
-        if check_handle.is_detached() {
-            session
-                .rescue_fiber(check_fid, event_id_2, checkpoint_payload)
-                .map_err(to_infra)?;
-        } else {
-            session
-                .append_to_fiber(check_fid, event_id_2, checkpoint_payload)
-                .map_err(to_infra)?;
-        }
+        let checkpoint_result = (|| {
+            let check_handle = session.fiber(check_fid).map_err(to_infra)?;
+            let verdict = if check_handle.is_detached() {
+                session
+                    .rescue_fiber(check_fid, event_id_2, checkpoint_payload)
+                    .map_err(to_infra)?
+            } else {
+                session
+                    .append_to_fiber(check_fid, event_id_2, checkpoint_payload)
+                    .map_err(to_infra)?
+            };
+            require_landed(verdict)
+        })();
+        checkpoint_result.map_err(|error| {
+            ProjectionError::Indeterminate(Box::new(WriteDiagnostic::SnapshotLanded(Box::new(
+                error,
+            ))))
+        })?;
         tracing::info!(
             target: "cherry_pit_projection",
             boundary = "checkpoint_written",
             "pardosa checkpoint persisted",
         );
 
-        session.sync().map_err(to_infra)?;
+        session.sync().map_err(|error| {
+            ProjectionError::Indeterminate(Box::new(WriteDiagnostic::CheckpointLanded(Box::new(
+                error,
+            ))))
+        })?;
         Ok(())
     }
 
@@ -302,12 +430,9 @@ where
         reason = "pardosa's facade is synchronous (PGN-0010:R5 bridge convention); the `async` keyword preserves the trait's async surface for callers"
     )]
     pub async fn load_snapshot(&self, aggregate_id: AggregateId) -> ProjectionResult<Option<P>> {
-        let key = snapshot_key(aggregate_id, &self.projection_name);
+        let key = snapshot_key(aggregate_id, self.projection_name());
         let fiber_id = derive_fiber_id(&key);
-        let session = self
-            .session
-            .lock()
-            .map_err(|_| ProjectionError::Infrastructure("session mutex poisoned".into()))?;
+        let session = self.ready_session()?;
         let handle = session.fiber(fiber_id).map_err(to_infra)?;
         if !handle.is_active() {
             return Ok(None);
@@ -339,10 +464,7 @@ where
         &self,
         aggregate_id: AggregateId,
     ) -> ProjectionResult<Option<ProjectionCheckpoint>> {
-        let session = self
-            .session
-            .lock()
-            .map_err(|_| ProjectionError::Infrastructure("session mutex poisoned".into()))?;
+        let session = self.ready_session()?;
         self.load_checkpoint_from_session(&session, aggregate_id)
     }
 
@@ -351,7 +473,7 @@ where
         session: &FileWriterSession,
         aggregate_id: AggregateId,
     ) -> ProjectionResult<Option<ProjectionCheckpoint>> {
-        let key = checkpoint_key(aggregate_id, &self.projection_name);
+        let key = checkpoint_key(aggregate_id, self.projection_name());
         let fiber_id = derive_fiber_id(&key);
         let handle = session.fiber(fiber_id).map_err(to_infra)?;
         if !handle.is_active() {
@@ -377,7 +499,7 @@ where
                     last_sequence,
                 );
                 if checkpoint.aggregate_id() != aggregate_id
-                    || checkpoint.projection_name() != self.projection_name
+                    || checkpoint.projection_name() != self.projection_name()
                 {
                     return Err(ProjectionError::CorruptData(
                         "checkpoint identity mismatch".into(),
@@ -398,7 +520,8 @@ where
     /// # Errors
     ///
     /// Returns [`ProjectionError::Infrastructure`] for pardosa write
-    /// failures.
+    /// failures before any removal lands. Unknown completion and failures after
+    /// a removal lands return [`ProjectionError::Indeterminate`].
     #[expect(
         clippy::unused_async,
         reason = "async fn preserves a call-site-compatible async surface for callers; pardosa's facade is sync (PGN-0010:R5 bridge convention)"
@@ -408,13 +531,10 @@ where
         reason = "pardosa's facade is synchronous (PGN-0010:R5 bridge convention); the `async` keyword preserves the trait's async surface for callers"
     )]
     pub async fn delete(&self, aggregate_id: AggregateId) -> ProjectionResult<()> {
-        let projection_name = to_bounded_name(&self.projection_name)?;
-        let mut session = self
-            .session
-            .lock()
-            .map_err(|_| ProjectionError::Infrastructure("session mutex poisoned".into()))?;
+        let projection_name = self.projection_name.clone();
+        let mut session = self.ready_session()?;
 
-        let check_key = checkpoint_key(aggregate_id, &self.projection_name);
+        let check_key = checkpoint_key(aggregate_id, self.projection_name());
         let check_fid = derive_fiber_id(&check_key);
         let check_handle = session.fiber(check_fid).map_err(to_infra)?;
         if check_handle.is_active() {
@@ -426,9 +546,11 @@ where
             let mut payload = Vec::new();
             tombstone.encode_payload(&mut payload).map_err(to_infra)?;
             let event_id = *uuid::Uuid::now_v7().as_bytes();
-            session
-                .detach_fiber(check_fid, event_id, payload)
-                .map_err(to_infra)?;
+            require_landed(
+                session
+                    .detach_fiber(check_fid, event_id, payload)
+                    .map_err(to_infra)?,
+            )?;
             tracing::info!(
                 target: "cherry_pit_projection",
                 boundary = "checkpoint_removed",
@@ -436,30 +558,51 @@ where
             );
         }
 
-        let snap_key = snapshot_key(aggregate_id, &self.projection_name);
+        let snap_key = snapshot_key(aggregate_id, self.projection_name());
         let snap_fid = derive_fiber_id(&snap_key);
-        let snap_handle = session.fiber(snap_fid).map_err(to_infra)?;
-        if snap_handle.is_active() {
-            let tombstone = PardosaProjectionRecord::Tombstone {
-                aggregate_id: aggregate_id.get(),
-                projection_name,
-                kind: KIND_SNAPSHOT,
-            };
-            let mut payload = Vec::new();
-            tombstone.encode_payload(&mut payload).map_err(to_infra)?;
-            let event_id = *uuid::Uuid::now_v7().as_bytes();
-            session
-                .detach_fiber(snap_fid, event_id, payload)
-                .map_err(to_infra)?;
-            tracing::info!(
-                target: "cherry_pit_projection",
-                boundary = "snapshot_removed",
-                "pardosa snapshot deleted",
-            );
-        }
+        let remaining = (|| {
+            let snap_handle = session.fiber(snap_fid).map_err(to_infra)?;
+            if snap_handle.is_active() {
+                let tombstone = PardosaProjectionRecord::Tombstone {
+                    aggregate_id: aggregate_id.get(),
+                    projection_name,
+                    kind: KIND_SNAPSHOT,
+                };
+                let mut payload = Vec::new();
+                tombstone.encode_payload(&mut payload).map_err(to_infra)?;
+                let event_id = *uuid::Uuid::now_v7().as_bytes();
+                require_landed(
+                    session
+                        .detach_fiber(snap_fid, event_id, payload)
+                        .map_err(to_infra)?,
+                )?;
+                tracing::info!(
+                    target: "cherry_pit_projection",
+                    boundary = "snapshot_removed",
+                    "pardosa snapshot deleted",
+                );
+            }
 
-        session.sync().map_err(to_infra)?;
-        Ok(())
+            session.sync().map_err(|error| {
+                if snap_handle.is_active() {
+                    ProjectionError::Indeterminate(Box::new(WriteDiagnostic::SnapshotRemoved(
+                        Box::new(error),
+                    )))
+                } else {
+                    to_infra(error)
+                }
+            })?;
+            Ok(())
+        })();
+        remaining.map_err(|error| {
+            if check_handle.is_active() {
+                ProjectionError::Indeterminate(Box::new(WriteDiagnostic::CheckpointRemoved(
+                    Box::new(error),
+                )))
+            } else {
+                error
+            }
+        })
     }
 }
 
@@ -481,7 +624,7 @@ where
         aggregate_id: AggregateId,
         projection: &P,
     ) -> ProjectionResult<()> {
-        let projection_name = to_bounded_name(&self.projection_name)?;
+        let projection_name = self.projection_name.clone();
         let bytes = encode_snapshot(projection)?;
         let snapshot = PardosaProjectionRecord::Snapshot {
             aggregate_id: aggregate_id.get(),
@@ -492,7 +635,7 @@ where
         snapshot
             .encode_payload(&mut snapshot_payload)
             .map_err(to_infra)?;
-        let snap_key = snapshot_key(aggregate_id, &self.projection_name);
+        let snap_key = snapshot_key(aggregate_id, self.projection_name());
         let snap_fid = derive_fiber_id(&snap_key);
         let event_id = *uuid::Uuid::now_v7().as_bytes();
         let mut session = self
@@ -500,15 +643,16 @@ where
             .lock()
             .map_err(|_| ProjectionError::Infrastructure("session mutex poisoned".into()))?;
         let snap_handle = session.fiber(snap_fid).map_err(to_infra)?;
-        if snap_handle.is_detached() {
+        let verdict = if snap_handle.is_detached() {
             session
                 .rescue_fiber(snap_fid, event_id, snapshot_payload)
-                .map_err(to_infra)?;
+                .map_err(to_infra)?
         } else {
             session
                 .append_to_fiber(snap_fid, event_id, snapshot_payload)
-                .map_err(to_infra)?;
-        }
+                .map_err(to_infra)?
+        };
+        require_landed(verdict)?;
         session.sync().map_err(to_infra)?;
         Err(ProjectionError::Infrastructure(
             "simulated crash after snapshot before checkpoint".into(),
@@ -532,6 +676,258 @@ mod tests {
 
     fn seq(value: u64) -> NonZeroU64 {
         NonZeroU64::new(value).expect("non-zero sequence")
+    }
+
+    #[test]
+    fn reopen_rejects_foreign_schema_and_version_without_changes() {
+        for descriptor in [
+            SchemaDescriptor::new(2, PardosaProjectionRecord::schema_descriptor()),
+            SchemaDescriptor::new(1, DescriptorNode::U64),
+        ] {
+            let path = temp_pgno_path();
+            let adapter = FileStorageAdapter::new(&path);
+            let admitted = AdmittedDescriptor::try_from_descriptor(descriptor).unwrap();
+            drop(adapter.create(&default_claim(1), &admitted).unwrap());
+            let before = (
+                std::fs::read(adapter.meta_path()).unwrap(),
+                std::fs::read(adapter.pgno_path()).unwrap(),
+            );
+            let error =
+                PardosaProjectionStore::<CounterView>::open_pgno(&path, "view").unwrap_err();
+            let ProjectionError::CorruptData(source) = error else {
+                panic!("expected schema refusal")
+            };
+            assert_eq!(
+                source
+                    .downcast_ref::<OperationFailure>()
+                    .unwrap()
+                    .condition(),
+                &FailureCondition::SchemaMismatch
+            );
+            assert_eq!(
+                before,
+                (
+                    std::fs::read(adapter.meta_path()).unwrap(),
+                    std::fs::read(adapter.pgno_path()).unwrap()
+                )
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn retained_uncertainty_blocks_all_projection_operations() {
+        for sync_failure in [false, true] {
+            let path = temp_pgno_path();
+            let store = PardosaProjectionStore::<CounterView>::create_pgno(&path, "view").unwrap();
+            if sync_failure {
+                store
+                    .persist(aggregate_id(1), &CounterView { total: 1 }, seq(1))
+                    .await
+                    .unwrap();
+                assert!(
+                    store
+                        .load_snapshot(aggregate_id(1))
+                        .await
+                        .unwrap()
+                        .is_some()
+                );
+            }
+            let native = store.session.into_inner().unwrap();
+            let native = if sync_failure {
+                native.with_simulate_sync_error(true)
+            } else {
+                native.with_undetermined_after_n_blocks(0)
+            };
+            let store = PardosaProjectionStore {
+                session: Mutex::new(native),
+                projection_name: store.projection_name,
+                _projection: PhantomData,
+            };
+            assert!(matches!(
+                store
+                    .persist(aggregate_id(1), &CounterView { total: 2 }, seq(2))
+                    .await,
+                Err(ProjectionError::Indeterminate(_))
+            ));
+            let diagnostic = store
+                .session
+                .lock()
+                .unwrap()
+                .uncertain_diagnostic()
+                .unwrap()
+                .to_owned();
+            let error = store.load_snapshot(aggregate_id(1)).await.unwrap_err();
+            let ProjectionError::Indeterminate(source) = error else {
+                panic!("expected retained uncertainty")
+            };
+            assert!(
+                matches!(source.downcast_ref::<WriteDiagnostic>(), Some(WriteDiagnostic::RetainedUncertainty { carried_epoch: 1, diagnostic: retained }) if retained == &diagnostic)
+            );
+            assert!(matches!(
+                store.load_snapshot(aggregate_id(1)).await,
+                Err(ProjectionError::Indeterminate(_))
+            ));
+            assert!(matches!(
+                store.load_checkpoint(aggregate_id(1)).await,
+                Err(ProjectionError::Indeterminate(_))
+            ));
+            assert!(matches!(
+                store
+                    .persist(aggregate_id(1), &CounterView { total: 2 }, seq(2))
+                    .await,
+                Err(ProjectionError::Indeterminate(_))
+            ));
+            assert!(matches!(
+                store.delete(aggregate_id(1)).await,
+                Err(ProjectionError::Indeterminate(_))
+            ));
+        }
+    }
+
+    #[tokio::test]
+    async fn metadata_failure_without_uncertainty_is_not_reclassified() {
+        let path = temp_pgno_path();
+        let store = PardosaProjectionStore::<CounterView>::create_pgno(&path, "view").unwrap();
+        let meta = FileStorageAdapter::new(&path).meta_path().to_owned();
+        std::fs::write(meta, b"invalid metadata").unwrap();
+        assert!(matches!(
+            store
+                .persist(aggregate_id(1), &CounterView { total: 1 }, seq(1))
+                .await,
+            Err(ProjectionError::Infrastructure(_))
+        ));
+        assert!(
+            store
+                .session
+                .lock()
+                .unwrap()
+                .uncertain_diagnostic()
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn invalid_name_preserves_existing_components() {
+        let path = temp_pgno_path();
+        let store = PardosaProjectionStore::<CounterView>::create_pgno(&path, "valid").unwrap();
+        drop(store);
+        let adapter = FileStorageAdapter::new(&path);
+        let meta = std::fs::read(adapter.meta_path()).unwrap();
+        let data = std::fs::read(adapter.pgno_path()).unwrap();
+        assert!(
+            PardosaProjectionStore::<CounterView>::create_pgno(&path, "x".repeat(129)).is_err()
+        );
+        assert_eq!(std::fs::read(adapter.meta_path()).unwrap(), meta);
+        assert_eq!(std::fs::read(adapter.pgno_path()).unwrap(), data);
+        assert!(PardosaProjectionStore::<CounterView>::open_pgno(&path, "é".repeat(65)).is_err());
+        let reopened =
+            PardosaProjectionStore::<CounterView>::open_pgno(&path, "é".repeat(64)).unwrap();
+        assert_eq!(reopened.projection_name().len(), 128);
+    }
+
+    #[test]
+    fn snapshot_admission_is_encoded_length_not_allocation() {
+        assert!(encode_snapshot(&"x".repeat(SNAPSHOT_BYTES_MAX - 2)).is_ok());
+        assert!(encode_snapshot(&"x".repeat(SNAPSHOT_BYTES_MAX - 1)).is_err());
+    }
+
+    fn inject(
+        store: PardosaProjectionStore<CounterView>,
+        blocks: usize,
+    ) -> PardosaProjectionStore<CounterView> {
+        PardosaProjectionStore {
+            session: Mutex::new(
+                store
+                    .session
+                    .into_inner()
+                    .unwrap()
+                    .with_undetermined_after_n_blocks(blocks),
+            ),
+            projection_name: store.projection_name,
+            _projection: PhantomData,
+        }
+    }
+
+    #[tokio::test]
+    async fn unknown_snapshot_stops_before_checkpoint_io() {
+        let path = temp_pgno_path();
+        let store = inject(
+            PardosaProjectionStore::create_pgno(&path, "view").unwrap(),
+            0,
+        );
+        let error = store
+            .persist(aggregate_id(1), &CounterView { total: 1 }, seq(1))
+            .await
+            .unwrap_err();
+        let ProjectionError::Indeterminate(source) = error else {
+            panic!("expected unknown")
+        };
+        assert!(matches!(
+            source.downcast_ref::<WriteDiagnostic>(),
+            Some(WriteDiagnostic::Undetermined { carried_epoch: 1 })
+        ));
+    }
+
+    #[tokio::test]
+    async fn unknown_checkpoint_retains_landed_snapshot() {
+        let path = temp_pgno_path();
+        let store = inject(
+            PardosaProjectionStore::create_pgno(&path, "view").unwrap(),
+            1,
+        );
+        let error = store
+            .persist(aggregate_id(1), &CounterView { total: 1 }, seq(1))
+            .await
+            .unwrap_err();
+        let ProjectionError::Indeterminate(source) = error else {
+            panic!("expected unknown")
+        };
+        assert!(matches!(
+            source.downcast_ref::<WriteDiagnostic>(),
+            Some(WriteDiagnostic::SnapshotLanded(_))
+        ));
+        drop(store);
+        let reopened = PardosaProjectionStore::<CounterView>::open_pgno(&path, "view").unwrap();
+        assert_eq!(
+            reopened.load_snapshot(aggregate_id(1)).await.unwrap(),
+            Some(CounterView { total: 1 })
+        );
+        assert_eq!(
+            reopened.load_checkpoint(aggregate_id(1)).await.unwrap(),
+            None
+        );
+    }
+
+    #[tokio::test]
+    async fn unknown_delete_retains_landed_checkpoint_removal() {
+        let path = temp_pgno_path();
+        let store = PardosaProjectionStore::create_pgno(&path, "view").unwrap();
+        store
+            .persist(aggregate_id(1), &CounterView { total: 1 }, seq(1))
+            .await
+            .unwrap();
+        let store = inject(store, 3);
+        let error = store.delete(aggregate_id(1)).await.unwrap_err();
+        let ProjectionError::Indeterminate(source) = error else {
+            panic!("expected unknown")
+        };
+        assert!(matches!(
+            source.downcast_ref::<WriteDiagnostic>(),
+            Some(WriteDiagnostic::CheckpointRemoved(_))
+        ));
+        drop(store);
+        let reopened = PardosaProjectionStore::<CounterView>::open_pgno(&path, "view").unwrap();
+        assert_eq!(
+            reopened.load_checkpoint(aggregate_id(1)).await.unwrap(),
+            None
+        );
+        assert!(
+            reopened
+                .load_snapshot(aggregate_id(1))
+                .await
+                .unwrap()
+                .is_some()
+        );
     }
 
     #[test]

@@ -26,5 +26,6 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 
 [dev-dependencies]
+pardosa = { workspace = true, features = ["unstable-test-support"] }
 tempfile = { workspace = true }
 tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros"] }

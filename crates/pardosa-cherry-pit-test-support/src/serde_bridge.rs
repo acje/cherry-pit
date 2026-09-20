@@ -148,7 +148,8 @@ impl<Ev: DomainEvent + serde::Serialize + DeserializeOwned + Clone + Send + 'sta
         let remapped = envelopes
             .iter()
             .map(remap_envelope)
-            .collect::<Result<Vec<_>, _>>()?;
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(crate::after_landed)?;
         Ok((id, remapped))
     }
 
@@ -168,6 +169,10 @@ impl<Ev: DomainEvent + serde::Serialize + DeserializeOwned + Clone + Send + 'sta
             .inner
             .append(id, expected_sequence, dtos, context)
             .await?;
-        envelopes.iter().map(remap_envelope).collect()
+        envelopes
+            .iter()
+            .map(remap_envelope)
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(crate::after_landed)
     }
 }

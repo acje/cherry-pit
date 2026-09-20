@@ -11,6 +11,33 @@ use cherry_pit_core::testing::InMemoryEventStore;
 use super::domain::{BarEvent, FooEvent, FooToBarOutput, FooToBarPolicy};
 use super::infra::{BarGateway, FooGateway};
 
+fn policy_error<E: std::error::Error + Send + Sync + 'static>(
+    error: cherry_pit_core::DispatchError<E>,
+) -> cherry_pit_app::AgentError {
+    match error {
+        cherry_pit_core::DispatchError::Indeterminate(source) => {
+            cherry_pit_app::AgentError::Store(cherry_pit_core::StoreError::Indeterminate(source))
+        }
+        other => cherry_pit_app::AgentError::Policy(Box::new(other)),
+    }
+}
+
+#[test]
+fn indeterminate_policy_mapping_preserves_category_and_source() {
+    use std::error::Error;
+    let error = policy_error::<std::convert::Infallible>(
+        cherry_pit_core::DispatchError::Indeterminate(std::io::Error::other("diagnostic").into()),
+    );
+    assert_eq!(
+        error.category(),
+        cherry_pit_core::ErrorCategory::ReconciliationRequired
+    );
+    assert_eq!(
+        error.source().unwrap().source().unwrap().to_string(),
+        "diagnostic"
+    );
+}
+
 pub struct Assembled {
     pub app: App<
         FooGateway,
@@ -42,10 +69,7 @@ pub fn assemble() -> Assembled {
             let bar = Arc::clone(&bar_for_policy);
             async move {
                 let FooToBarOutput::Ping(cmd) = out;
-                bar.create(cmd, ctx)
-                    .await
-                    .map(|_| ())
-                    .map_err(|e| cherry_pit_app::AgentError::Policy(format!("bar: {e}").into()))
+                bar.create(cmd, ctx).await.map(|_| ()).map_err(policy_error)
             }
         },
         "FooToBarPolicy",

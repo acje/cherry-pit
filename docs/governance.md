@@ -95,9 +95,8 @@ Local intake is complete only in `ghr-7wc6p.11.2`'s admitted context.
 Resource review I2: 262144 bytes limits admitted serialized snapshot length.
 Serialization allocates a Vec before checking that limit; its allocation,
 concurrent waiters and aggregate process memory are not bounded by it.
-I1 remains a future construction-boundary gap: create/open accept arbitrary
-projection-name strings; 128-byte validation occurs later during use.
-No boundary-validated name type or before-create rejection is claimed.
+Projection create/open validate the 128-byte name at the public boundary and
+store its bounded type. Create admits the schema before removing existing files.
 
 The source's CI job names and pass reports describe **gh-report**, not this
 producer. Applicable gate transfer, a locally runnable entry point, supply-chain

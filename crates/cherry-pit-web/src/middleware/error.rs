@@ -55,6 +55,7 @@ mod code {
 /// interpolated into a response body.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum OpaqueCode {
+    Indeterminate,
     ConcurrencyConflict,
     AggregateNotFound,
     Infrastructure,
@@ -64,10 +65,37 @@ enum OpaqueCode {
     AcceptedUnknown,
 }
 
+#[cfg(test)]
+mod uncertainty_tests {
+    use super::*;
+
+    #[test]
+    fn indeterminate_dispatch_http_is_opaque_without_retry_advice() {
+        let dispatch: DispatchError<std::convert::Infallible> =
+            DispatchError::Indeterminate("secret".into());
+        assert_indeterminate_response(map_dispatch_error(&dispatch));
+    }
+
+    #[test]
+    fn indeterminate_store_http_is_opaque_without_retry_advice() {
+        let store = StoreError::Indeterminate("secret".into());
+        assert_indeterminate_response(map_store_error(&store));
+    }
+
+    fn assert_indeterminate_response((status, headers, body): ErrorResponse) {
+        assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
+        assert!(!headers.contains_key(RETRY_AFTER));
+        assert_eq!(body.code, "indeterminate");
+        assert!(!body.message.contains("secret"));
+        assert!(!body.message.contains("safe"));
+    }
+}
+
 impl OpaqueCode {
     /// Stable machine-readable code for [`ErrorBody::code`].
     const fn wire(self) -> &'static str {
         match self {
+            Self::Indeterminate => "indeterminate",
             Self::ConcurrencyConflict => "concurrency_conflict",
             Self::AggregateNotFound => "aggregate_not_found",
             Self::Infrastructure => "infrastructure",
@@ -82,6 +110,9 @@ impl OpaqueCode {
     /// names no path, identifier, sequence, or backend detail.
     const fn message(self) -> &'static str {
         match self {
+            Self::Indeterminate => {
+                "operation outcome unknown; reconciliation required before further action"
+            }
             Self::ConcurrencyConflict => "the aggregate changed concurrently; reload and retry",
             Self::AggregateNotFound => "aggregate not found",
             Self::Infrastructure => "infrastructure failure; retry is safe",
@@ -272,6 +303,11 @@ where
     E: Error + Send + Sync,
 {
     match err {
+        DispatchError::Indeterminate(_) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            no_headers(),
+            opaque_body(OpaqueCode::Indeterminate, err),
+        ),
         DispatchError::Rejected(_) => (
             StatusCode::UNPROCESSABLE_ENTITY,
             no_headers(),
@@ -317,6 +353,11 @@ where
 #[must_use]
 pub fn map_store_error(err: &StoreError) -> ErrorResponse {
     match err {
+        StoreError::Indeterminate(_) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            no_headers(),
+            opaque_body(OpaqueCode::Indeterminate, err),
+        ),
         StoreError::ConcurrencyConflict { .. } => (
             StatusCode::CONFLICT,
             no_headers(),

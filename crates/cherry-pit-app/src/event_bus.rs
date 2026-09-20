@@ -56,14 +56,40 @@ type HandlerFn<E> = Arc<dyn Fn(&EventEnvelope<E>) + Send + Sync>;
 /// transport. A panicking handler propagates; per CHE-0051:R7,
 /// dead-letter routing of failed policy outputs is `App`'s job.
 pub struct InProcessEventBus<E: DomainEvent> {
+    #[cfg(test)]
+    handlers: Arc<Mutex<Arc<Vec<HandlerFn<E>>>>>,
+    #[cfg(not(test))]
     handlers: Mutex<Arc<Vec<HandlerFn<E>>>>,
 }
 
 impl<E: DomainEvent> InProcessEventBus<E> {
+    #[cfg(test)]
+    pub(crate) fn test_publisher(&self) -> impl Fn(&[EventEnvelope<E>]) -> bool + use<E> {
+        let handlers = Arc::downgrade(&self.handlers);
+        move |events| {
+            let Some(handlers) = handlers.upgrade() else {
+                return false;
+            };
+            let snapshot = Arc::clone(&handlers.lock().unwrap());
+            if snapshot.is_empty() {
+                return false;
+            }
+            for event in events {
+                for handler in snapshot.iter() {
+                    handler(event);
+                }
+            }
+            true
+        }
+    }
+
     /// Construct an empty bus with no handlers registered.
     #[must_use]
     pub fn new() -> Self {
         Self {
+            #[cfg(test)]
+            handlers: Arc::new(Mutex::new(Arc::new(Vec::new()))),
+            #[cfg(not(test))]
             handlers: Mutex::new(Arc::new(Vec::new())),
         }
     }
