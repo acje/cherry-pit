@@ -94,7 +94,10 @@ R9 [10]: A lock read MUST distinguish verified outcomes (unowned,
   otherwise failing read is NOT corruption: it MUST propagate as an error
   with no mutation of the lock file. Resolves ghr-wsf5u H4.
 
-R10 [10]: The coordination inode MUST be opened without following symlinks
+R10 [10]: Lock coordination is supported on Unix targets only; on any other
+  target acquisition MUST fail closed before the coordination path is opened
+  or mutated. On Unix the coordination inode MUST be opened without following
+  symlinks
   and without blocking, and MUST be rejected unless it is a regular file with
   exactly one link; rejection happens before any read or mutation, so an
   unrelated linked target is never truncated and a FIFO never stalls a
@@ -126,15 +129,17 @@ rewritten to this ADR. Subsequent canonical repairs have since diverged
 `src/fs.rs` (bare-relative parent normalization, R11) and `src/lock.rs`
 (coordination-inode ownership, bounded typed reads and the file-kind/link
 boundary, R6/R9/R10), together with their tests. `src/lib.rs`, `README.md`,
-`tests/smoke.rs` and `Cargo.toml` differ only in ADR citation, repository URL,
-and homepage metadata.
+`tests/smoke.rs` differ only in ADR citation, repository URL, and homepage
+metadata; `Cargo.toml` additionally adds the `uuid` dependency edge used for
+generation identity and enables the `fs` feature of the existing `rustix`
+dependency.
 
 Donor doc-comments retain references to ADRs that must be read as
 **donor-corpus** records, qualified by source: `CHE-0088` and `PGN-0016` exist
 only in `Mattilsynet/gh-report` @ `c850737` under that repository's
 `docs/adr/`, and are historical provenance, not canonical authority. Where such
 a citation appears in an API contract or a test assertion it is normative in
-the donor only; the adopted canonical contract for this crate is R1–R8 above.
+the donor only; the adopted canonical contract for this crate is R1–R11 above.
 In particular, donor `PGN-0016:R10` forbids in-append resync, and donor
 `CHE-0088` carries application-specific convergence policy — neither is a
 generic contract for this crate. Any donor "A8 replaces this" assertion is

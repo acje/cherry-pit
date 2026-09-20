@@ -23,7 +23,10 @@
 //! drop never waits.
 //!
 //! The coordination inode is opened without following symlinks and is
-//! rejected unless it is a regular file with a single link. This fences the
+//! rejected unless it is a regular file with a single link. Locking is
+//! supported on Unix targets only; every acquisition on another platform
+//! fails closed before the coordination path is opened or mutated. This
+//! fences the
 //! crate's own lock metadata transactions for cooperating clients in a
 //! trusted lock directory on a local filesystem supporting advisory locking.
 //! It makes no claim against arbitrary external unlinking, against an
@@ -243,35 +246,45 @@ impl Drop for Guard<'_> {
 }
 
 fn open_coordination(lock_path: &Path) -> Result<std::fs::File, PersistenceError> {
-    let mut options = std::fs::OpenOptions::new();
-    options.read(true).write(true).create(true).truncate(false);
-    #[cfg(unix)]
+    #[cfg(not(unix))]
     {
-        use std::os::unix::fs::OpenOptionsExt;
-        let flags = rustix::fs::OFlags::NOFOLLOW | rustix::fs::OFlags::NONBLOCK;
-        options.custom_flags(i32::try_from(flags.bits()).unwrap_or(0));
-    }
-    let file = options.open(lock_path).map_err(PersistenceError::Io)?;
-    let meta = file.metadata().map_err(PersistenceError::Io)?;
-    if !meta.file_type().is_file() {
         return Err(PersistenceError::LockFailed {
-            reason: format!("lock path is not a regular file: {}", lock_path.display()),
+            reason: format!(
+                "lock coordination is unsupported on this platform: {}",
+                lock_path.display()
+            ),
         });
     }
     #[cfg(unix)]
     {
-        use std::os::unix::fs::MetadataExt;
-        if meta.nlink() != 1 {
+        let mut options = std::fs::OpenOptions::new();
+        options.read(true).write(true).create(true).truncate(false);
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            let flags = rustix::fs::OFlags::NOFOLLOW | rustix::fs::OFlags::NONBLOCK;
+            options.custom_flags(i32::try_from(flags.bits()).unwrap_or(0));
+        }
+        let file = options.open(lock_path).map_err(PersistenceError::Io)?;
+        let meta = file.metadata().map_err(PersistenceError::Io)?;
+        if !meta.file_type().is_file() {
             return Err(PersistenceError::LockFailed {
-                reason: format!(
-                    "lock path has {} links; a coordination inode must be unshared: {}",
-                    meta.nlink(),
-                    lock_path.display()
-                ),
+                reason: format!("lock path is not a regular file: {}", lock_path.display()),
             });
         }
+        {
+            use std::os::unix::fs::MetadataExt;
+            if meta.nlink() != 1 {
+                return Err(PersistenceError::LockFailed {
+                    reason: format!(
+                        "lock path has {} links; a coordination inode must be unshared: {}",
+                        meta.nlink(),
+                        lock_path.display()
+                    ),
+                });
+            }
+        }
+        Ok(file)
     }
-    Ok(file)
 }
 
 fn describe_live_holder(file: &std::fs::File, lock_path: &Path) -> String {
@@ -500,6 +513,10 @@ enum LockState {
 }
 
 fn read_state(file: &std::fs::File) -> Result<LockState, PersistenceError> {
+    parse_state(&read_bounded(file)?)
+}
+
+fn read_bounded(file: &std::fs::File) -> Result<Vec<u8>, PersistenceError> {
     use std::io::{Read, Seek, SeekFrom};
 
     let mut handle = file;
@@ -511,7 +528,7 @@ fn read_state(file: &std::fs::File) -> Result<LockState, PersistenceError> {
         .take(MAX_LOCK_FILE_BYTES + 1)
         .read_to_end(&mut buf)
         .map_err(PersistenceError::Io)?;
-    parse_state(&buf)
+    Ok(buf)
 }
 
 fn bounded_buffer() -> Vec<u8> {
@@ -1801,9 +1818,10 @@ mod ownership_regression {
             }
         });
 
-        assert!(
-            count.load(Ordering::Relaxed) >= 1,
-            "at least one reclaimer must win the expired lock"
+        assert_eq!(
+            count.load(Ordering::Relaxed),
+            1,
+            "exactly one reclaimer must win the expired lock"
         );
         let held = held.into_inner().unwrap();
         let lock_path = dir.path().join(DEFAULT_LOCK_FILENAME);
@@ -1930,7 +1948,8 @@ mod ownership_regression {
                 DEFAULT_LOCK_FILENAME,
             )
             .map_or_else(|e| e.to_string(), |_| "acquired".to_string());
-            let _ = tx.send(outcome);
+            tx.send(outcome)
+                .expect("the FIFO witness receiver must still be connected");
         });
 
         let reason = rx
@@ -1939,6 +1958,25 @@ mod ownership_regression {
         assert!(
             reason.contains("not a regular file"),
             "a FIFO must be rejected by the file-kind guard, got: {reason}"
+        );
+    }
+
+    #[test]
+    fn m2_post_open_read_error_is_io_not_invalid() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("write-only.lock");
+        let file = std::fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(&path)
+            .unwrap();
+
+        let err = read_state(&file)
+            .expect_err("a successfully opened but unreadable handle must not classify");
+        assert!(
+            matches!(err, PersistenceError::Io(_)),
+            "a post-open read error must stay Io, got: {err}"
         );
     }
 
@@ -1976,12 +2014,29 @@ mod ownership_regression {
             "expected oversize rejection, got: {err}"
         );
 
-        let buf = bounded_buffer();
-        let capacity = buf.capacity();
+        let buf = read_bounded(&open_coordination(&path).unwrap()).unwrap();
         assert_eq!(
-            u64::try_from(capacity).unwrap(),
+            u64::try_from(buf.capacity()).unwrap(),
             MAX_LOCK_FILE_BYTES + 1,
-            "the read buffer must be allocated once at exactly the budget"
+            "the buffer the reader actually used must stay at exactly the budget"
+        );
+        assert_eq!(
+            u64::try_from(buf.len()).unwrap(),
+            MAX_LOCK_FILE_BYTES + 1,
+            "the reader must consume no more than the oversize-detection byte"
+        );
+
+        let at_limit = dir.path().join("at-limit.lock");
+        std::fs::write(
+            &at_limit,
+            vec![b' '; usize::try_from(MAX_LOCK_FILE_BYTES).unwrap()],
+        )
+        .unwrap();
+        let at_limit_buf = read_bounded(&open_coordination(&at_limit).unwrap()).unwrap();
+        assert_eq!(
+            u64::try_from(at_limit_buf.capacity()).unwrap(),
+            MAX_LOCK_FILE_BYTES + 1,
+            "an at-limit read must not grow the buffer"
         );
     }
 }
