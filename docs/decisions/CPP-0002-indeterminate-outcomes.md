@@ -13,15 +13,20 @@ References: CPP-0001
 
 Accepted narrow decision authority: gh-report `ghr-hxyqs.66.8`, informed by
 `ghr-fl0i3` and `ghr-h50lm`. Implementation acceptance requires verification
-and independent review. Source-qualified rules mean Mattilsynet/gh-report
+and independent review. The consumer need in `ghr-hxyqs.66.11.1` extends the
+same typed-knowledge contract to storage-native errors under commander authority.
+Source-qualified rules mean Mattilsynet/gh-report
 at `c8507377b2748a015148751ce288be2bad9ec708`: CHE-0046:R1/R2/R5/R7 and
 CHE-0024:R1/R4/R5. Their historical text remains unchanged.
 
 ## Decision
 
-R1 [5]: Neutral StoreError, DispatchError and ProjectionError expose an explicit
+R1 [5]: Neutral StoreError, DispatchError, ProjectionError and storage-native
+  PersistenceError expose an explicit
   Indeterminate diagnostic source, classified ReconciliationRequired. Unknown
   completion MUST NOT imply safe retry or terminal dead-letter completion.
+  Storage uses its own RetryClass without a cherry-pit-core dependency. All
+  existing non-indeterminate storage classifications remain unchanged.
 
 R2 [5]: Conversions preserve unknown outcomes. The sequential policy consumer
   stops dependent dispatch and App::run observes its result without requiring

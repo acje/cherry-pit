@@ -5,6 +5,10 @@ use thiserror::Error;
 /// Errors related to persistence (checkpoints, evidence, locks, publishing).
 #[derive(Debug, Error)]
 pub enum PersistenceError {
+    /// Completion is unknown; reconcile before deciding whether to retry.
+    #[error("persistence outcome indeterminate: {0}")]
+    Indeterminate(#[source] Box<dyn std::error::Error + Send + Sync + 'static>),
+
     #[error("collection lock failed: {reason}")]
     LockFailed { reason: String },
 
@@ -64,12 +68,16 @@ pub enum PersistenceError {
 
 /// Storage-native retry guidance for [`PersistenceError`].
 ///
-/// Two-way classification, mirroring the intent of
+/// Classification mirroring the intent of
 /// `cherry_pit_core::ErrorCategory` and `DispatchError::category()`
 /// without depending on `cherry-pit-core` (CHE-0053:R1/R8 forbid a
 /// cherry-pit-core dependency in this crate).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RetryClass {
+    /// Completion is unknown. Neither automatic retry nor terminal completion
+    /// is justified until the caller reconciles the outcome.
+    ReconciliationRequired,
+
     /// Repeating the operation may succeed after backoff or backend
     /// recovery.
     Retryable,
@@ -89,8 +97,7 @@ impl RetryClass {
         matches!(self, Self::Retryable)
     }
 
-    /// Returns true for classes requiring caller/operator action before
-    /// retry.
+    /// Returns true for terminal failures. Unknown completion is not terminal.
     #[must_use]
     pub const fn is_terminal(self) -> bool {
         matches!(self, Self::Terminal)
@@ -98,10 +105,11 @@ impl RetryClass {
 }
 
 impl PersistenceError {
-    /// Classify the persistence failure as retryable or terminal.
+    /// Classify the persistence outcome as retryable, terminal, or requiring reconciliation.
     #[must_use]
     pub const fn retry_class(&self) -> RetryClass {
         match self {
+            Self::Indeterminate(_) => RetryClass::ReconciliationRequired,
             Self::BackendUnavailable { .. } => RetryClass::Retryable,
             Self::LockFailed { .. }
             | Self::AtomicWriteFailed { .. }
@@ -118,9 +126,45 @@ impl PersistenceError {
 #[cfg(test)]
 mod retry_class_tests {
     use super::{PersistenceError, RetryClass};
+    use std::error::Error;
 
     #[test]
-    fn retry_class_covers_all_eight_variants() {
+    fn indeterminate_requires_reconciliation_without_retry_or_terminal_guidance() {
+        let error = PersistenceError::Indeterminate(Box::new(std::io::Error::other("unknown")));
+        let class = error.retry_class();
+        assert_eq!(class, RetryClass::ReconciliationRequired);
+        assert!(!class.is_retryable());
+        assert!(!class.is_terminal());
+        assert!(RetryClass::Retryable.is_retryable());
+        assert!(!RetryClass::Retryable.is_terminal());
+        assert!(RetryClass::Terminal.is_terminal());
+        assert!(!RetryClass::Terminal.is_retryable());
+    }
+
+    #[test]
+    fn indeterminate_preserves_typed_diagnostic_chain() {
+        let error = PersistenceError::Indeterminate(Box::new(PersistenceError::Io(
+            std::io::Error::from(std::io::ErrorKind::TimedOut),
+        )));
+        let source = error.source().expect("boxed diagnostic source");
+        assert!(matches!(
+            source.downcast_ref::<PersistenceError>(),
+            Some(PersistenceError::Io(_))
+        ));
+        let root = source.source().expect("underlying I/O source");
+        assert_eq!(
+            root.downcast_ref::<std::io::Error>().unwrap().kind(),
+            std::io::ErrorKind::TimedOut
+        );
+        assert!(
+            error
+                .to_string()
+                .starts_with("persistence outcome indeterminate:")
+        );
+    }
+
+    #[test]
+    fn retry_class_preserves_existing_variants() {
         assert_eq!(
             PersistenceError::BackendUnavailable {
                 reason: "down".to_string()
