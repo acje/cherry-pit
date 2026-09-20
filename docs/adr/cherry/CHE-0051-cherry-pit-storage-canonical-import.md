@@ -55,17 +55,37 @@ R5 [5]: Test witnesses imported from the donor MUST be retained in full. The
   donor's `tests/smoke.rs` scaffold placeholder is retained verbatim pending
   the crate's own taxonomy work.
 
-R6 [10]: Lock *publication* MUST be atomic — the create step goes through
-  `persist_noclobber` (`link(2)`), so two concurrent acquirers cannot both
-  publish. This is a property of the publication step only and is NOT a
-  claim that the whole lock lifecycle is fenced: reclaim, renew and release
-  are pathname-addressed, so ownership is not proven at removal time. Stale
-  reclaim is driven by TTL expiry or a dead holder on the *same* host, and a
-  lock file without a recorded hostname is TTL-only and MUST NOT be
-  auto-stolen; these are not the only removal paths — forced release and the
-  corrupt-metadata recovery path also remove lock files. Fencing the
-  reclaim/renew/release lifecycle and typing the lock-read outcome are
-  OPEN behavioural work (ghr-wsf5u H3/H4), not ratified here.
+R6 [10]: The lock file is a stable coordination inode that MUST NOT be
+  unlinked by this crate. Ownership MUST be held through an OS-backed
+  advisory lock (`std::fs::File::try_lock`) taken on that inode, and
+  ownership metadata MUST be written or cleared only through the owning
+  handle. Consequently acquire, renew, release and reclaim are all fenced:
+  a departed, released or TTL-expired holder can neither renew nor remove a
+  later owner, and explicit release cannot double-remove. Admission MUST be
+  non-blocking — an inode owned by a live cooperating holder yields
+  `LockFailed` immediately, with no wait, spawn or retry loop. Stale reclaim
+  (TTL expiry, or a dead holder on the *same* host) and forced takeover
+  apply only when no live cooperating holder owns the inode; a lock file
+  without a recorded hostname remains TTL-only. Verified-invalid content is
+  replaced under the held advisory lock. The guarantee is scoped to
+  cooperating clients of this crate on a local filesystem supporting
+  advisory locking; no protection against arbitrary external unlinking is
+  claimed. Resolves ghr-wsf5u H3.
+
+R6a [10]: A lock read MUST distinguish verified outcomes (unowned,
+  owned, verified-invalid content) from unknown ones. An unreadable or
+  otherwise failing read is NOT corruption: it MUST propagate as an error
+  with no mutation of the lock file. Resolves ghr-wsf5u H4.
+
+R6b [10]: Lock content MUST be read through the same opened regular-file
+  handle that holds the advisory lock, bounded to 1 MiB plus one
+  oversize-detection byte per call; oversize input is rejected without
+  mutation. The bound covers the raw content buffer; transient JSON parser
+  overhead is explicitly excluded. Resolves ghr-wsf5u M2.
+
+R6c [5]: Atomic write MUST normalize a bare relative filename — whose
+  `Path::parent()` is `Some("")` — to the current directory, so the
+  durability fsync step succeeds. Resolves ghr-wsf5u M3.
 
 R7 [5]: `LockMetadata` is a serde DTO. Schema evolution is handled by
   field-presence plus `#[serde(default)]`, NOT by `#[non_exhaustive]`.

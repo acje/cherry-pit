@@ -30,7 +30,7 @@ pub fn atomic_write_text(path: &Path, content: &str) -> Result<(), PersistenceEr
 /// writing, flushing, or persisting the file fails.
 pub fn atomic_write_bytes(path: &Path, data: &[u8]) -> Result<(), PersistenceError> {
     trace!(path = %path.display(), bytes = data.len(), "atomic write (bytes)");
-    let dir = path.parent().unwrap_or(Path::new("."));
+    let dir = parent_dir(path);
     fs::create_dir_all(dir).map_err(PersistenceError::Io)?;
 
     let mut temp =
@@ -63,6 +63,18 @@ pub fn atomic_write_bytes(path: &Path, data: &[u8]) -> Result<(), PersistenceErr
 
     trace!(path = %path.display(), "atomic write complete");
     Ok(())
+}
+
+pub(crate) fn dir_or_current(dir: &Path) -> &Path {
+    if dir.as_os_str().is_empty() {
+        Path::new(".")
+    } else {
+        dir
+    }
+}
+
+pub(crate) fn parent_dir(path: &Path) -> &Path {
+    dir_or_current(path.parent().unwrap_or_else(|| Path::new(".")))
 }
 
 fn fsync_parent_dir(dir: &Path) -> Result<(), PersistenceError> {
@@ -100,5 +112,36 @@ mod tests {
         std::fs::remove_dir_all(&parent).unwrap();
         atomic_write_bytes(&path, b"second").unwrap();
         assert_eq!(std::fs::read(&path).unwrap(), b"second");
+    }
+}
+
+#[cfg(test)]
+mod relative_path_regression {
+    use super::*;
+    use std::sync::Mutex;
+    use tempfile::TempDir;
+
+    static CWD: Mutex<()> = Mutex::new(());
+
+    fn write_in_cwd(name: &str) {
+        let _guard = CWD.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        let dir = TempDir::new().unwrap();
+        let original = std::env::current_dir().unwrap();
+        std::env::set_current_dir(dir.path()).unwrap();
+        let result = atomic_write_bytes(Path::new(name), b"bare");
+        let read_back = fs::read(name);
+        std::env::set_current_dir(&original).unwrap();
+        result.unwrap_or_else(|e| panic!("bare relative write must succeed for {name}: {e}"));
+        assert_eq!(read_back.unwrap(), b"bare");
+    }
+
+    #[test]
+    fn m3_bare_relative_filename_writes_to_current_directory() {
+        write_in_cwd("checkpoint.json");
+    }
+
+    #[test]
+    fn m3_dot_relative_filename_writes_to_current_directory() {
+        write_in_cwd("./checkpoint-dot.json");
     }
 }
