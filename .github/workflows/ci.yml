@@ -1,76 +1,105 @@
 name: CI
 
 on:
-  pull_request:
   push:
-    branches:
-      - main
-      - master
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
-  CARGO_TERM_COLOR: always
+  CHERRY_INTAKE_CONTEXT: github-linux-x86_64
+  CARGO_HOME: /home/runner/.cargo
+  RUSTUP_HOME: /home/runner/.rustup
+  RUSTUP_DIST_SERVER: https://static.rust-lang.org
+  RUSTUP_UPDATE_ROOT: https://static.rust-lang.org/rustup
+  RUSTC_WRAPPER: ''
+  RUSTC_WORKSPACE_WRAPPER: ''
+  RUSTFLAGS: ''
+  RUSTDOCFLAGS: ''
+  LD_PRELOAD: ''
+  LD_AUDIT: ''
+  LD_LIBRARY_PATH: ''
 
 jobs:
-  correctness:
-    name: Workspace correctness gates
+  build-test-lint:
+    name: build, test, lint
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Install pinned Rust toolchain
-        uses: dtolnay/rust-toolchain@master
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # source v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          toolchain: 1.95
-          components: clippy,rustfmt
-
-      - name: Verify pinned toolchain files
-        run: |
-          test "$(grep '^rust-version = ' Cargo.toml)" = 'rust-version = "1.95"'
-          test "$(grep '^channel = ' rust-toolchain.toml)" = 'channel = "1.95"'
-          test "$(grep '^msrv = ' clippy.toml)" = 'msrv = "1.95"'
-
-      - name: Check formatting
-        run: cargo fmt --all -- --check
-
-      - name: Run clippy
-        run: cargo clippy --workspace --all-targets
-
-      - name: Run tests
-        run: cargo test --workspace --all-targets
-
-      - name: Install adr-fmt build toolchain
-        uses: dtolnay/rust-toolchain@master
+          repository: Mattilsynet/gh-report
+          ref: c8507377b2748a015148751ce288be2bad9ec708
+          path: target/source-governance
+          persist-credentials: false
+      - name: source-qualified ADR gates (gh-report RST-0007:R7)
+        env:
+          GH_REPORT_SOURCE: target/source-governance
+        run: python3.12 -B tools/verify.py static
+      - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8
         with:
           toolchain: 1.98.0
+          components: clippy, rustfmt
+      - name: verify admitted execution context (CPP-0001:R7)
+        run: python3.12 -B tools/verify.py intake
+      - name: fetch locked sources without build execution (CPP-0001:R7)
+        run: python3.12 -B tools/verify.py fetch
+      - name: verification guard regressions (gh-report RST-0007:R7)
+        run: python3.12 -B tools/test_verify.py
+      - name: deny async-trait and rearm pardosa-cherry-pit-projection DAG guard (gh-report CHE-0025:R1+R2 CHE-0084:R5+R9)
+        run: python3.12 -B tools/verify.py graph
+      - name: full workspace verification (gh-report CHE-0038:R1+R2+R3+R4+R5 RST-0003:R4)
+        run: python3.12 -B tools/verify.py rust
 
-      - name: Verify ADR corpus
-        run: |
-          cargo +1.98.0 install --git https://github.com/Mattilsynet/adr-fmt \
-            --rev ec9f833b13affdd448862b48668dd74ec0234750 --locked adr-fmt
-          adr-fmt --lint
+  non-exhaustive-check:
+    name: non-exhaustive error-enum gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8
+        with:
+          toolchain: 1.98.0
+      - name: verify admitted execution context (CPP-0001:R7)
+        run: python3.12 -B tools/verify.py intake
+      - name: fetch locked sources without build execution (CPP-0001:R7)
+        run: python3.12 -B tools/verify.py fetch
+      - name: closed library error enums (gh-report RST-0006:R1+R3)
+        run: python3.12 -B tools/verify.py non-exhaustive
 
-      - name: Verify release profile invariants
-        run: |
-          grep -q '^lto = true$' Cargo.toml
-          grep -q '^strip = true$' Cargo.toml
-          grep -q '^codegen-units = 1$' Cargo.toml
-          grep -q '^overflow-checks = true$' Cargo.toml
+  dead-code-inner-suppression-tripwire:
+    name: ban module-level dead_code suppression (crates/*/src)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: ban inner dead_code suppression (gh-report RST-0003:R6)
+        run: python3.12 -B tools/verify.py dead-code
 
   supply-chain:
-    name: Supply-chain audit
+    name: supply-chain (audit + deny)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Install pinned Rust toolchain
-        uses: dtolnay/rust-toolchain@master
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: advisory ignore lifecycle (gh-report SEC-0013:R6)
+        run: python3.12 -B tools/verify.py deny-lifecycle
+      - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8
         with:
-          toolchain: 1.95
-
-      - name: Install cargo-deny
-        uses: taiki-e/install-action@cargo-deny
-
-      - name: Run cargo-deny
-        run: cargo deny check advisories licenses bans sources
+          toolchain: 1.98.0
+      - name: verify admitted execution context (CPP-0001:R7)
+        run: python3.12 -B tools/verify.py intake
+      - name: verified official audit and deny assets (CPP-0001:R7)
+        run: python3.12 -B tools/verify.py provision
+      - name: fetch locked sources without build execution (CPP-0001:R7)
+        run: python3.12 -B tools/verify.py fetch
+      - name: audit and deny (gh-report RST-0004:R3+R4 SEC-0009:R1)
+        run: python3.12 -B tools/verify.py supply-chain

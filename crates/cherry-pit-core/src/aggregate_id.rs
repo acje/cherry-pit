@@ -5,31 +5,35 @@ use serde::{Deserialize, Serialize};
 
 /// Validated aggregate instance identifier — the stream partition key.
 ///
-/// Identifies a specific aggregate instance within an event store.
-/// Each aggregate's event stream is keyed by its `AggregateId`.
-/// The `(AggregateId, sequence)` tuple is the globally unique
-/// coordinate for any single event.
+/// Identifies a specific aggregate instance within an event store. The
+/// `(AggregateId, sequence)` tuple is the globally unique coordinate
+/// for any single event.
 ///
-/// # ID assignment
+/// Assigned exclusively by [`EventStore`](crate::EventStore)'s `create`
+/// method (auto-incrementing from 1); callers never invent IDs, only
+/// receive and pass them back (CHE-0020, infrastructure-owned identity).
 ///
-/// Aggregate IDs are assigned by the [`EventStore`](crate::EventStore)
-/// via its `create` method. The store auto-increments from 1. Callers
-/// never invent IDs — they receive them from the store on creation and
-/// pass them back on subsequent commands.
+/// Backed by `NonZeroU64` — zero is not a valid ID, and store-assigned
+/// IDs start from 1 so zero never occurs in practice. This removes the
+/// `AggregateId(0)` hole at the type level at zero runtime cost
+/// (`Option<AggregateId>` niche-optimizes to the same size as
+/// `AggregateId`) (CHE-0011).
 ///
-/// # Non-zero invariant
+/// Sequential numeric IDs are safe without distributed coordination
+/// because each aggregate instance is single-writer, owned by exactly
+/// one process (CHE-0006).
 ///
-/// Backed by `NonZeroU64` — zero is not a valid aggregate ID.
-/// Store-assigned IDs start from 1, so zero never occurs in practice.
-/// This eliminates the `AggregateId(0)` hole at the type level with
-/// zero runtime cost (niche optimization allows `Option<AggregateId>`
-/// to be the same size as `AggregateId`).
+/// # Examples
 ///
-/// # Single-writer assumption
+/// ```
+/// use std::num::NonZeroU64;
+/// use cherry_pit_core::AggregateId;
 ///
-/// Cherry-pit assumes single-writer aggregates: each aggregate instance
-/// is owned by exactly one process. This makes sequential `u64` IDs
-/// safe without distributed coordination.
+/// // Construct from NonZeroU64 (the only infallible path).
+/// let nz = NonZeroU64::new(42).unwrap();
+/// let id = AggregateId::new(nz);
+/// assert_eq!(id.get(), 42);
+/// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct AggregateId(NonZeroU64);
 
@@ -71,23 +75,6 @@ impl From<AggregateId> for NonZeroU64 {
     }
 }
 
-impl From<AggregateId> for u64 {
-    fn from(id: AggregateId) -> Self {
-        id.0.get()
-    }
-}
-
-impl TryFrom<u64> for AggregateId {
-    type Error = std::num::TryFromIntError;
-
-    /// Attempt to create an `AggregateId` from a `u64`.
-    ///
-    /// Returns an error if the value is zero.
-    fn try_from(value: u64) -> Result<Self, Self::Error> {
-        NonZeroU64::try_from(value).map(Self)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -106,8 +93,8 @@ mod tests {
     #[test]
     fn copy_semantics() {
         let original = id(1);
-        let copy = original; // Copy, not move
-        assert_eq!(original, copy); // original still usable
+        let copy = original;
+        assert_eq!(original, copy);
     }
 
     #[test]
@@ -122,25 +109,6 @@ mod tests {
         let aggregate_id = id(99);
         let nz: NonZeroU64 = aggregate_id.into();
         assert_eq!(nz.get(), 99);
-    }
-
-    #[test]
-    fn into_u64() {
-        let aggregate_id = id(99);
-        let raw: u64 = aggregate_id.into();
-        assert_eq!(raw, 99);
-    }
-
-    #[test]
-    fn try_from_u64_valid() {
-        let aggregate_id = AggregateId::try_from(7u64).unwrap();
-        assert_eq!(aggregate_id.get(), 7);
-    }
-
-    #[test]
-    fn try_from_u64_zero_fails() {
-        let result = AggregateId::try_from(0u64);
-        assert!(result.is_err());
     }
 
     #[test]
@@ -168,30 +136,6 @@ mod tests {
     }
 
     #[test]
-    fn serde_msgpack_roundtrip() {
-        let aggregate_id = id(42);
-        let bytes = rmp_serde::to_vec(&aggregate_id).unwrap();
-        let back: AggregateId = rmp_serde::from_slice(&bytes).unwrap();
-        assert_eq!(back, aggregate_id);
-    }
-
-    #[test]
-    fn serde_msgpack_zero_rejected() {
-        // Serialize a raw 0u64 and attempt to deserialize as AggregateId.
-        let bytes = rmp_serde::to_vec(&0u64).unwrap();
-        let result = rmp_serde::from_slice::<AggregateId>(&bytes);
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn serde_msgpack_wire_format_matches_raw_u64() {
-        // Verify NonZeroU64 serializes identically to u64 in msgpack.
-        let raw_bytes = rmp_serde::to_vec(&42u64).unwrap();
-        let id_bytes = rmp_serde::to_vec(&id(42)).unwrap();
-        assert_eq!(raw_bytes, id_bytes);
-    }
-
-    #[test]
     fn hash_consistent() {
         use std::collections::HashSet;
         let mut set = HashSet::new();
@@ -203,7 +147,6 @@ mod tests {
 
     #[test]
     fn const_new() {
-        // Verify new() is usable in const context.
         const NZ: NonZeroU64 = match NonZeroU64::new(1) {
             Some(v) => v,
             None => panic!("zero"),
@@ -220,7 +163,6 @@ mod tests {
 
     #[test]
     fn option_aggregate_id_same_size() {
-        // NonZeroU64 niche optimization: Option<AggregateId> is same size.
         assert_eq!(
             std::mem::size_of::<AggregateId>(),
             std::mem::size_of::<Option<AggregateId>>()
@@ -233,30 +175,20 @@ mod tests {
 
         proptest! {
             #[test]
-            fn aggregate_id_u64_roundtrip(val in 1..=u64::MAX) {
-                let id = AggregateId::try_from(val).unwrap();
+            fn aggregate_id_nonzero_roundtrip(val in 1..=u64::MAX) {
+                let nz = NonZeroU64::new(val).unwrap();
+                let id = AggregateId::new(nz);
                 prop_assert_eq!(id.get(), val);
 
-                let nz: NonZeroU64 = id.into();
-                prop_assert_eq!(nz.get(), val);
-
-                let raw: u64 = id.into();
-                prop_assert_eq!(raw, val);
+                let back: NonZeroU64 = id.into();
+                prop_assert_eq!(back.get(), val);
             }
 
             #[test]
             fn aggregate_id_json_roundtrip(val in 1..=u64::MAX) {
-                let id = AggregateId::try_from(val).unwrap();
+                let id = AggregateId::new(NonZeroU64::new(val).unwrap());
                 let json = serde_json::to_string(&id).unwrap();
                 let back: AggregateId = serde_json::from_str(&json).unwrap();
-                prop_assert_eq!(back, id);
-            }
-
-            #[test]
-            fn aggregate_id_msgpack_roundtrip(val in 1..=u64::MAX) {
-                let id = AggregateId::try_from(val).unwrap();
-                let bytes = rmp_serde::to_vec(&id).unwrap();
-                let back: AggregateId = rmp_serde::from_slice(&bytes).unwrap();
                 prop_assert_eq!(back, id);
             }
         }

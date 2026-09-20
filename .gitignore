@@ -1,24 +1,35 @@
-# Build artifacts
+# Build output (source .gitignore, restricted to generated directories)
 target/
+**/target/
 
-# Non-authoritative reference code
-non-authoritative/
-
-# Local event store (MessagePack files)
-store/
-
-# macOS
+# Local editor and OS state
 .DS_Store
-
-# IDE
 .idea/
 .vscode/
 *.swp
 *.swo
 
-# Beads / Dolt files (added by bd init)
-.dolt/
-*.db
+# Local agent evidence and generated knowledge graph
+/.ooda/*
+!/.ooda/.gitkeep
+/graphify-out/
+/.opencode/node_modules/
+
+# Local credentials; examples remain visible
+.env
+.env.*
+!.env.example
+!.env.sample
 .beads-credential-key
-.beads/proxieddb/
-*.gate.lock*
+
+# Beads audit/runtime; preserve tracked scaffold and nested ignore policy
+/.dolt/
+/.beads.gate.lock
+/.beads/issues.jsonl
+/.beads/events.jsonl
+/.beads/interactions.jsonl
+/.beads/.auto-import-issues.jsonl
+/.beads.backup-*
+
+# Pending snapshot output
+*.snap.new

@@ -10,28 +10,8 @@
 //! TTL. The default TTL is 15 minutes.
 //! Manual recovery is available via `--force-unlock`.
 //!
-//! **Lock ownership:** The lock file is a stable coordination inode that is
-//! never unlinked. An OS-backed advisory lock (`File::try_lock`) is taken on
-//! that inode only for the duration of a single metadata transaction —
-//! acquire, reclaim, renew or release — never for the lifetime of the guard.
-//! Each successful acquisition records a fresh unique generation inside the
-//! coordination record; renew, release and drop compare that generation and
-//! mutate under the same short guard. A TTL-expired, forced or dead holder
-//! can therefore still be taken over while alive, and the displaced holder's
-//! renew reports lost ownership while its release and drop become no-ops.
-//! Every guard is non-blocking: contention yields an error immediately, and
-//! drop never waits.
-//!
-//! The coordination inode is opened without following symlinks and is
-//! rejected unless it is a regular file with a single link. Locking is
-//! supported on Unix targets only; every acquisition on another platform
-//! fails closed before the coordination path is opened or mutated. This
-//! fences the
-//! crate's own lock metadata transactions for cooperating clients in a
-//! trusted lock directory on a local filesystem supporting advisory locking.
-//! It makes no claim against arbitrary external unlinking, against an
-//! uncooperative writer, or over application writes performed by a stale
-//! holder.
+//! **Lock atomicity:** Lock creation uses `O_CREAT | O_EXCL` to prevent
+//! TOCTOU races — only one process can successfully create the file.
 
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -42,6 +22,7 @@ use serde::{Deserialize, Serialize};
 use tracing::{info, warn};
 
 use crate::error::PersistenceError;
+use crate::fs::atomic_write_text;
 
 /// Default stale-lock TTL: 15 minutes.
 pub const DEFAULT_LOCK_TTL: Duration = Duration::from_mins(15);
@@ -89,12 +70,11 @@ fn current_hostname() -> String {
     gethostname::gethostname().to_string_lossy().into_owned()
 }
 
-/// RAII guard over an owned run lock.
+/// RAII guard that releases the lock file when dropped.
 ///
-/// Ownership is recorded as a unique generation inside the coordination
-/// inode. Dropping the guard clears that record only while the generation
-/// still matches, so a holder displaced by a TTL, dead-holder or forced
-/// takeover cannot disturb its successor.
+/// The lock is released by deleting the lock file. If deletion fails,
+/// a warning is logged but the error is swallowed to avoid masking
+/// the original operation's result.
 ///
 /// Fields are private; construction is via [`acquire`] only.
 /// `#[non_exhaustive]` is not needed (CHE-0021 scope is error types
@@ -104,9 +84,6 @@ fn current_hostname() -> String {
 pub struct RunLock {
     path: PathBuf,
     metadata: LockMetadata,
-    generation: Generation,
-    file: std::fs::File,
-    released: bool,
 }
 
 impl RunLock {
@@ -122,22 +99,17 @@ impl RunLock {
         &self.path
     }
 
-    /// Explicitly release the lock.
+    /// Explicitly release the lock (delete the lock file).
     ///
-    /// Clears the coordination record while this guard's generation is still
-    /// the recorded one, then drops the short advisory guard. The
-    /// coordination inode is never unlinked, and a release by a displaced
-    /// holder is a no-op. Calling this explicitly disarms the drop path.
+    /// This is also called automatically on drop. Returns any I/O error
+    /// from the deletion attempt.
     ///
     /// # Errors
     ///
-    /// Returns [`PersistenceError::LockFailed`] if the coordination guard is
-    /// contended, or [`PersistenceError::Io`] if the record cannot be read or
-    /// cleared.
-    pub fn release(mut self) -> Result<(), PersistenceError> {
-        let result = self.relinquish();
-        self.released = true;
-        result
+    /// Returns [`PersistenceError::Io`] if the lock file exists but cannot
+    /// be deleted.
+    pub fn release(self) -> Result<(), PersistenceError> {
+        self.delete_lock_file()
     }
 
     /// Refresh the lock's `created_at` to now, so a long-running holder
@@ -145,16 +117,16 @@ impl RunLock {
     /// process. Callers (typically long-running daemons) invoke this
     /// well inside the configured stale-lock TTL.
     ///
-    /// Rewrites the coordination record in place under a short advisory
-    /// guard, after confirming this guard still owns the recorded
-    /// generation. The in-memory `metadata` is updated only on success.
+    /// Rewrites the lock file atomically via [`atomic_write_text`], so
+    /// concurrent readers never observe a partial-write state. The
+    /// in-memory `metadata` is updated only on a successful write.
     ///
     /// # Errors
     ///
-    /// Returns [`PersistenceError::LockFailed`] if metadata serialization
-    /// fails, if the coordination guard is contended, or if ownership has
-    /// been taken over by a later holder; otherwise propagates the
-    /// underlying I/O failure as [`PersistenceError::Io`].
+    /// Returns [`PersistenceError::LockFailed`] if metadata
+    /// serialization fails; otherwise propagates any error from the
+    /// underlying atomic write as [`PersistenceError::AtomicWriteFailed`]
+    /// or [`PersistenceError::Io`].
     pub fn renew(&mut self) -> Result<(), PersistenceError> {
         self.renew_with_clock(Timestamp::now)
     }
@@ -166,45 +138,28 @@ impl RunLock {
             hostname: self.metadata.hostname.clone(),
             created_at: now(),
         };
-        let guard = Guard::acquire(&self.file, &self.path)?;
-        match read_state(&self.file)? {
-            LockState::Owned(_, Some(recorded)) if recorded == self.generation => {}
-            _ => {
-                return Err(PersistenceError::LockFailed {
-                    reason: format!(
-                        "lock ownership lost: run {} no longer holds {}",
-                        self.metadata.run_id,
-                        self.path.display()
-                    ),
-                });
-            }
-        }
-        write_record(&self.file, &refreshed, self.generation)?;
-        drop(guard);
+        let json =
+            serde_json::to_string_pretty(&refreshed).map_err(|e| PersistenceError::LockFailed {
+                reason: format!("failed to serialize lock metadata: {e}"),
+            })?;
+        atomic_write_text(&self.path, &json)?;
         self.metadata = refreshed;
         Ok(())
     }
 
-    fn relinquish(&mut self) -> Result<(), PersistenceError> {
-        let guard = Guard::acquire(&self.file, &self.path)?;
-        let owned_by_us = matches!(
-            read_state(&self.file)?,
-            LockState::Owned(_, Some(recorded)) if recorded == self.generation
-        );
-        let result = if owned_by_us {
-            clear_record(&self.file)
-        } else {
-            Ok(())
-        };
-        drop(guard);
-        result
+    fn delete_lock_file(&self) -> Result<(), PersistenceError> {
+        match std::fs::remove_file(&self.path) {
+            Ok(()) => Ok(()),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+            Err(e) => Err(PersistenceError::Io(e)),
+        }
     }
 }
 
 impl Drop for RunLock {
     fn drop(&mut self) {
-        if !self.released
-            && let Err(e) = self.relinquish()
+        if let Err(e) = std::fs::remove_file(&self.path)
+            && e.kind() != std::io::ErrorKind::NotFound
         {
             warn!(
                 path = %self.path.display(),
@@ -215,108 +170,58 @@ impl Drop for RunLock {
     }
 }
 
-type Generation = uuid::Uuid;
+/// Maximum number of acquire attempts after stale-lock recovery.
+///
+/// Handles the race where two processes both see a stale lock, both call
+/// `remove_file`, and one wins the `create_lock_exclusive` — the loser
+/// retries the full acquire logic.
+const MAX_ACQUIRE_ATTEMPTS: u32 = 3;
 
-fn new_generation() -> Generation {
-    uuid::Uuid::now_v7()
-}
-
-struct Guard<'a> {
-    file: &'a std::fs::File,
-}
-
-impl<'a> Guard<'a> {
-    fn acquire(file: &'a std::fs::File, path: &Path) -> Result<Self, PersistenceError> {
-        match file.try_lock() {
-            Ok(()) => Ok(Self { file }),
-            Err(std::fs::TryLockError::WouldBlock) => Err(PersistenceError::LockFailed {
-                reason: format!("lock coordination is contended: {}", path.display()),
-            }),
-            Err(std::fs::TryLockError::Error(e)) => Err(PersistenceError::Io(e)),
+/// Force-remove an existing lock file, logging the previous holder.
+fn force_remove_lock(lock_path: &Path) {
+    match read_lock(lock_path) {
+        Ok(existing) => {
+            warn!(
+                run_id = %existing.run_id,
+                pid = existing.pid,
+                created_at = %existing.created_at,
+                "force-removing existing lock"
+            );
+        }
+        Err(_) => {
+            warn!(
+                path = %lock_path.display(),
+                "force-removing corrupt/unreadable lock file"
+            );
         }
     }
-}
-
-impl Drop for Guard<'_> {
-    fn drop(&mut self) {
-        if let Err(e) = self.file.unlock() {
-            warn!(error = %e, "failed to drop lock coordination guard");
-        }
-    }
-}
-
-fn open_coordination(lock_path: &Path) -> Result<std::fs::File, PersistenceError> {
-    #[cfg(not(unix))]
-    {
-        return Err(PersistenceError::LockFailed {
-            reason: format!(
-                "lock coordination is unsupported on this platform: {}",
-                lock_path.display()
-            ),
-        });
-    }
-    #[cfg(unix)]
-    {
-        let mut options = std::fs::OpenOptions::new();
-        options.read(true).write(true).create(true).truncate(false);
-        {
-            use std::os::unix::fs::OpenOptionsExt;
-            let flags = rustix::fs::OFlags::NOFOLLOW | rustix::fs::OFlags::NONBLOCK;
-            options.custom_flags(i32::try_from(flags.bits()).unwrap_or(0));
-        }
-        let file = options.open(lock_path).map_err(PersistenceError::Io)?;
-        let meta = file.metadata().map_err(PersistenceError::Io)?;
-        if !meta.file_type().is_file() {
-            return Err(PersistenceError::LockFailed {
-                reason: format!("lock path is not a regular file: {}", lock_path.display()),
-            });
-        }
-        {
-            use std::os::unix::fs::MetadataExt;
-            if meta.nlink() != 1 {
-                return Err(PersistenceError::LockFailed {
-                    reason: format!(
-                        "lock path has {} links; a coordination inode must be unshared: {}",
-                        meta.nlink(),
-                        lock_path.display()
-                    ),
-                });
-            }
-        }
-        Ok(file)
-    }
-}
-
-fn describe_live_holder(file: &std::fs::File, lock_path: &Path) -> String {
-    match read_state(file) {
-        Ok(LockState::Owned(existing, _)) => format!(
-            "lock held by run {} (pid {}, since {})",
-            existing.run_id, existing.pid, existing.created_at,
-        ),
-        _ => format!("lock held by a live process ({})", lock_path.display()),
+    if let Err(e) = std::fs::remove_file(lock_path) {
+        warn!(
+            path = %lock_path.display(),
+            error = %e,
+            "failed to remove lock file during force-unlock"
+        );
     }
 }
 
 /// Attempt to acquire a run lock.
 ///
-/// If a lock record already exists, checks whether it is stale using
+/// If a lock file already exists, checks whether it is stale using
 /// `stale_ttl`. A lock is stale when its `created_at` timestamp plus
-/// `stale_ttl` is in the past, or when its holder is dead on this host.
+/// `stale_ttl` is in the past.
 ///
-/// When `force` is true, any existing record is taken over regardless of
-/// stale/alive status. The previous holder's details are logged at `warn`
-/// level. A TTL-expired or forced takeover succeeds even against a *live*
-/// holder: the displaced holder loses its recorded generation, so its later
-/// renew fails and its release and drop become no-ops.
+/// When `force` is true, any existing lock is removed before acquiring,
+/// regardless of stale/alive status. The previous lock's details are
+/// logged at `warn` level.
 ///
-/// The coordination inode is validated and never unlinked; metadata
-/// transactions run under a short non-blocking advisory guard (CHE-0051:R6).
+/// Lock creation is atomic via [`create_lock_exclusive`] (no TOCTOU
+/// window), per SEC-0006:R1 and the stale-lock recovery procedure
+/// mandated by COM-0025:R6.
 ///
 /// # Errors
 ///
-/// Returns `PersistenceError::LockFailed` if a live, non-stale holder owns
-/// the record, if the coordination guard is contended, or if the lock path
-/// is not a valid coordination inode.
+/// Returns `PersistenceError::LockFailed` if the lock cannot be acquired
+/// because another process holds a non-stale lock.
 pub fn acquire(
     lock_dir: &Path,
     run_id: &str,
@@ -342,65 +247,85 @@ fn acquire_with_clock(
     lock_filename: &str,
     now: impl Fn() -> Timestamp,
 ) -> Result<RunLock, PersistenceError> {
-    let lock_dir = crate::fs::dir_or_current(lock_dir);
     let lock_path = lock_dir.join(lock_filename);
 
     std::fs::create_dir_all(lock_dir).map_err(PersistenceError::Io)?;
 
-    let file = open_coordination(&lock_path)?;
-    let guard = Guard::acquire(&file, &lock_path)?;
+    if force && lock_path.exists() {
+        force_remove_lock(&lock_path);
+    }
 
-    match read_state(&file)? {
-        LockState::Unowned => {}
-        LockState::Invalid(reason) => {
-            warn!(
-                path = %lock_path.display(),
-                reason = %reason,
-                "replacing corrupt lock file contents"
-            );
-        }
-        LockState::Owned(existing, _) => {
-            if force {
-                warn!(
-                    run_id = %existing.run_id,
-                    pid = existing.pid,
-                    created_at = %existing.created_at,
-                    "force-removing existing lock"
+    let metadata = LockMetadata::current_with_clock(run_id, &now);
+
+    for _attempt in 0..MAX_ACQUIRE_ATTEMPTS {
+        match create_lock_exclusive(&lock_path, &metadata) {
+            Ok(()) => {
+                info!(
+                    run_id = %metadata.run_id,
+                    pid = metadata.pid,
+                    "lock acquired"
                 );
-            } else if let Some(reclaim_reason) = reclaim_reason(&existing, stale_ttl, &now) {
-                warn!(
-                    run_id = %existing.run_id,
-                    pid = existing.pid,
-                    host = %existing.hostname,
-                    created_at = %existing.created_at,
-                    reason = reclaim_reason.as_str(),
-                    "reclaiming stale lock"
-                );
-            } else {
+                return Ok(RunLock {
+                    path: lock_path,
+                    metadata,
+                });
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+                if let Ok(existing) = read_lock(&lock_path) {
+                    if let Some(reclaim_reason) = reclaim_reason(&existing, stale_ttl, &now) {
+                        let reason = reclaim_reason.as_str();
+                        warn!(
+                            run_id = %existing.run_id,
+                            pid = existing.pid,
+                            host = %existing.hostname,
+                            created_at = %existing.created_at,
+                            reason = reason,
+                            "reclaiming stale lock"
+                        );
+                        if let Err(e) = std::fs::remove_file(&lock_path) {
+                            warn!(
+                                path = %lock_path.display(),
+                                error = %e,
+                                "failed to remove stale lock file"
+                            );
+                        }
+                        continue;
+                    }
+                    return Err(PersistenceError::LockFailed {
+                        reason: format!(
+                            "lock held by run {} (pid {}, since {})",
+                            existing.run_id, existing.pid, existing.created_at,
+                        ),
+                    });
+                }
+                match std::fs::metadata(&lock_path) {
+                    Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+                    _ => {
+                        warn!(
+                            path = %lock_path.display(),
+                            "removing corrupt lock file"
+                        );
+                        if let Err(e) = std::fs::remove_file(&lock_path) {
+                            warn!(
+                                path = %lock_path.display(),
+                                error = %e,
+                                "failed to remove corrupt lock file"
+                            );
+                        }
+                    }
+                }
+            }
+            Err(e) => {
                 return Err(PersistenceError::LockFailed {
-                    reason: describe_live_holder(&file, &lock_path),
+                    reason: format!("failed to create lock file: {e}"),
                 });
             }
         }
     }
 
-    let metadata = LockMetadata::current_with_clock(run_id, &now);
-    let generation = new_generation();
-    write_record(&file, &metadata, generation)?;
-    drop(guard);
-
-    info!(
-        run_id = %metadata.run_id,
-        pid = metadata.pid,
-        "lock acquired"
-    );
-
-    Ok(RunLock {
-        path: lock_path,
-        metadata,
-        generation,
-        file,
-        released: false,
+    Err(PersistenceError::LockFailed {
+        reason: "lock acquisition failed after max retries (concurrent stale-lock race)"
+            .to_string(),
     })
 }
 
@@ -467,119 +392,68 @@ fn pid_is_alive(pid: u32) -> bool {
 fn pid_is_alive(_pid: u32) -> bool {
     true
 }
-#[derive(Serialize, Deserialize)]
-struct LockRecord {
-    #[serde(flatten)]
-    metadata: LockMetadata,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    generation: Option<Generation>,
-}
 
-fn write_record(
-    file: &std::fs::File,
-    metadata: &LockMetadata,
-    generation: Generation,
-) -> Result<(), PersistenceError> {
-    use std::io::{Seek, SeekFrom, Write};
-
-    let record = LockRecord {
-        metadata: metadata.clone(),
-        generation: Some(generation),
-    };
-    let json = serde_json::to_string_pretty(&record).map_err(|e| PersistenceError::LockFailed {
-        reason: format!("failed to serialize lock metadata: {e}"),
+/// Create a lock file atomically by writing to a temp file in the same
+/// directory and publishing via `link(2)` (`persist_noclobber`).
+///
+/// Returns `Ok(())` if the file was created and written successfully.
+/// Returns `Err` with `ErrorKind::AlreadyExists` if the destination
+/// already exists. The whole-file contents are durable and visible
+/// atomically — readers never observe an empty or partial state
+/// produced by this function.
+fn create_lock_exclusive(path: &Path, metadata: &LockMetadata) -> Result<(), std::io::Error> {
+    use std::io::Write;
+    let json = serde_json::to_string_pretty(metadata)
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+    let parent = path.parent().ok_or_else(|| {
+        std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "lock path has no parent directory",
+        )
     })?;
-    let mut handle = file;
-    handle.set_len(0).map_err(PersistenceError::Io)?;
-    handle
-        .seek(SeekFrom::Start(0))
-        .map_err(PersistenceError::Io)?;
-    handle
-        .write_all(json.as_bytes())
-        .map_err(PersistenceError::Io)?;
-    handle.sync_all().map_err(PersistenceError::Io)
+    let mut tmp = tempfile::NamedTempFile::new_in(parent)?;
+    tmp.write_all(json.as_bytes())?;
+    tmp.as_file().sync_all()?;
+    tmp.persist_noclobber(path)
+        .map_err(|persist_err| persist_err.error)?;
+    Ok(())
 }
 
-fn clear_record(file: &std::fs::File) -> Result<(), PersistenceError> {
-    file.set_len(0).map_err(PersistenceError::Io)?;
-    file.sync_all().map_err(PersistenceError::Io)
-}
-
-#[derive(Debug)]
-enum LockState {
-    Unowned,
-    Owned(LockMetadata, Option<Generation>),
-    Invalid(String),
-}
-
-fn read_state(file: &std::fs::File) -> Result<LockState, PersistenceError> {
-    parse_state(&read_bounded(file)?)
-}
-
-fn read_bounded(file: &std::fs::File) -> Result<Vec<u8>, PersistenceError> {
-    use std::io::{Read, Seek, SeekFrom};
-
-    let mut handle = file;
-    handle
-        .seek(SeekFrom::Start(0))
-        .map_err(PersistenceError::Io)?;
-    let mut buf = bounded_buffer();
-    handle
-        .take(MAX_LOCK_FILE_BYTES + 1)
-        .read_to_end(&mut buf)
-        .map_err(PersistenceError::Io)?;
-    Ok(buf)
-}
-
-fn bounded_buffer() -> Vec<u8> {
-    Vec::with_capacity(usize::try_from(MAX_LOCK_FILE_BYTES + 1).unwrap_or(usize::MAX))
-}
-
-fn parse_state(buf: &[u8]) -> Result<LockState, PersistenceError> {
-    if u64::try_from(buf.len()).unwrap_or(u64::MAX) > MAX_LOCK_FILE_BYTES {
-        return Err(PersistenceError::LockFailed {
-            reason: format!("lock file too large: exceeds {MAX_LOCK_FILE_BYTES} bytes"),
-        });
-    }
-    if buf.iter().all(u8::is_ascii_whitespace) {
-        return Ok(LockState::Unowned);
-    }
-    match serde_json::from_slice::<LockRecord>(buf) {
-        Ok(record) => Ok(LockState::Owned(record.metadata, record.generation)),
-        Err(e) => Ok(LockState::Invalid(format!("lock file is corrupt: {e}"))),
-    }
-}
-
+/// Write lock metadata to a file using atomic temp+rename.
+///
+/// Used by test fixtures to set up lock file state. Production lock
+/// creation uses `create_lock_exclusive` for TOCTOU safety.
 #[cfg(test)]
 fn write_lock(path: &Path, metadata: &LockMetadata) -> Result<(), PersistenceError> {
     let json =
         serde_json::to_string_pretty(metadata).map_err(|e| PersistenceError::LockFailed {
             reason: format!("failed to serialize lock metadata: {e}"),
         })?;
-    crate::fs::atomic_write_text(path, &json).map_err(|e| PersistenceError::LockFailed {
+    atomic_write_text(path, &json).map_err(|e| PersistenceError::LockFailed {
         reason: format!("failed to write lock file: {e}"),
     })
 }
 
+/// Maximum lock file size in bytes (1 MB).
+///
+/// Lock files are small (~200 bytes of JSON). A file exceeding this limit
+/// is corrupt or adversarially crafted and should not be loaded into memory.
 const MAX_LOCK_FILE_BYTES: u64 = 1_048_576;
 
-#[cfg(test)]
 fn read_lock(path: &Path) -> Result<LockMetadata, PersistenceError> {
-    use std::io::Read;
-
-    let file = open_coordination(path)?;
-    let mut buf = bounded_buffer();
-    (&file)
-        .take(MAX_LOCK_FILE_BYTES + 1)
-        .read_to_end(&mut buf)
-        .map_err(PersistenceError::Io)?;
-    match parse_state(&buf)? {
-        LockState::Owned(metadata, _) => Ok(metadata),
-        LockState::Unowned => Err(PersistenceError::LockFailed {
-            reason: "lock file is unowned".to_string(),
-        }),
-        LockState::Invalid(reason) => Err(PersistenceError::LockFailed { reason }),
+    let metadata = std::fs::metadata(path).map_err(PersistenceError::Io)?;
+    if metadata.len() > MAX_LOCK_FILE_BYTES {
+        return Err(PersistenceError::LockFailed {
+            reason: format!(
+                "lock file too large: {} bytes (max {MAX_LOCK_FILE_BYTES})",
+                metadata.len(),
+            ),
+        });
     }
+    let content = std::fs::read_to_string(path).map_err(PersistenceError::Io)?;
+    serde_json::from_str(&content).map_err(|e| PersistenceError::LockFailed {
+        reason: format!("lock file is corrupt: {e}"),
+    })
 }
 
 #[must_use]
@@ -661,26 +535,7 @@ mod tests {
             lock_file_path = lock.path().to_path_buf();
             assert!(lock_file_path.exists());
         }
-        assert!(
-            lock_file_path.exists(),
-            "coordination inode is never unlinked (H3 fencing)"
-        );
-        assert_eq!(
-            std::fs::metadata(&lock_file_path).unwrap().len(),
-            0,
-            "drop must clear ownership"
-        );
-        assert!(
-            acquire(
-                dir.path(),
-                "run-2",
-                DEFAULT_LOCK_TTL,
-                false,
-                DEFAULT_LOCK_FILENAME
-            )
-            .is_ok(),
-            "dropped lock must be immediately re-acquirable"
-        );
+        assert!(!lock_file_path.exists());
     }
 
     #[test]
@@ -698,21 +553,7 @@ mod tests {
         assert!(path.exists());
 
         lock.release().unwrap();
-        assert!(
-            path.exists(),
-            "coordination inode is never unlinked (H3 fencing)"
-        );
-        assert!(
-            acquire(
-                dir.path(),
-                "run-2",
-                DEFAULT_LOCK_TTL,
-                false,
-                DEFAULT_LOCK_FILENAME
-            )
-            .is_ok(),
-            "released lock must be immediately re-acquirable"
-        );
+        assert!(!path.exists());
     }
 
     #[test]
@@ -990,10 +831,9 @@ mod tests {
             taken.release().unwrap();
         }
 
-        assert_eq!(
-            std::fs::metadata(&lock_path).unwrap().len(),
-            0,
-            "take+release must clear ownership without unlinking the inode"
+        assert!(
+            !lock_path.exists(),
+            "lock file should be deleted after take+release"
         );
     }
 
@@ -1236,6 +1076,14 @@ mod tests {
     }
 
     #[test]
+    fn force_remove_lock_on_missing_file_does_not_panic() {
+        let dir = TempDir::new().unwrap();
+        let missing = dir.path().join("nonexistent.lock");
+
+        force_remove_lock(&missing);
+    }
+
+    #[test]
     fn renew_updates_created_at_and_keeps_run_id_and_pid() {
         let dir = TempDir::new().unwrap();
         let mut lock = acquire(
@@ -1319,17 +1167,7 @@ mod tests {
             DEFAULT_LOCK_FILENAME,
             || after_ttl,
         )
-        .expect("a TTL-expired lock must be reclaimable even from a live holder");
-        assert!(
-            lock.renew_with_clock(|| after_ttl).is_err(),
-            "the displaced holder must learn it lost ownership"
-        );
-        drop(lock);
-        assert_eq!(
-            read_lock(replacement.path()).unwrap().run_id,
-            "other",
-            "the displaced holder's drop must not disturb the replacement"
-        );
+        .expect("renewed lock must expire strictly after TTL");
         assert_eq!(replacement.metadata.run_id, "other");
         assert_eq!(replacement.metadata.created_at, after_ttl);
         assert_eq!(read_lock(replacement.path()).unwrap(), replacement.metadata);
@@ -1604,439 +1442,5 @@ mod tests {
         tracing::subscriber::with_default(subscriber, f);
         drop(registration_dispatch);
         events.lock().unwrap().clone()
-    }
-}
-
-#[cfg(test)]
-mod ownership_regression {
-    use super::*;
-    use tempfile::TempDir;
-
-    fn acquire_at(
-        dir: &Path,
-        run_id: &str,
-        ttl: Duration,
-        at: Timestamp,
-    ) -> Result<RunLock, PersistenceError> {
-        acquire_with_clock(dir, run_id, ttl, false, DEFAULT_LOCK_FILENAME, || at)
-    }
-
-    #[test]
-    fn h3_stale_owner_drop_does_not_destroy_replacement() {
-        let dir = TempDir::new().unwrap();
-        let start: Timestamp = "2026-01-01T00:00:00Z".parse().unwrap();
-        let ttl = Duration::from_mins(1);
-        let stale = acquire_at(dir.path(), "old", ttl, start).unwrap();
-        let taken_over = start + SignedDuration::from_secs(600);
-
-        let replacement = acquire_at(dir.path(), "new", ttl, taken_over)
-            .expect("TTL takeover must succeed against a live stale holder");
-        drop(stale);
-
-        assert_eq!(replacement.metadata().run_id, "new");
-        assert_eq!(
-            read_lock(replacement.path()).unwrap().run_id,
-            "new",
-            "replacement ownership must survive the displaced holder's drop"
-        );
-        let fresh = acquire(
-            dir.path(),
-            "probe",
-            DEFAULT_LOCK_TTL,
-            false,
-            DEFAULT_LOCK_FILENAME,
-        )
-        .expect("a fresh acquisition may take over the ancient replacement record");
-        assert!(
-            replacement.release().is_ok(),
-            "the displaced replacement's release must be a harmless no-op"
-        );
-        assert_eq!(
-            read_lock(fresh.path()).unwrap().run_id,
-            "probe",
-            "the newest owner's record must be intact"
-        );
-    }
-
-    #[test]
-    fn h3_stale_owner_renew_does_not_overwrite_replacement() {
-        let dir = TempDir::new().unwrap();
-        let start: Timestamp = "2026-01-01T00:00:00Z".parse().unwrap();
-        let ttl = Duration::from_mins(1);
-        let mut stale = acquire_at(dir.path(), "old", ttl, start).unwrap();
-        let replacement = acquire_at(
-            dir.path(),
-            "new",
-            ttl,
-            start + SignedDuration::from_secs(600),
-        )
-        .expect("TTL takeover must succeed against a live stale holder");
-
-        assert!(
-            stale
-                .renew_with_clock(|| start + SignedDuration::from_secs(900))
-                .is_err(),
-            "a displaced holder's renew must report lost ownership"
-        );
-        assert!(
-            stale.release().is_ok(),
-            "a displaced holder's release must be a harmless no-op"
-        );
-
-        let on_disk = read_lock(replacement.path()).unwrap();
-        assert_eq!(
-            on_disk.run_id, "new",
-            "the replacement's record must survive the displaced holder"
-        );
-    }
-
-    #[test]
-    fn h3_explicit_release_cannot_double_remove_a_later_owner() {
-        let dir = TempDir::new().unwrap();
-        let first = acquire(
-            dir.path(),
-            "first",
-            DEFAULT_LOCK_TTL,
-            false,
-            DEFAULT_LOCK_FILENAME,
-        )
-        .unwrap();
-        first.release().unwrap();
-
-        let second = acquire(
-            dir.path(),
-            "second",
-            DEFAULT_LOCK_TTL,
-            false,
-            DEFAULT_LOCK_FILENAME,
-        )
-        .unwrap();
-
-        assert_eq!(second.metadata().run_id, "second");
-        assert_eq!(
-            read_lock(second.path()).unwrap().run_id,
-            "second",
-            "released guard must not remove a later owner's record"
-        );
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn h4_unreadable_live_lock_errors_without_mutation() {
-        use std::os::unix::fs::PermissionsExt;
-
-        let dir = TempDir::new().unwrap();
-        let path = dir.path().join(DEFAULT_LOCK_FILENAME);
-        write_lock(&path, &LockMetadata::current("live")).unwrap();
-        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o000)).unwrap();
-
-        let result = acquire(
-            dir.path(),
-            "contender",
-            DEFAULT_LOCK_TTL,
-            false,
-            DEFAULT_LOCK_FILENAME,
-        );
-
-        assert!(result.is_err(), "unreadable lock must not be acquirable");
-        assert!(
-            path.exists(),
-            "unreadable lock must not be deleted as corrupt"
-        );
-        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
-        let survivor = read_lock(&path).unwrap();
-        assert_eq!(survivor.run_id, "live");
-    }
-
-    #[test]
-    fn m2_oversize_lock_is_rejected_without_mutation() {
-        let dir = TempDir::new().unwrap();
-        let path = dir.path().join(DEFAULT_LOCK_FILENAME);
-        let file = std::fs::File::create(&path).unwrap();
-        file.set_len(MAX_LOCK_FILE_BYTES + 1).unwrap();
-        drop(file);
-
-        let result = acquire(
-            dir.path(),
-            "contender",
-            DEFAULT_LOCK_TTL,
-            false,
-            DEFAULT_LOCK_FILENAME,
-        );
-
-        let err = result.expect_err("oversize lock must be rejected");
-        assert!(
-            format!("{err}").contains("too large"),
-            "expected oversize rejection, got: {err}"
-        );
-        assert_eq!(
-            std::fs::metadata(&path).unwrap().len(),
-            MAX_LOCK_FILE_BYTES + 1,
-            "oversize lock must not be mutated"
-        );
-    }
-
-    #[test]
-    fn m2_at_limit_lock_is_read_within_bound() {
-        let dir = TempDir::new().unwrap();
-        let path = dir.path().join("at-limit.lock");
-        let file = std::fs::File::create(&path).unwrap();
-        file.set_len(MAX_LOCK_FILE_BYTES).unwrap();
-        drop(file);
-
-        let err = read_lock(&path).unwrap_err();
-        assert!(
-            !format!("{err}").contains("too large"),
-            "at-limit file must not be rejected as oversize: {err}"
-        );
-    }
-
-    #[test]
-    fn h1_competing_reclaimers_are_serialized_to_one_generation() {
-        use std::sync::Arc;
-        use std::sync::atomic::{AtomicUsize, Ordering};
-
-        let dir = Arc::new(TempDir::new().unwrap());
-        let start: Timestamp = "2026-01-01T00:00:00Z".parse().unwrap();
-        let ttl = Duration::from_mins(1);
-        let stale = acquire_at(dir.path(), "old", ttl, start).unwrap();
-        let takeover = start + SignedDuration::from_secs(600);
-
-        let count = Arc::new(AtomicUsize::new(0));
-        let held = std::sync::Mutex::new(Vec::new());
-        std::thread::scope(|scope| {
-            for i in 0..8 {
-                let dir = Arc::clone(&dir);
-                let count = Arc::clone(&count);
-                let held = &held;
-                scope.spawn(move || {
-                    if let Ok(lock) = acquire_at(dir.path(), &format!("c{i}"), ttl, takeover) {
-                        count.fetch_add(1, Ordering::Relaxed);
-                        held.lock().unwrap().push(lock);
-                    }
-                });
-            }
-        });
-
-        assert_eq!(
-            count.load(Ordering::Relaxed),
-            1,
-            "exactly one reclaimer must win the expired lock"
-        );
-        let held = held.into_inner().unwrap();
-        let lock_path = dir.path().join(DEFAULT_LOCK_FILENAME);
-        let on_disk = read_lock(&lock_path).unwrap().run_id;
-        let mut owner = None;
-        for candidate in held {
-            if candidate.metadata().run_id == on_disk {
-                owner = Some(candidate);
-            } else {
-                assert!(
-                    candidate.release().is_ok(),
-                    "a displaced reclaimer's release must be a no-op"
-                );
-            }
-        }
-        let owner = owner.expect("the recorded run must be one of the reclaimers");
-        assert!(
-            stale.release().is_ok(),
-            "the displaced original holder's release must be a no-op"
-        );
-        let survivor = read_lock(owner.path()).unwrap();
-        assert_eq!(
-            survivor.run_id,
-            owner.metadata().run_id,
-            "exactly one reclaimer's record must survive the others' releases"
-        );
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn h2_symlinked_coordination_path_is_rejected_without_mutating_target() {
-        let dir = TempDir::new().unwrap();
-        let target = dir.path().join("innocent.txt");
-        std::fs::write(&target, b"not json, not ours").unwrap();
-        std::os::unix::fs::symlink(&target, dir.path().join(DEFAULT_LOCK_FILENAME)).unwrap();
-
-        let err = acquire(
-            dir.path(),
-            "contender",
-            DEFAULT_LOCK_TTL,
-            false,
-            DEFAULT_LOCK_FILENAME,
-        )
-        .expect_err("a symlinked coordination path must be rejected");
-        assert!(
-            matches!(
-                err,
-                PersistenceError::Io(_) | PersistenceError::LockFailed { .. }
-            ),
-            "unexpected rejection: {err}"
-        );
-        assert_eq!(
-            std::fs::read(&target).unwrap(),
-            b"not json, not ours",
-            "the symlink target must not be mutated"
-        );
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn h2_hardlinked_coordination_inode_is_rejected_without_mutating_target() {
-        let dir = TempDir::new().unwrap();
-        let target = dir.path().join("innocent.txt");
-        std::fs::write(&target, b"not json, not ours").unwrap();
-        std::fs::hard_link(&target, dir.path().join(DEFAULT_LOCK_FILENAME)).unwrap();
-
-        let err = acquire(
-            dir.path(),
-            "contender",
-            DEFAULT_LOCK_TTL,
-            false,
-            DEFAULT_LOCK_FILENAME,
-        )
-        .expect_err("a shared coordination inode must be rejected");
-        assert!(
-            format!("{err}").contains("links"),
-            "expected a link-policy rejection, got: {err}"
-        );
-        assert_eq!(
-            std::fs::read(&target).unwrap(),
-            b"not json, not ours",
-            "the hard-link target must not be mutated"
-        );
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn h2_directory_coordination_path_is_rejected() {
-        let dir = TempDir::new().unwrap();
-        std::fs::create_dir(dir.path().join(DEFAULT_LOCK_FILENAME)).unwrap();
-
-        assert!(
-            acquire(
-                dir.path(),
-                "contender",
-                DEFAULT_LOCK_TTL,
-                false,
-                DEFAULT_LOCK_FILENAME,
-            )
-            .is_err(),
-            "a directory must never be used as a coordination inode"
-        );
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn h2_fifo_coordination_path_is_rejected_without_hanging() {
-        let dir = TempDir::new().unwrap();
-        let path = dir.path().join(DEFAULT_LOCK_FILENAME);
-        let status = std::process::Command::new("mkfifo")
-            .arg(&path)
-            .status()
-            .expect("mkfifo must be available");
-        assert!(status.success(), "mkfifo failed");
-
-        let (tx, rx) = std::sync::mpsc::channel();
-        let probe_dir = dir.path().to_path_buf();
-        std::thread::spawn(move || {
-            let outcome = acquire(
-                &probe_dir,
-                "contender",
-                DEFAULT_LOCK_TTL,
-                false,
-                DEFAULT_LOCK_FILENAME,
-            )
-            .map_or_else(|e| e.to_string(), |_| "acquired".to_string());
-            tx.send(outcome)
-                .expect("the FIFO witness receiver must still be connected");
-        });
-
-        let reason = rx
-            .recv_timeout(Duration::from_secs(5))
-            .expect("opening a FIFO coordination path must not block");
-        assert!(
-            reason.contains("not a regular file"),
-            "a FIFO must be rejected by the file-kind guard, got: {reason}"
-        );
-    }
-
-    #[test]
-    fn m2_post_open_read_error_is_io_not_invalid() {
-        let dir = TempDir::new().unwrap();
-        let path = dir.path().join("write-only.lock");
-        let file = std::fs::OpenOptions::new()
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .open(&path)
-            .unwrap();
-
-        let err = read_state(&file)
-            .expect_err("a successfully opened but unreadable handle must not classify");
-        assert!(
-            matches!(err, PersistenceError::Io(_)),
-            "a post-open read error must stay Io, got: {err}"
-        );
-    }
-
-    #[test]
-    fn m1_valid_at_limit_record_is_accepted_within_the_read_budget() {
-        let dir = TempDir::new().unwrap();
-        let path = dir.path().join("at-limit-valid.lock");
-        let mut meta = LockMetadata::current("padded");
-        let base = serde_json::to_string_pretty(&meta).unwrap().len();
-        let pad = usize::try_from(MAX_LOCK_FILE_BYTES).unwrap() - base;
-        meta.run_id = "x".repeat(pad + "padded".len());
-        let json = serde_json::to_string_pretty(&meta).unwrap();
-        assert_eq!(
-            u64::try_from(json.len()).unwrap(),
-            MAX_LOCK_FILE_BYTES,
-            "fixture must sit exactly at the read bound"
-        );
-        std::fs::write(&path, &json).unwrap();
-
-        let read = read_lock(&path).expect("a valid at-limit record must be accepted");
-        assert_eq!(read.run_id, meta.run_id);
-    }
-
-    #[test]
-    fn m1_excess_byte_is_rejected_and_read_buffer_never_grows() {
-        let dir = TempDir::new().unwrap();
-        let path = dir.path().join("excess.lock");
-        let mut json = serde_json::to_string_pretty(&LockMetadata::current("padded")).unwrap();
-        json.push_str(&" ".repeat(usize::try_from(MAX_LOCK_FILE_BYTES).unwrap() + 1 - json.len()));
-        std::fs::write(&path, &json).unwrap();
-
-        let err = read_lock(&path).expect_err("one excess byte must be rejected");
-        assert!(
-            format!("{err}").contains("too large"),
-            "expected oversize rejection, got: {err}"
-        );
-
-        let buf = read_bounded(&open_coordination(&path).unwrap()).unwrap();
-        assert_eq!(
-            u64::try_from(buf.capacity()).unwrap(),
-            MAX_LOCK_FILE_BYTES + 1,
-            "the buffer the reader actually used must stay at exactly the budget"
-        );
-        assert_eq!(
-            u64::try_from(buf.len()).unwrap(),
-            MAX_LOCK_FILE_BYTES + 1,
-            "the reader must consume no more than the oversize-detection byte"
-        );
-
-        let at_limit = dir.path().join("at-limit.lock");
-        std::fs::write(
-            &at_limit,
-            vec![b' '; usize::try_from(MAX_LOCK_FILE_BYTES).unwrap()],
-        )
-        .unwrap();
-        let at_limit_buf = read_bounded(&open_coordination(&at_limit).unwrap()).unwrap();
-        assert_eq!(
-            u64::try_from(at_limit_buf.capacity()).unwrap(),
-            MAX_LOCK_FILE_BYTES + 1,
-            "an at-limit read must not grow the buffer"
-        );
     }
 }

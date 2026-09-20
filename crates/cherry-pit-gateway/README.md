@@ -1,12 +1,20 @@
 # cherry-pit-gateway
 
-Infrastructure implementations for cherry-pit: event stores.
+Infrastructure helpers for cherry-pit port traits.
 
-Provides `MsgpackFileStore` — a file-based, MessagePack-serialized event store
-with atomic writes, process-level fencing, and optimistic concurrency.
+`StaleLockEvidence` and `stale_lock_evidence` capture filesystem metadata
+for operator-side lock recovery. Event persistence is supplied externally
+through `pardosa` or `pardosa-nats`.
 
-## Status
+## Operational recovery
 
-Implemented. `MsgpackFileStore` is the only event store implementation.
+See [RUNBOOKS.md](RUNBOOKS.md) for the stale-lock evidence procedure.
+
+## Tests
+
+The source-derived integration tests exercise event-store and projection
+conformance through `pardosa-cherry-pit-test-support`, including persistence
+across reopening a `.pgno` store. This is a development dependency, not a
+production dependency of the gateway.
 
 Part of the [cherry-pit](../../README.md) workspace.

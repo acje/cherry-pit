@@ -1,88 +1,54 @@
-# Cherry pit
+# Cherry-pit
 
-A composable systems-kernel for agent-first building. Focus on domain
-logic rather than system design and infrastructure.
-
-Cherry-pit provides the undifferentiated heavy lifting — architecture
-patterns, event infrastructure, message transport, web serving — as
-composable components. You describe aggregates, commands, and events;
-the pit handles persistence, transport, and fan-out.
-
-## Design priorities
-
-Every decision is evaluated against these priorities, in strict rank order:
-
-1. **Correctness** — Make illegal states unrepresentable. Validated
-   constructors enforce invariants in all build profiles, derive macros
-   reject non-deterministic types at compile time, and every decode path
-   must run the full verification suite — no opt-out. Total functions.
-   `#![forbid(unsafe_code)]` in every crate.
-2. **Secure** — Treat every input as hostile. Validate structurally at
-   boundaries, bound resource consumption before allocation, and reject
-   malformed data as a hard error — no lenient modes. Module boundaries
-   hide design decisions; the crate DAG prevents domain code from depending
-   on infrastructure.
-3. **Energy efficient** — Do less work, not faster work. Prefer zero-copy
-   reads over deserialization, exact-size buffers over reallocation, and
-   compact wire representations over convenient ones. Avoid unnecessary
-   allocations, cloning, and serialization.
-4. **Response time** — Fast, but never at the cost of correctness. Bound
-   latency with timeouts and circuit breakers that preserve read
-   availability during write-path failures. Trade simplicity for throughput
-   only when measured, not estimated.
-
-## Architecture
-
-Cherry-pit combines three architectural styles:
-
-- **Domain-Driven Design** — aggregates, value objects, domain events, commands
-- **Event-Driven Architecture** — commands produce events; events drive policies and projections
-- **Hexagonal (Ports & Adapters)** — narrow, typed ports for all I/O
-
-### Type safety by construction
-
-Every infrastructure port is bound to a single aggregate type via
-associated types. The compiler proves end-to-end that commands, events,
-persistence, and publication all agree on the same types. Multiple
-aggregates are supported by deploying separate bounded contexts — each
-with its own typed infrastructure stack.
-
-What cannot compile:
-
-- Dispatching a command to an aggregate that doesn't handle it
-- Loading one aggregate's events as another's
-- Publishing events through a bus typed for a different aggregate
-- Downcasting domain errors — `DispatchError<E>` preserves the exact type
-
-## Status
-
-Active development. `cherry-pit-core` traits are implemented and stable.
-`cherry-pit-gateway` provides a working `MsgpackFileStore` event store with
-atomic writes, process-level fencing, and optimistic concurrency. Remaining
-infrastructure crates (`cherry-pit-web`, `cherry-pit-projection`) are planned.
+Typed building blocks for event-sourced Rust applications: synchronous domain
+logic, asynchronous infrastructure ports, and explicit application composition.
+This workspace is extracted from
+[Mattilsynet/gh-report at c8507377b2748a015148751ce288be2bad9ec708](https://github.com/Mattilsynet/gh-report/tree/c8507377b2748a015148751ce288be2bad9ec708).
 
 ## Components
 
-| Component      | Status      | Description                                         |
-|----------------|-------------|-----------------------------------------------------|
-| **cherry-pit-core**   | implemented | Aggregate, command, event, policy, projection traits. Port traits: CommandGateway, CommandBus, EventStore, EventBus |
-| **cherry-pit-gateway**| implemented | `MsgpackFileStore` event store with atomic writes, process fencing, optimistic concurrency |
-| **cherry-pit-web**    | planned     | Web serving adapter (axum)                          |
-| **cherry-pit-projection** | planned | Read model storage and query serving                |
+| Crate | Responsibility |
+|---|---|
+| `cherry-pit-core` | Aggregates, commands, events, typed ports, correlation, scheduling contracts |
+| `cherry-pit-gateway` | Gateway recovery support; persistence adapters are supplied separately |
+| `cherry-pit-storage` | Synchronous filesystem writes, run locks, snapshot signatures |
+| `cherry-pit-wq` | In-process queues, worker pools and domain-neutral admission regulators |
+| `cherry-pit-merger` | Generic read-side convergence |
+| `cherry-pit-projection` | Neutral projection drivers, in-memory views and write-cell coordination |
+| `cherry-pit-web` | HTTP/WebSocket serving and read-side transport adapters |
+| `cherry-pit-app` | Explicit composition, policy dispatch, projections and scheduling |
+| `pardosa-cherry-pit-projection` | Outer Pardosa-backed persistent projection adapter |
+| `pardosa-cherry-pit-test-support` | Unpublished outer adapter for durable integration tests |
 
-## Repository structure
+Applications own runtime construction, signal handling, domain policy and
+infrastructure selection. Ports bind to one aggregate/event type through
+associated types. `DomainEvent` requires `Clone + Send + Sync + 'static`;
+serialization bounds belong to the consumers that serialize events.
 
-```
-cherry-pit/
-├── crates/
-│   ├── cherry-pit-core/       # Aggregate, command, event, port traits
-│   └── cherry-pit-gateway/    # EventStore implementations
-├── docs/
-│   ├── adr/                   # Architecture decision records (governed by the canonical adr-fmt CLI)
-│   ├── plans/                 # Ephemeral working drafts (consumed into code and ADRs)
-│   └── glossary.md            # Domain vocabulary across all crates
-├── adr-fmt.toml               # Corpus/domain config for the canonical adr-fmt CLI
-└── Cargo.toml                 # Workspace manifest (edition 2024, rust 1.95+)
-```
+The eight `cherry-pit-*` crates have a neutral normal/build dependency boundary.
+Pardosa-dependent functionality lives in the separately named outer packages;
+durable integration tests may depend on those packages. These are cohosted
+Pardosa-family facade adopters under the explicit CPP-0001 placement decision.
 
-Licensed under [MIT](LICENSE).
+Persistence precedes publication; publication is notification, not commit.
+Cancellation after persistence does not imply rollback. The in-process queue
+is not durable, the default dead-letter sink logs, and policy-output dispatch
+is not an automatic retry engine. `MsgpackFileStore` is retired.
+
+## Development
+
+Rust **1.98.0**, edition **2024**, resolver **3**. Use the committed lockfile
+and the root workspace lint configuration; pedantic is the standing bar.
+[AGENTS.md](AGENTS.md) defines scoped local verification and the producer
+acceptance gates. Scoped local dependency intake is recorded in `ghr-7wc6p.11.2`.
+Producer acceptance still requires build, CI and mandatory pre-merge review;
+existing workflow files are not
+evidence that standalone CI is implemented or passing.
+
+Read the crate READMEs for APIs and [governance](docs/governance.md) for
+source-qualified decisions and the persistent-projection placement amendment.
+
+## License
+
+Licensed under either [Apache-2.0](LICENSE-APACHE) or [MIT](LICENSE-MIT), at
+your option, as in the source workspace. The source notices are preserved.

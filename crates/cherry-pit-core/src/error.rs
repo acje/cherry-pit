@@ -1,5 +1,6 @@
 use std::error::Error;
 use std::fmt;
+use std::num::NonZeroU64;
 use std::path::PathBuf;
 
 use crate::aggregate::{Aggregate, HandleCommand};
@@ -7,11 +8,26 @@ use crate::aggregate_id::AggregateId;
 use crate::event::EventEnvelope;
 
 /// Stable retry guidance for framework errors.
+/// (CHE-0021 R3: `ErrorCategory` exposed on all error types;
+/// CHE-0046: retry/timeout/cancellation semantics.)
 ///
 /// This category is intentionally coarse. Callers use it to choose a
 /// first response strategy without matching every concrete error variant:
 /// retry after reloading/backing off, or stop and surface the condition
 /// for domain/operator action.
+///
+/// # Examples
+///
+/// ```
+/// use cherry_pit_core::ErrorCategory;
+///
+/// let cat = ErrorCategory::Retryable;
+/// assert!(cat.is_retryable());
+/// assert!(!cat.is_terminal());
+///
+/// let cat = ErrorCategory::Terminal;
+/// assert!(cat.is_terminal());
+/// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ErrorCategory {
     /// Repeating the operation may succeed after backoff, reload, or
@@ -38,13 +54,14 @@ impl ErrorCategory {
 }
 
 /// Errors that can occur during command dispatch.
+/// (CHE-0021 R1: `#[non_exhaustive]`; CHE-0015 R2: lossless domain error;
+/// CHE-0019 R2: `AggregateNotFound` lives here, not on `StoreError`.)
 ///
 /// Generic over `E` — the domain-specific error type from
 /// `HandleCommand<C>::Error`. This preserves full type information
 /// through the gateway and bus, allowing callers to match on
 /// domain errors without downcasting.
 #[derive(Debug)]
-#[non_exhaustive]
 pub enum DispatchError<E: Error + Send + Sync> {
     /// The aggregate rejected the command (business invariant violation).
     Rejected(E),
@@ -56,7 +73,13 @@ pub enum DispatchError<E: Error + Send + Sync> {
     /// load and our persist. The caller may retry.
     ConcurrencyConflict {
         aggregate_id: AggregateId,
-        expected_sequence: u64,
+        /// Sequence the caller required for the next write. This comes
+        /// from `EventEnvelope::sequence()` (or the equivalent counter)
+        /// upstream, so it is always `NonZeroU64`.
+        expected_sequence: NonZeroU64,
+        /// Sequence actually observed in the store at the time of the
+        /// write. May be `0` when the stream is empty (no events yet),
+        /// hence raw `u64`.
         actual_sequence: u64,
     },
 
@@ -107,14 +130,19 @@ impl<E: Error + Send + Sync + 'static> Error for DispatchError<E> {
 }
 
 /// Errors from event store operations.
+/// (CHE-0021 R1: `#[non_exhaustive]`; CHE-0027 R1: manual Display/Error,
+/// no thiserror dependency.)
 #[derive(Debug)]
-#[non_exhaustive]
 pub enum StoreError {
     /// Optimistic concurrency violation — another writer persisted
     /// events after our load.
     ConcurrencyConflict {
         aggregate_id: AggregateId,
-        expected_sequence: u64,
+        /// Sequence the caller required for the next write. Always
+        /// `NonZeroU64` — propagated from `EventEnvelope::sequence()`.
+        expected_sequence: NonZeroU64,
+        /// Sequence actually observed in the store at the time of the
+        /// write. May be `0` when the stream is empty, hence raw `u64`.
         actual_sequence: u64,
     },
 
@@ -139,6 +167,17 @@ pub enum StoreError {
 
     /// Infrastructure failure (disk I/O, network, serialization).
     Infrastructure(Box<dyn Error + Send + Sync>),
+
+    /// A `tokio::task::spawn_blocking` task failed to join.
+    ///
+    /// Surfaces when an implementation of an async port (e.g.
+    /// [`ListableEventStore::list_aggregates`](crate::ListableEventStore::list_aggregates))
+    /// wraps blocking substrate work in `tokio::task::spawn_blocking`
+    /// per CHE-0070:R6 and the spawned task panics or the runtime is
+    /// shutting down. Both conditions are unrecoverable: a panic is a
+    /// programming error in the blocking body, and a shutting-down
+    /// runtime will not accept further work. Classified as terminal.
+    JoinFailure(Box<dyn Error + Send + Sync>),
 }
 
 impl StoreError {
@@ -149,7 +188,7 @@ impl StoreError {
             Self::ConcurrencyConflict { .. }
             | Self::StoreLocked { .. }
             | Self::Infrastructure(_) => ErrorCategory::Retryable,
-            Self::CorruptData(_) => ErrorCategory::Terminal,
+            Self::CorruptData(_) | Self::JoinFailure(_) => ErrorCategory::Terminal,
         }
     }
 }
@@ -172,6 +211,7 @@ impl fmt::Display for StoreError {
             ),
             Self::CorruptData(e) => write!(f, "store corrupt data: {e}"),
             Self::Infrastructure(e) => write!(f, "store infrastructure error: {e}"),
+            Self::JoinFailure(e) => write!(f, "store spawn_blocking join failure: {e}"),
         }
     }
 }
@@ -179,19 +219,21 @@ impl fmt::Display for StoreError {
 impl Error for StoreError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
-            Self::CorruptData(e) | Self::Infrastructure(e) => Some(e.as_ref()),
+            Self::CorruptData(e) | Self::Infrastructure(e) | Self::JoinFailure(e) => {
+                Some(e.as_ref())
+            }
             Self::ConcurrencyConflict { .. } | Self::StoreLocked { .. } => None,
         }
     }
 }
 
 /// Error from event bus publication.
+/// (CHE-0021 R1: `#[non_exhaustive]`; CHE-0027 R1: manual Display/Error.)
 ///
 /// Intentionally simple — publication errors are infrastructure-level.
 /// The `CommandBus` may log this error but does not propagate it as a
 /// `DispatchError` — the command already succeeded (events are persisted).
 #[derive(Debug)]
-#[non_exhaustive]
 pub struct BusError(Box<dyn Error + Send + Sync>);
 
 impl BusError {
@@ -226,12 +268,13 @@ impl Error for BusError {
 }
 
 /// Errors from `EventEnvelope` construction or validation.
+/// (CHE-0021 R1: `#[non_exhaustive]`; CHE-0042 R1–R4: validated
+/// construction and stream integrity checks.)
 ///
 /// Only one variant: `NilEventId`. Sequence validity is guaranteed
 /// by `NonZeroU64` — the type system eliminates zero sequences at
 /// compile time, and serde rejects zero on deserialization.
 #[derive(Debug)]
-#[non_exhaustive]
 pub enum EnvelopeError {
     /// The `event_id` is nil (`Uuid::nil()`), which indicates a
     /// missing or corrupted event identifier.
@@ -248,10 +291,21 @@ pub enum EnvelopeError {
 
     /// The stream sequence is not exactly contiguous from 1..=N.
     SequenceGap {
-        /// Sequence required at this stream position.
+        /// Sequence required at this stream position. This is a 1-based
+        /// loop counter (`u64` to keep arithmetic simple at the call
+        /// site); always ≥ 1 in practice.
         expected_sequence: u64,
-        /// Sequence found in the envelope.
-        actual_sequence: u64,
+        /// Sequence found in the envelope. Always `NonZeroU64` because
+        /// it comes directly from `EventEnvelope::sequence()`.
+        actual_sequence: NonZeroU64,
+    },
+
+    /// Two envelopes in the same stream share an `event_id` (CHE-0019,
+    /// CHE-0032). Envelope identity must be unique per stream; a
+    /// repeated `event_id` indicates corrupt or duplicated data.
+    DuplicateEventId {
+        /// The `event_id` that appears more than once in the stream.
+        event_id: uuid::Uuid,
     },
 }
 
@@ -278,6 +332,9 @@ impl fmt::Display for EnvelopeError {
                 f,
                 "event sequence gap: expected sequence {expected_sequence}, actual {actual_sequence}"
             ),
+            Self::DuplicateEventId { event_id } => {
+                write!(f, "duplicate event_id in stream: {event_id}")
+            }
         }
     }
 }
@@ -302,3 +359,247 @@ pub type CreateResult<A, C> = Result<
     (AggregateId, Vec<EventEnvelope<<A as Aggregate>::Event>>),
     DispatchError<<A as HandleCommand<C>>::Error>,
 >;
+
+/// Result type for [`EventStore::create`](crate::EventStore::create).
+///
+/// Returns the store-assigned [`AggregateId`] and the persisted event
+/// envelopes on success.
+pub type StoreCreateResult<E> = Result<(AggregateId, Vec<EventEnvelope<E>>), StoreError>;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::num::NonZeroU64;
+
+    #[derive(Debug)]
+    struct TestDomainError(&'static str);
+    impl fmt::Display for TestDomainError {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            write!(f, "{}", self.0)
+        }
+    }
+    impl Error for TestDomainError {}
+
+    #[test]
+    fn dispatch_error_construction() {
+        let _err: DispatchError<TestDomainError> = DispatchError::AggregateNotFound {
+            aggregate_id: AggregateId::new(NonZeroU64::new(1).unwrap()),
+        };
+    }
+
+    #[test]
+    fn dispatch_error_category_retryable() {
+        let id = AggregateId::new(NonZeroU64::new(1).unwrap());
+        let err: DispatchError<TestDomainError> = DispatchError::ConcurrencyConflict {
+            aggregate_id: id,
+            expected_sequence: NonZeroU64::new(1).unwrap(),
+            actual_sequence: 2,
+        };
+        assert_eq!(err.category(), ErrorCategory::Retryable);
+
+        let err2: DispatchError<TestDomainError> = DispatchError::Infrastructure("io".into());
+        assert_eq!(err2.category(), ErrorCategory::Retryable);
+    }
+
+    #[test]
+    fn dispatch_error_category_terminal() {
+        let err: DispatchError<TestDomainError> = DispatchError::Rejected(TestDomainError("nope"));
+        assert_eq!(err.category(), ErrorCategory::Terminal);
+
+        let err2: DispatchError<TestDomainError> = DispatchError::AggregateNotFound {
+            aggregate_id: AggregateId::new(NonZeroU64::new(1).unwrap()),
+        };
+        assert_eq!(err2.category(), ErrorCategory::Terminal);
+    }
+
+    #[test]
+    fn store_error_category_retryable() {
+        let id = AggregateId::new(NonZeroU64::new(1).unwrap());
+        assert_eq!(
+            StoreError::ConcurrencyConflict {
+                aggregate_id: id,
+                expected_sequence: NonZeroU64::new(1).unwrap(),
+                actual_sequence: 2,
+            }
+            .category(),
+            ErrorCategory::Retryable
+        );
+        assert_eq!(
+            StoreError::StoreLocked {
+                path: "/tmp".into()
+            }
+            .category(),
+            ErrorCategory::Retryable
+        );
+        assert_eq!(
+            StoreError::Infrastructure("io".into()).category(),
+            ErrorCategory::Retryable
+        );
+    }
+
+    #[test]
+    fn store_error_category_terminal() {
+        assert_eq!(
+            StoreError::CorruptData("bad".into()).category(),
+            ErrorCategory::Terminal
+        );
+        assert_eq!(
+            StoreError::JoinFailure("join".into()).category(),
+            ErrorCategory::Terminal
+        );
+    }
+
+    #[test]
+    fn bus_error_category_always_retryable() {
+        let err = BusError::new("network");
+        assert_eq!(err.category(), ErrorCategory::Retryable);
+    }
+
+    #[test]
+    fn envelope_error_category_always_terminal() {
+        assert_eq!(
+            EnvelopeError::NilEventId.category(),
+            ErrorCategory::Terminal
+        );
+        assert_eq!(
+            EnvelopeError::AggregateIdMismatch {
+                expected: AggregateId::new(NonZeroU64::new(1).unwrap()),
+                actual: AggregateId::new(NonZeroU64::new(2).unwrap()),
+            }
+            .category(),
+            ErrorCategory::Terminal
+        );
+        assert_eq!(
+            EnvelopeError::SequenceGap {
+                expected_sequence: 1,
+                actual_sequence: NonZeroU64::new(3).unwrap(),
+            }
+            .category(),
+            ErrorCategory::Terminal
+        );
+    }
+
+    #[test]
+    fn dispatch_error_display() {
+        let err: DispatchError<TestDomainError> =
+            DispatchError::Rejected(TestDomainError("invariant violated"));
+        assert_eq!(err.to_string(), "command rejected: invariant violated");
+
+        let err2: DispatchError<TestDomainError> = DispatchError::AggregateNotFound {
+            aggregate_id: AggregateId::new(NonZeroU64::new(42).unwrap()),
+        };
+        assert_eq!(err2.to_string(), "aggregate not found: 42");
+    }
+
+    #[test]
+    fn store_error_display() {
+        let err = StoreError::StoreLocked {
+            path: "/data/store".into(),
+        };
+        assert!(err.to_string().contains("/data/store"));
+
+        let err2 = StoreError::CorruptData("bad checksum".into());
+        assert!(err2.to_string().contains("bad checksum"));
+
+        let err3 = StoreError::JoinFailure("task panicked".into());
+        assert!(err3.to_string().contains("spawn_blocking"));
+        assert!(err3.to_string().contains("task panicked"));
+        assert!(
+            err3.source().is_some(),
+            "JoinFailure must expose its inner cause via Error::source",
+        );
+    }
+
+    #[test]
+    fn bus_error_display_and_source() {
+        let err = BusError::new("connection reset");
+        assert!(err.to_string().contains("connection reset"));
+        assert!(err.source().is_some());
+    }
+
+    #[test]
+    fn envelope_error_display() {
+        assert_eq!(
+            EnvelopeError::NilEventId.to_string(),
+            "event_id must not be nil"
+        );
+    }
+
+    #[test]
+    fn dispatch_error_source() {
+        let err: DispatchError<TestDomainError> = DispatchError::Rejected(TestDomainError("x"));
+        assert!(err.source().is_some());
+
+        let err2: DispatchError<TestDomainError> = DispatchError::AggregateNotFound {
+            aggregate_id: AggregateId::new(NonZeroU64::new(1).unwrap()),
+        };
+        assert!(err2.source().is_none());
+    }
+
+    #[test]
+    fn dispatch_error_preserves_domain_error() {
+        let domain_err = TestDomainError("business rule X");
+        let err: DispatchError<TestDomainError> = DispatchError::Rejected(domain_err);
+        if let DispatchError::Rejected(inner) = &err {
+            assert_eq!(inner.0, "business rule X");
+        } else {
+            panic!("expected Rejected variant");
+        }
+    }
+
+    #[test]
+    fn bus_error_into_inner() {
+        let err = BusError::new("timeout");
+        let inner = err.into_inner();
+        assert_eq!(inner.to_string(), "timeout");
+    }
+
+    /// PGN-0016 R9 / CHE-0027: `ConcurrencyConflict`'s `source()` is `None`
+    /// (see `dispatch_error_source` above), so the ratified retrieval path
+    /// is variant-matching, not a `std::error::Error` source-chain
+    /// downcast. This proves a caller can match the non-exhaustive variant
+    /// and read all three typed fields as discrete values on both
+    /// `DispatchError` and `StoreError`, without `Display` parsing.
+    #[test]
+    fn concurrency_conflict_fields_readable_by_variant_match() {
+        let id = AggregateId::new(NonZeroU64::new(7).unwrap());
+        let expected = NonZeroU64::new(3).unwrap();
+        let actual = 5u64;
+
+        let dispatch_err: DispatchError<TestDomainError> = DispatchError::ConcurrencyConflict {
+            aggregate_id: id,
+            expected_sequence: expected,
+            actual_sequence: actual,
+        };
+        match dispatch_err {
+            DispatchError::ConcurrencyConflict {
+                aggregate_id,
+                expected_sequence,
+                actual_sequence,
+            } => {
+                assert_eq!(aggregate_id, id);
+                assert_eq!(expected_sequence, expected);
+                assert_eq!(actual_sequence, actual);
+            }
+            _ => panic!("expected ConcurrencyConflict variant"),
+        }
+
+        let store_err = StoreError::ConcurrencyConflict {
+            aggregate_id: id,
+            expected_sequence: expected,
+            actual_sequence: actual,
+        };
+        match store_err {
+            StoreError::ConcurrencyConflict {
+                aggregate_id,
+                expected_sequence,
+                actual_sequence,
+            } => {
+                assert_eq!(aggregate_id, id);
+                assert_eq!(expected_sequence, expected);
+                assert_eq!(actual_sequence, actual);
+            }
+            _ => panic!("expected ConcurrencyConflict variant"),
+        }
+    }
+}
