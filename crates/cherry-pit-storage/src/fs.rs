@@ -124,7 +124,9 @@ mod relative_path_regression {
     static CWD: Mutex<()> = Mutex::new(());
 
     fn write_in_cwd(name: &str) {
-        let _guard = CWD.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        let _guard = CWD
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let dir = TempDir::new().unwrap();
         let original = std::env::current_dir().unwrap();
         std::env::set_current_dir(dir.path()).unwrap();
