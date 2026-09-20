@@ -56,36 +56,27 @@ R5 [5]: Test witnesses imported from the donor MUST be retained in full. The
   the crate's own taxonomy work.
 
 R6 [10]: The lock file is a stable coordination inode that MUST NOT be
-  unlinked by this crate. Ownership MUST be held through an OS-backed
-  advisory lock (`std::fs::File::try_lock`) taken on that inode, and
-  ownership metadata MUST be written or cleared only through the owning
-  handle. Consequently acquire, renew, release and reclaim are all fenced:
-  a departed, released or TTL-expired holder can neither renew nor remove a
-  later owner, and explicit release cannot double-remove. Admission MUST be
-  non-blocking — an inode owned by a live cooperating holder yields
-  `LockFailed` immediately, with no wait, spawn or retry loop. Stale reclaim
-  (TTL expiry, or a dead holder on the *same* host) and forced takeover
-  apply only when no live cooperating holder owns the inode; a lock file
-  without a recorded hostname remains TTL-only. Verified-invalid content is
-  replaced under the held advisory lock. The guarantee is scoped to
-  cooperating clients of this crate on a local filesystem supporting
-  advisory locking; no protection against arbitrary external unlinking is
-  claimed. Resolves ghr-wsf5u H3.
-
-R6a [10]: A lock read MUST distinguish verified outcomes (unowned,
-  owned, verified-invalid content) from unknown ones. An unreadable or
-  otherwise failing read is NOT corruption: it MUST propagate as an error
-  with no mutation of the lock file. Resolves ghr-wsf5u H4.
-
-R6b [10]: Lock content MUST be read through the same opened regular-file
-  handle that holds the advisory lock, bounded to 1 MiB plus one
-  oversize-detection byte per call; oversize input is rejected without
-  mutation. The bound covers the raw content buffer; transient JSON parser
-  overhead is explicitly excluded. Resolves ghr-wsf5u M2.
-
-R6c [5]: Atomic write MUST normalize a bare relative filename — whose
-  `Path::parent()` is `Some("")` — to the current directory, so the
-  durability fsync step succeeds. Resolves ghr-wsf5u M3.
+  unlinked by this crate. Every ownership transaction — acquire, reclaim,
+  renew, release and drop — MUST take an OS-backed advisory lock
+  (`std::fs::File::try_lock`) on that inode for the duration of that
+  transaction only, never for the lifetime of the guard, and MUST compare
+  and mutate ownership under that same guard. Each successful acquisition
+  MUST record a fresh unique generation, derived from neither run id, pid
+  nor timestamp, so that ABA confusion across a takeover is impossible; the
+  generation is private to the ownership envelope and is not a required
+  field of the public `LockMetadata` DTO. A displaced holder's renew MUST
+  report lost ownership, and its release and drop MUST be no-ops that leave
+  the successor's record intact. Stale reclaim (TTL expiry, or a dead holder
+  on the *same* host) and forced takeover apply to a *live* holder as well:
+  availability of hung-holder recovery is retained. A lock file without a
+  recorded hostname remains TTL-only. Verified-invalid content is replaced
+  under the held guard. Every guard is non-blocking — contention yields
+  `LockFailed` immediately, with no wait, spawn or retry loop, and drop never
+  waits. The guarantee is scoped to this crate's lock metadata transactions,
+  for cooperating clients in a trusted lock directory on a local filesystem
+  supporting advisory locking; it fences neither arbitrary external
+  unlinking nor application writes performed by a displaced holder.
+  Resolves ghr-wsf5u H3 and ghr-1r175 H1.
 
 R7 [5]: `LockMetadata` is a serde DTO. Schema evolution is handled by
   field-presence plus `#[serde(default)]`, NOT by `#[non_exhaustive]`.
@@ -98,6 +89,27 @@ R8 [5]: `PersistenceError` and `RetryClass` are closed (non-`#[non_exhaustive]`)
   it does not adopt `CHE-0049`, which is Proposed, is not current authority,
   and targets core.
 
+R9 [10]: A lock read MUST distinguish verified outcomes (unowned,
+  owned, verified-invalid content) from unknown ones. An unreadable or
+  otherwise failing read is NOT corruption: it MUST propagate as an error
+  with no mutation of the lock file. Resolves ghr-wsf5u H4.
+
+R10 [10]: The coordination inode MUST be opened without following symlinks
+  and without blocking, and MUST be rejected unless it is a regular file with
+  exactly one link; rejection happens before any read or mutation, so an
+  unrelated linked target is never truncated and a FIFO never stalls a
+  diagnostic read. Lock content MUST then be read through that same opened
+  handle, bounded to 1 MiB plus one oversize-detection byte per call, into a
+  buffer allocated once at exactly that capacity so the raw content buffer
+  can neither reallocate nor retain beyond the budget; oversize input is
+  rejected without mutation. Transient JSON parser overhead is explicitly
+  excluded, and no process-wide memory or no-allocation claim is made.
+  Resolves ghr-wsf5u M2 and ghr-1r175 H2/M1.
+
+R11 [5]: Atomic write MUST normalize a bare relative filename — whose
+  `Path::parent()` is `Some("")` — to the current directory, so the
+  durability fsync step succeeds. Resolves ghr-wsf5u M3.
+
 ## Provenance
 
 | Donor | `Mattilsynet/gh-report` @ `c850737` |
@@ -107,9 +119,13 @@ R8 [5]: `PersistenceError` and `RetryClass` are closed (non-`#[non_exhaustive]`)
 | Files imported | 9 (Cargo.toml, README.md, 5 × src (lib + four modules), 2 × tests) |
 | Donor line counts | error 186, fs 104, lib 68, lock 1446, signature 278, properties 226, smoke 5 |
 
-Source `src/error.rs`, `src/fs.rs`, `src/lock.rs`, `src/signature.rs` and
-`tests/properties.rs` are byte-identical to the donor except where a donor-local
-ADR citation was rewritten to this ADR. `src/lib.rs`, `README.md`,
+At the original import revision (`c1055ef`), source `src/error.rs`,
+`src/fs.rs`, `src/lock.rs`, `src/signature.rs` and `tests/properties.rs` were
+byte-identical to the donor except where a donor-local ADR citation was
+rewritten to this ADR. Subsequent canonical repairs have since diverged
+`src/fs.rs` (bare-relative parent normalization, R11) and `src/lock.rs`
+(coordination-inode ownership, bounded typed reads and the file-kind/link
+boundary, R6/R9/R10), together with their tests. `src/lib.rs`, `README.md`,
 `tests/smoke.rs` and `Cargo.toml` differ only in ADR citation, repository URL,
 and homepage metadata.
 
