@@ -33,6 +33,8 @@ use cherry_pit_core::{
 /// ```
 #[derive(Debug)]
 pub enum ProjectionError {
+    /// Completion is unknown and requires reconciliation before dependent work.
+    Indeterminate(Box<dyn Error + Send + Sync>),
     /// Persisted or loaded data failed structural validation.
     CorruptData(Box<dyn Error + Send + Sync>),
 
@@ -65,6 +67,7 @@ impl ProjectionError {
     #[must_use]
     pub const fn category(&self) -> ErrorCategory {
         match self {
+            Self::Indeterminate(_) => ErrorCategory::ReconciliationRequired,
             Self::CorruptData(_) | Self::CheckpointRegression { .. } => ErrorCategory::Terminal,
             Self::Infrastructure(_) | Self::StoreLocked => ErrorCategory::Retryable,
         }
@@ -78,6 +81,7 @@ impl ProjectionError {
         let category = match self.category() {
             ErrorCategory::Retryable => "retryable",
             ErrorCategory::Terminal => "terminal",
+            ErrorCategory::ReconciliationRequired => "reconciliation_required",
         };
         tracing::warn!(
             target: "cherry_pit_projection",
@@ -91,6 +95,7 @@ impl ProjectionError {
 impl fmt::Display for ProjectionError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::Indeterminate(e) => write!(f, "projection outcome indeterminate: {e}"),
             Self::CorruptData(e) => write!(f, "projection corrupt data: {e}"),
             Self::Infrastructure(e) => write!(f, "projection infrastructure error: {e}"),
             Self::StoreLocked => write!(
@@ -111,7 +116,9 @@ impl fmt::Display for ProjectionError {
 impl Error for ProjectionError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
-            Self::CorruptData(e) | Self::Infrastructure(e) => Some(e.as_ref()),
+            Self::Indeterminate(e) | Self::CorruptData(e) | Self::Infrastructure(e) => {
+                Some(e.as_ref())
+            }
             Self::StoreLocked | Self::CheckpointRegression { .. } => None,
         }
     }
@@ -302,11 +309,12 @@ where
         aggregate_id: AggregateId,
         correlation: &cherry_pit_core::CorrelationContext,
     ) -> ProjectionResult<(P, Option<NonZeroU64>)> {
-        let stream = self
-            .store
-            .load(aggregate_id)
-            .await
-            .map_err(|e| ProjectionError::Infrastructure(Box::new(e)))?;
+        let stream = self.store.load(aggregate_id).await.map_err(|e| match e {
+            unknown @ cherry_pit_core::StoreError::Indeterminate(_) => {
+                ProjectionError::Indeterminate(Box::new(unknown))
+            }
+            other => ProjectionError::Infrastructure(Box::new(other)),
+        })?;
         cherry_pit_core::EventEnvelope::validate_stream(aggregate_id, &stream)
             .map_err(|e| ProjectionError::CorruptData(Box::new(e)))?;
         let mut projection = P::default();
@@ -466,12 +474,14 @@ mod tests {
 
     struct StaticStore {
         stream: Mutex<Vec<EventEnvelope<CounterEvent>>>,
+        failure: Option<fn() -> StoreError>,
     }
 
     impl StaticStore {
         fn new(stream: Vec<EventEnvelope<CounterEvent>>) -> Self {
             Self {
                 stream: Mutex::new(stream),
+                failure: None,
             }
         }
     }
@@ -487,7 +497,10 @@ mod tests {
             &self,
             _id: AggregateId,
         ) -> Result<Vec<EventEnvelope<Self::Event>>, StoreError> {
-            Ok(self.stream.lock().expect("stream mutex").clone())
+            match self.failure {
+                Some(failure) => Err(failure()),
+                None => Ok(self.stream.lock().expect("stream mutex").clone()),
+            }
         }
 
         #[expect(
@@ -545,6 +558,27 @@ mod tests {
         let mut backend = InMemoryProjection::<CounterView>::new();
         backend.replace(CounterView { total: 3 });
         assert_eq!(backend.get().total, 3);
+    }
+
+    #[tokio::test]
+    async fn indeterminate_replay_preserves_source_and_stops() {
+        let store = StaticStore {
+            stream: Mutex::new(Vec::new()),
+            failure: Some(|| {
+                StoreError::Indeterminate(std::io::Error::other("load diagnostic").into())
+            }),
+        };
+        let driver = ProjectionDriver::<CounterView, _>::new(store);
+        let error = driver
+            .replay(aggregate_id(1), &CorrelationContext::none())
+            .await
+            .unwrap_err();
+        assert!(matches!(error, ProjectionError::Indeterminate(_)));
+        assert_eq!(error.category(), ErrorCategory::ReconciliationRequired);
+        assert_eq!(
+            error.source().unwrap().source().unwrap().to_string(),
+            "load diagnostic"
+        );
     }
 
     #[tokio::test]

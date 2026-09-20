@@ -37,6 +37,9 @@ pub enum ErrorCategory {
     /// Repeating the same operation against the same state is expected
     /// to fail until input, domain state, or stored data is repaired.
     Terminal,
+
+    /// The outcome is unknown. Stop dependent work and reconcile before retrying.
+    ReconciliationRequired,
 }
 
 impl ErrorCategory {
@@ -63,6 +66,8 @@ impl ErrorCategory {
 /// domain errors without downcasting.
 #[derive(Debug)]
 pub enum DispatchError<E: Error + Send + Sync> {
+    /// Completion is unknown; the source carries diagnostics, not retry policy.
+    Indeterminate(Box<dyn Error + Send + Sync>),
     /// The aggregate rejected the command (business invariant violation).
     Rejected(E),
 
@@ -89,10 +94,11 @@ pub enum DispatchError<E: Error + Send + Sync> {
 }
 
 impl<E: Error + Send + Sync> DispatchError<E> {
-    /// Classify the dispatch failure as retryable or terminal.
+    /// Classify the failure as retryable, terminal, or reconciliation-required.
     #[must_use]
     pub const fn category(&self) -> ErrorCategory {
         match self {
+            Self::Indeterminate(_) => ErrorCategory::ReconciliationRequired,
             Self::ConcurrencyConflict { .. } | Self::Infrastructure(_) => ErrorCategory::Retryable,
             Self::Rejected(_) | Self::AggregateNotFound { .. } => ErrorCategory::Terminal,
         }
@@ -102,6 +108,7 @@ impl<E: Error + Send + Sync> DispatchError<E> {
 impl<E: Error + Send + Sync> fmt::Display for DispatchError<E> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::Indeterminate(e) => write!(f, "dispatch outcome indeterminate: {e}"),
             Self::Rejected(e) => write!(f, "command rejected: {e}"),
             Self::AggregateNotFound { aggregate_id } => {
                 write!(f, "aggregate not found: {aggregate_id}")
@@ -123,7 +130,7 @@ impl<E: Error + Send + Sync + 'static> Error for DispatchError<E> {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
             Self::Rejected(e) => Some(e),
-            Self::Infrastructure(e) => Some(e.as_ref()),
+            Self::Infrastructure(e) | Self::Indeterminate(e) => Some(e.as_ref()),
             Self::AggregateNotFound { .. } | Self::ConcurrencyConflict { .. } => None,
         }
     }
@@ -134,6 +141,8 @@ impl<E: Error + Send + Sync + 'static> Error for DispatchError<E> {
 /// no thiserror dependency.)
 #[derive(Debug)]
 pub enum StoreError {
+    /// Completion is unknown; do not retry or acknowledge delivery as complete.
+    Indeterminate(Box<dyn Error + Send + Sync>),
     /// Optimistic concurrency violation — another writer persisted
     /// events after our load.
     ConcurrencyConflict {
@@ -181,10 +190,11 @@ pub enum StoreError {
 }
 
 impl StoreError {
-    /// Classify the store failure as retryable or terminal.
+    /// Classify the failure as retryable, terminal, or reconciliation-required.
     #[must_use]
     pub const fn category(&self) -> ErrorCategory {
         match self {
+            Self::Indeterminate(_) => ErrorCategory::ReconciliationRequired,
             Self::ConcurrencyConflict { .. }
             | Self::StoreLocked { .. }
             | Self::Infrastructure(_) => ErrorCategory::Retryable,
@@ -196,6 +206,7 @@ impl StoreError {
 impl fmt::Display for StoreError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::Indeterminate(e) => write!(f, "store outcome indeterminate: {e}"),
             Self::ConcurrencyConflict {
                 aggregate_id,
                 expected_sequence,
@@ -219,9 +230,10 @@ impl fmt::Display for StoreError {
 impl Error for StoreError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
-            Self::CorruptData(e) | Self::Infrastructure(e) | Self::JoinFailure(e) => {
-                Some(e.as_ref())
-            }
+            Self::Indeterminate(e)
+            | Self::CorruptData(e)
+            | Self::Infrastructure(e)
+            | Self::JoinFailure(e) => Some(e.as_ref()),
             Self::ConcurrencyConflict { .. } | Self::StoreLocked { .. } => None,
         }
     }
@@ -379,6 +391,20 @@ mod tests {
         }
     }
     impl Error for TestDomainError {}
+
+    #[test]
+    fn indeterminate_retains_diagnostic_chain() {
+        let error: DispatchError<TestDomainError> = DispatchError::Indeterminate(Box::new(
+            StoreError::Indeterminate(Box::new(TestDomainError("diagnostic"))),
+        ));
+        assert_eq!(error.category(), ErrorCategory::ReconciliationRequired);
+        assert!(!error.category().is_retryable());
+        assert!(!error.category().is_terminal());
+        assert_eq!(
+            error.source().unwrap().source().unwrap().to_string(),
+            "diagnostic"
+        );
+    }
 
     #[test]
     fn dispatch_error_construction() {

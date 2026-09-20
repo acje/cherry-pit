@@ -19,6 +19,38 @@ use cherry_pit_core::{
 
 use super::domain::{Bar, Foo};
 
+#[test]
+fn indeterminate_store_mapping_preserves_category_and_source() {
+    use std::error::Error;
+    let error = dispatch_store_error::<std::convert::Infallible>(StoreError::Indeterminate(
+        std::io::Error::other("diagnostic").into(),
+    ));
+    assert_eq!(
+        error.category(),
+        cherry_pit_core::ErrorCategory::ReconciliationRequired
+    );
+    assert_eq!(
+        error.source().unwrap().source().unwrap().to_string(),
+        "diagnostic"
+    );
+}
+
+fn dispatch_store_error<E: std::error::Error + Send + Sync>(error: StoreError) -> DispatchError<E> {
+    match error {
+        unknown @ StoreError::Indeterminate(_) => DispatchError::Indeterminate(Box::new(unknown)),
+        StoreError::ConcurrencyConflict {
+            aggregate_id,
+            expected_sequence,
+            actual_sequence,
+        } => DispatchError::ConcurrencyConflict {
+            aggregate_id,
+            expected_sequence,
+            actual_sequence,
+        },
+        other => DispatchError::Infrastructure(Box::new(other)),
+    }
+}
+
 /// Generic `InMemoryEventStore`-backed gateway parameterised over `A`.
 ///
 /// Each instance is bound to one aggregate type per CHE-0005:R1.
@@ -53,7 +85,7 @@ where
             .store
             .create(events, context)
             .await
-            .map_err(|e| DispatchError::Infrastructure(Box::new(e)))?;
+            .map_err(dispatch_store_error)?;
         Ok((id, envelopes))
     }
 
@@ -67,11 +99,7 @@ where
         Self::Aggregate: HandleCommand<C>,
         C: Command,
     {
-        let history = self
-            .store
-            .load(id)
-            .await
-            .map_err(|e| DispatchError::Infrastructure(Box::new(e)))?;
+        let history = self.store.load(id).await.map_err(dispatch_store_error)?;
         if history.is_empty() {
             return Err(DispatchError::AggregateNotFound { aggregate_id: id });
         }
@@ -87,21 +115,7 @@ where
             .store
             .append(id, last_seq, new_events, context)
             .await
-            .map_err(|e| match e {
-                StoreError::ConcurrencyConflict {
-                    aggregate_id,
-                    expected_sequence,
-                    actual_sequence,
-                } => DispatchError::ConcurrencyConflict {
-                    aggregate_id,
-                    expected_sequence,
-                    actual_sequence,
-                },
-                other @ (StoreError::StoreLocked { .. }
-                | StoreError::CorruptData(_)
-                | StoreError::Infrastructure(_)
-                | StoreError::JoinFailure(_)) => DispatchError::Infrastructure(Box::new(other)),
-            })?;
+            .map_err(dispatch_store_error)?;
         Ok(envelopes)
     }
 }

@@ -180,8 +180,9 @@ where
     D: DeadLetterSink + ?Sized,
 {
     let category = err.category();
-    if category == ErrorCategory::Retryable {
-        return Err(err);
+    match category {
+        ErrorCategory::Retryable | ErrorCategory::ReconciliationRequired => return Err(err),
+        ErrorCategory::Terminal => {}
     }
 
     let record = DeadLetterRecord {
@@ -336,6 +337,42 @@ mod tests {
             *self.last_record.lock().unwrap() = Some(record);
             async move { Ok(()) }
         }
+    }
+
+    #[tokio::test]
+    async fn indeterminate_stops_policies_without_dead_letter() {
+        let gateway = GatewayStub {
+            log: Mutex::new(Vec::new()),
+        };
+        let first = make_adapter::<PolicyA, _, _, GatewayStub>(
+            PolicyA,
+            |_, _, _| async {
+                Err(AgentError::Store(
+                    cherry_pit_core::StoreError::Indeterminate("diagnostic".into()),
+                ))
+            },
+            "first",
+            "Out",
+        );
+        let second = make_adapter::<PolicyA, _, _, GatewayStub>(
+            PolicyA,
+            |_, gw, _| {
+                gw.log.lock().unwrap().push("unexpected".into());
+                async { Ok(()) }
+            },
+            "second",
+            "Out",
+        );
+        let sink = CountingSink::new();
+        let result = dispatch_one(&[first, second], &envelope(1), &gateway, &sink).await;
+        assert!(matches!(
+            result,
+            Err(AgentError::Store(
+                cherry_pit_core::StoreError::Indeterminate(_)
+            ))
+        ));
+        assert_eq!(*sink.count.lock().unwrap(), 0);
+        assert!(gateway.log.lock().unwrap().is_empty());
     }
 
     #[tokio::test]

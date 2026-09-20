@@ -4,8 +4,8 @@ use std::collections::HashMap;
 use std::num::NonZeroU64;
 use std::path::Path;
 use std::sync::Arc;
-use std::sync::Mutex as StdMutex;
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Mutex as StdMutex, MutexGuard};
 
 use cherry_pit_core::{
     AggregateId, CorrelationContext, DomainEvent, EventEnvelope, EventStore, StoreCreateResult,
@@ -18,6 +18,81 @@ use serde::{Deserialize, Serialize};
 const SINGLE_EVENT_ONLY: &str = "PgnoEventStore accepts only single-event batches (create/append); \
      multi-event atomic commit has no primitive in the pardosa substrate today \
      (see bd ghr-00b572de option (a))";
+
+type JsonBytes = EventBytes<{ u32::MAX as usize }>;
+
+#[derive(Debug)]
+enum WriteDiagnostic {
+    Undetermined {
+        carried_epoch: u64,
+    },
+    RetainedUncertainty {
+        carried_epoch: u64,
+        diagnostic: String,
+    },
+    Landed(Box<dyn std::error::Error + Send + Sync>),
+}
+
+impl std::fmt::Display for WriteDiagnostic {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Undetermined { carried_epoch } => {
+                write!(f, "write landing undetermined at epoch {carried_epoch}")
+            }
+            Self::RetainedUncertainty {
+                carried_epoch,
+                diagnostic,
+            } => write!(
+                f,
+                "session uncertain at epoch {carried_epoch}: {diagnostic}"
+            ),
+            Self::Landed(source) => write!(f, "event landed before failure: {source}"),
+        }
+    }
+}
+
+impl std::error::Error for WriteDiagnostic {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Undetermined { .. } | Self::RetainedUncertainty { .. } => None,
+            Self::Landed(source) => Some(source.as_ref()),
+        }
+    }
+}
+
+fn after_landed(error: impl std::error::Error + Send + Sync + 'static) -> StoreError {
+    StoreError::Indeterminate(Box::new(WriteDiagnostic::Landed(Box::new(error))))
+}
+
+fn expected_descriptor() -> Result<AdmittedDescriptor, StoreError> {
+    AdmittedDescriptor::try_from_descriptor(SchemaDescriptor::new(1, JsonBytes::descriptor_node()))
+        .map_err(to_store_error)
+}
+
+fn validate_descriptor(
+    recorded: Option<&SchemaDescriptor>,
+    expected: &AdmittedDescriptor,
+) -> Result<(), StoreError> {
+    match recorded {
+        Some(descriptor) if descriptor == expected.descriptor() => Ok(()),
+        _ => Err(StoreError::CorruptData(Box::new(OperationFailure::new(
+            FailureCondition::SchemaMismatch,
+            "JSON byte codec/schema version mismatch",
+        )))),
+    }
+}
+
+fn decode_record<Ev: DeserializeOwned>(payload: &[u8]) -> Result<PgnoEnvelope<Ev>, StoreError> {
+    let (bytes, consumed) = JsonBytes::decode_type(payload)
+        .map_err(|error| StoreError::CorruptData(Box::new(error)))?;
+    if consumed != payload.len() {
+        return Err(StoreError::CorruptData(
+            "trailing JSON envelope bytes".into(),
+        ));
+    }
+    serde_json::from_slice(bytes.as_slice())
+        .map_err(|error| StoreError::CorruptData(Box::new(error)))
+}
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 struct PgnoEnvelope<Ev> {
@@ -48,6 +123,10 @@ fn default_claim(epoch: u64) -> OwnershipClaimRecord {
 
 /// Test-only `.pgno`-backed [`EventStore`] adapter over
 /// `pardosa`'s facade — bridge crate per CHE-0084:R4-R6.
+/// JSON is carried in a length-prefixed Pardosa byte value, bounded by the
+/// existing u32 wire length. This is not an allocation or process memory bound.
+/// Writes with unknown completion or a failure after landing return
+/// [`StoreError::Indeterminate`] and require reconciliation.
 pub struct PgnoEventStore<Ev: DomainEvent + Serialize + DeserializeOwned + Clone + Send + 'static> {
     session: StdMutex<FileWriterSession>,
     next_id: AtomicU64,
@@ -56,18 +135,34 @@ pub struct PgnoEventStore<Ev: DomainEvent + Serialize + DeserializeOwned + Clone
 }
 
 impl<Ev: DomainEvent + Serialize + DeserializeOwned + Clone + Send + 'static> PgnoEventStore<Ev> {
+    fn ready_session(&self) -> Result<MutexGuard<'_, FileWriterSession>, StoreError> {
+        let session = self.session.lock().expect("session lock poisoned");
+        match session.uncertain_diagnostic() {
+            Some(diagnostic) => Err(StoreError::Indeterminate(Box::new(
+                WriteDiagnostic::RetainedUncertainty {
+                    carried_epoch: session.carried_epoch(),
+                    diagnostic: diagnostic.to_owned(),
+                },
+            ))),
+            None => Ok(session),
+        }
+    }
+
     /// Create a fresh `.pgno`-backed store, truncating any existing file.
     ///
     /// # Errors
     /// Returns [`StoreError::Infrastructure`] when pardosa cannot create
     /// the backing container.
     pub fn create_pgno(path: &Path) -> Result<Self, StoreError> {
+        let descriptor = expected_descriptor()?;
         let adapter = FileStorageAdapter::new(path);
         clear_component_if_removable(adapter.meta_path());
         clear_component_if_removable(adapter.pgno_path());
         let claim = default_claim(1);
-        let session = adapter.create(&claim).map_err(to_store_error)?;
-        Ok(Self::from_session(session))
+        let session = adapter
+            .create(&claim, &descriptor)
+            .map_err(to_store_error)?;
+        Self::from_session(session)
     }
 
     /// Open an existing `.pgno`-backed store, rehydrating its fibers and
@@ -76,29 +171,29 @@ impl<Ev: DomainEvent + Serialize + DeserializeOwned + Clone + Send + 'static> Pg
     /// # Errors
     /// Returns [`StoreError::Infrastructure`] when pardosa cannot open
     /// or fold the backing container.
+    /// Returns [`StoreError::CorruptData`] for a different codec schema or version.
     pub fn open_pgno(path: &Path) -> Result<Self, StoreError> {
         let adapter = FileStorageAdapter::new(path);
+        let expected = expected_descriptor()?;
+        let meta = adapter.read_meta_records().map_err(to_store_error)?;
+        validate_descriptor(meta.schema_descriptor.as_ref(), &expected)?;
         let epoch = adapter.current_epoch().map_err(to_store_error)?;
         let session = adapter.open_write(epoch).map_err(to_store_error)?;
-        Ok(Self::from_session(session))
+        Self::from_session(session)
     }
 
-    fn from_session(mut session: FileWriterSession) -> Self {
-        let envelopes = session.read_all_envelopes().unwrap_or_default();
-        let max_id = envelopes
-            .iter()
-            .filter_map(|env| {
-                let record = serde_json::from_slice::<PgnoEnvelope<Ev>>(&env.payload).ok()?;
-                Some(record.aggregate_id)
-            })
-            .max()
-            .unwrap_or(0);
-        Self {
+    fn from_session(mut session: FileWriterSession) -> Result<Self, StoreError> {
+        validate_descriptor(session.schema_descriptor(), &expected_descriptor()?)?;
+        let envelopes = session.read_all_envelopes().map_err(to_store_error)?;
+        let max_id = envelopes.iter().try_fold(0, |maximum, env| {
+            decode_record::<Ev>(&env.payload).map(|record| maximum.max(record.aggregate_id))
+        })?;
+        Ok(Self {
             session: StdMutex::new(session),
             next_id: AtomicU64::new(max_id),
             locks: StdMutex::new(HashMap::new()),
             _marker: std::marker::PhantomData,
-        }
+        })
     }
 
     fn aggregate_lock(&self, id: u64) -> Arc<StdMutex<()>> {
@@ -111,15 +206,14 @@ impl<Ev: DomainEvent + Serialize + DeserializeOwned + Clone + Send + 'static> Pg
     }
 
     fn ordered_stream(&self, id: AggregateId) -> Result<Vec<EventEnvelope<Ev>>, StoreError> {
-        let mut session = self.session.lock().expect("session lock poisoned");
+        let mut session = self.ready_session()?;
         let envelopes = session.read_all_envelopes().map_err(to_store_error)?;
         let mut result = Vec::new();
         for env in envelopes {
             if env.header.detached {
                 continue;
             }
-            let record = serde_json::from_slice::<PgnoEnvelope<Ev>>(&env.payload)
-                .map_err(|e| StoreError::CorruptData(Box::new(e)))?;
+            let record = decode_record::<Ev>(&env.payload)?;
             if record.aggregate_id == id.get() {
                 let sequence = NonZeroU64::new(record.sequence).ok_or_else(|| {
                     StoreError::CorruptData(Box::<dyn std::error::Error + Send + Sync>::from(
@@ -168,24 +262,37 @@ impl<Ev: DomainEvent + Serialize + DeserializeOwned + Clone + Send + 'static> Pg
             causation_id,
             payload,
         };
-        let payload_bytes =
+        let json =
             serde_json::to_vec(&envelope).map_err(|e| StoreError::Infrastructure(Box::new(e)))?;
+        let bytes = JsonBytes::new(json).map_err(to_store_error)?;
+        let mut payload_bytes = Vec::new();
+        bytes
+            .encode_type(&mut payload_bytes)
+            .map_err(to_store_error)?;
         let key = aggregate_id.to_string();
         let fiber_id = derive_fiber_id(&key);
         let event_id_bytes = *event_id.as_bytes();
 
-        let mut session = self.session.lock().expect("session lock poisoned");
+        let mut session = self.ready_session()?;
         let handle = session.fiber(fiber_id).map_err(to_store_error)?;
-        if handle.is_detached() {
+        let verdict = if handle.is_detached() {
             session
                 .rescue_fiber(fiber_id, event_id_bytes, payload_bytes)
-                .map_err(to_store_error)?;
+                .map_err(to_store_error)?
         } else {
             session
                 .append_to_fiber(fiber_id, event_id_bytes, payload_bytes)
-                .map_err(to_store_error)?;
+                .map_err(to_store_error)?
+        };
+        match verdict {
+            WriteLandingVerdict::Landed(_) => {}
+            WriteLandingVerdict::Undetermined { carried_epoch } => {
+                return Err(StoreError::Indeterminate(Box::new(
+                    WriteDiagnostic::Undetermined { carried_epoch },
+                )));
+            }
         }
-        session.sync().map_err(to_store_error)?;
+        session.sync().map_err(after_landed)?;
         Ok(())
     }
 }
@@ -248,6 +355,7 @@ impl<Ev: DomainEvent + Serialize + DeserializeOwned + Clone + Send + 'static> Ev
         events: Vec<Self::Event>,
         context: CorrelationContext,
     ) -> StoreCreateResult<Self::Event> {
+        drop(self.ready_session()?);
         if events.len() > 1 {
             return Err(single_event_error());
         }
@@ -277,7 +385,7 @@ impl<Ev: DomainEvent + Serialize + DeserializeOwned + Clone + Send + 'static> Ev
             context.causation_id(),
             payload,
         )?;
-        let envelopes = self.ordered_stream(id)?;
+        let envelopes = self.ordered_stream(id).map_err(after_landed)?;
         Ok((id, envelopes))
     }
 
@@ -292,6 +400,7 @@ impl<Ev: DomainEvent + Serialize + DeserializeOwned + Clone + Send + 'static> Ev
         events: Vec<Self::Event>,
         context: CorrelationContext,
     ) -> Result<Vec<EventEnvelope<Self::Event>>, StoreError> {
+        drop(self.ready_session()?);
         if events.len() > 1 {
             return Err(single_event_error());
         }
@@ -328,11 +437,15 @@ impl<Ev: DomainEvent + Serialize + DeserializeOwned + Clone + Send + 'static> Ev
             context.causation_id(),
             payload,
         )?;
-        let full_stream = self.ordered_stream(id)?;
+        let full_stream = self.ordered_stream(id).map_err(after_landed)?;
         let new_envelope = full_stream
             .into_iter()
             .find(|envelope| envelope.event_id() == event_id)
-            .expect("just-recorded envelope must be present in the reloaded stream");
+            .ok_or_else(|| {
+                after_landed(std::io::Error::other(
+                    "landed event absent from reloaded stream",
+                ))
+            })?;
         Ok(vec![new_envelope])
     }
 }
@@ -365,6 +478,249 @@ mod tests {
         let path = file.into_temp_path();
         std::fs::remove_file(&path).expect("clear placeholder so create_pgno starts fresh");
         path
+    }
+
+    #[test]
+    fn reopen_rejects_foreign_schema_and_version_without_changes() {
+        for descriptor in [
+            SchemaDescriptor::new(2, JsonBytes::descriptor_node()),
+            SchemaDescriptor::new(1, DescriptorNode::U64),
+        ] {
+            let path = temp_pgno_path();
+            let adapter = FileStorageAdapter::new(&path);
+            let admitted = AdmittedDescriptor::try_from_descriptor(descriptor).unwrap();
+            drop(adapter.create(&default_claim(1), &admitted).unwrap());
+            let before = (
+                std::fs::read(adapter.meta_path()).unwrap(),
+                std::fs::read(adapter.pgno_path()).unwrap(),
+            );
+            let Err(StoreError::CorruptData(source)) =
+                PgnoEventStore::<TestEvent>::open_pgno(&path)
+            else {
+                panic!("expected schema refusal")
+            };
+            assert_eq!(
+                source
+                    .downcast_ref::<OperationFailure>()
+                    .unwrap()
+                    .condition(),
+                &FailureCondition::SchemaMismatch
+            );
+            assert_eq!(
+                before,
+                (
+                    std::fs::read(adapter.meta_path()).unwrap(),
+                    std::fs::read(adapter.pgno_path()).unwrap()
+                )
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn retained_uncertainty_blocks_all_event_operations() {
+        for sync_failure in [false, true] {
+            let path = temp_pgno_path();
+            let store = PgnoEventStore::<TestEvent>::create_pgno(&path).unwrap();
+            if sync_failure {
+                let (id, _) = store
+                    .create(vec![event("landed")], CorrelationContext::none())
+                    .await
+                    .unwrap();
+                assert_eq!(store.load(id).await.unwrap().len(), 1);
+            }
+            let native = store.session.into_inner().unwrap();
+            let native = if sync_failure {
+                native.with_simulate_sync_error(true)
+            } else {
+                native.with_undetermined_after_n_blocks(0)
+            };
+            let store = PgnoEventStore {
+                session: StdMutex::new(native),
+                next_id: store.next_id,
+                locks: store.locks,
+                _marker: std::marker::PhantomData::<TestEvent>,
+            };
+            assert!(matches!(
+                store
+                    .create(vec![event("first")], CorrelationContext::none())
+                    .await,
+                Err(StoreError::Indeterminate(_))
+            ));
+            let diagnostic = store
+                .session
+                .lock()
+                .unwrap()
+                .uncertain_diagnostic()
+                .unwrap()
+                .to_owned();
+            let id = AggregateId::new(NonZeroU64::new(1).unwrap());
+            let error = store.load(id).await.unwrap_err();
+            let StoreError::Indeterminate(source) = error else {
+                panic!("expected retained uncertainty")
+            };
+            assert!(
+                matches!(source.downcast_ref::<WriteDiagnostic>(), Some(WriteDiagnostic::RetainedUncertainty { carried_epoch: 1, diagnostic: retained }) if retained == &diagnostic)
+            );
+            assert!(matches!(
+                store.load(id).await,
+                Err(StoreError::Indeterminate(_))
+            ));
+            assert!(matches!(
+                store
+                    .create(vec![event("next")], CorrelationContext::none())
+                    .await,
+                Err(StoreError::Indeterminate(_))
+            ));
+            for events in [Vec::new(), vec![event("next")]] {
+                assert!(matches!(
+                    store
+                        .append(
+                            id,
+                            NonZeroU64::new(1).unwrap(),
+                            events,
+                            CorrelationContext::none()
+                        )
+                        .await,
+                    Err(StoreError::Indeterminate(_))
+                ));
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn metadata_failure_without_uncertainty_is_not_reclassified() {
+        let path = temp_pgno_path();
+        let store = PgnoEventStore::<TestEvent>::create_pgno(&path).unwrap();
+        let meta = FileStorageAdapter::new(&path).meta_path().to_owned();
+        std::fs::write(meta, b"invalid metadata").unwrap();
+        assert!(matches!(
+            store
+                .create(vec![event("a")], CorrelationContext::none())
+                .await,
+            Err(StoreError::Infrastructure(_))
+        ));
+        assert!(
+            store
+                .session
+                .lock()
+                .unwrap()
+                .uncertain_diagnostic()
+                .is_none()
+        );
+    }
+
+    #[tokio::test]
+    async fn unknown_append_preserves_epoch_before_sync_or_reload() {
+        let path = temp_pgno_path();
+        let store = PgnoEventStore::<TestEvent>::create_pgno(&path).unwrap();
+        let store = PgnoEventStore {
+            session: StdMutex::new(
+                store
+                    .session
+                    .into_inner()
+                    .unwrap()
+                    .with_undetermined_after_n_blocks(0),
+            ),
+            next_id: store.next_id,
+            locks: store.locks,
+            _marker: std::marker::PhantomData::<TestEvent>,
+        };
+        let error = store
+            .create(vec![event("unknown")], CorrelationContext::none())
+            .await
+            .unwrap_err();
+        let StoreError::Indeterminate(source) = error else {
+            panic!("expected unknown")
+        };
+        assert!(matches!(
+            source.downcast_ref::<WriteDiagnostic>(),
+            Some(WriteDiagnostic::Undetermined { carried_epoch: 1 })
+        ));
+    }
+
+    #[test]
+    fn landed_failure_retains_original_source() {
+        let error = after_landed(std::io::Error::other("reload failed"));
+        let StoreError::Indeterminate(source) = error else {
+            panic!("expected unknown")
+        };
+        assert!(matches!(
+            source.downcast_ref::<WriteDiagnostic>(),
+            Some(WriteDiagnostic::Landed(_))
+        ));
+        assert!(
+            source
+                .source()
+                .unwrap()
+                .downcast_ref::<std::io::Error>()
+                .is_some()
+        );
+    }
+
+    #[tokio::test]
+    async fn reload_failure_after_write_retains_landed_knowledge() {
+        #[derive(Clone, Debug, Serialize)]
+        struct RejectDecode;
+
+        impl<'de> Deserialize<'de> for RejectDecode {
+            fn deserialize<D: serde::Deserializer<'de>>(
+                _deserializer: D,
+            ) -> Result<Self, D::Error> {
+                Err(serde::de::Error::custom("injected decode failure"))
+            }
+        }
+
+        impl DomainEvent for RejectDecode {
+            fn event_type(&self) -> &'static str {
+                "reject-decode"
+            }
+        }
+
+        let path = temp_pgno_path();
+        let store = PgnoEventStore::<RejectDecode>::create_pgno(&path).unwrap();
+        let error = store
+            .create(vec![RejectDecode], CorrelationContext::none())
+            .await
+            .unwrap_err();
+        let StoreError::Indeterminate(source) = error else {
+            panic!("expected landed failure")
+        };
+        assert!(matches!(
+            source.downcast_ref::<WriteDiagnostic>(),
+            Some(WriteDiagnostic::Landed(_))
+        ));
+        assert_eq!(
+            store
+                .session
+                .lock()
+                .unwrap()
+                .read_all_envelopes()
+                .unwrap()
+                .len(),
+            1
+        );
+    }
+
+    #[test]
+    fn json_wire_rejects_trailing_bytes() {
+        let record = PgnoEnvelope {
+            event_id: uuid::Uuid::now_v7(),
+            aggregate_id: 1,
+            sequence: 1,
+            timestamp_nanos: 0,
+            correlation_id: None,
+            causation_id: None,
+            payload: event("a"),
+        };
+        let json = JsonBytes::new(serde_json::to_vec(&record).unwrap()).unwrap();
+        let mut wire = Vec::new();
+        json.encode_type(&mut wire).unwrap();
+        assert!(decode_record::<TestEvent>(&wire).is_ok());
+        wire.push(0);
+        assert!(matches!(
+            decode_record::<TestEvent>(&wire),
+            Err(StoreError::CorruptData(_))
+        ));
     }
 
     #[tokio::test]

@@ -25,8 +25,8 @@ use std::future::Future;
 use std::sync::Arc;
 
 use cherry_pit_core::{
-    Aggregate, CommandGateway, CorrelationContext, DomainEvent, EventBus, EventEnvelope,
-    EventStore, Policy,
+    Aggregate, CommandGateway, CorrelationContext, DomainEvent, ErrorCategory, EventBus,
+    EventEnvelope, EventStore, Policy,
 };
 use tokio::sync::mpsc;
 
@@ -318,7 +318,8 @@ async fn run_dispatch_consumer<E, G, D>(
     policies: Arc<Vec<Box<dyn ErasedPolicyDispatcher<E, G>>>>,
     gateway: Arc<G>,
     dead_letter: Arc<D>,
-) where
+) -> Result<(), AgentError>
+where
     E: DomainEvent,
     G: Send + Sync + 'static,
     D: DeadLetterSink + Send + Sync + 'static,
@@ -327,6 +328,9 @@ async fn run_dispatch_consumer<E, G, D>(
         if let Err(err) =
             dispatch::dispatch_one(&policies, &envelope, &*gateway, &*dead_letter).await
         {
+            if err.category() == ErrorCategory::ReconciliationRequired {
+                return Err(err);
+            }
             tracing::error!(
                 error = %err,
                 event_id = %envelope.event_id(),
@@ -334,6 +338,7 @@ async fn run_dispatch_consumer<E, G, D>(
             );
         }
     }
+    Ok(())
 }
 
 impl<G, S, P, D> App<G, S, InProcessEventBus<EventOf<G>>, P, D>
@@ -344,8 +349,8 @@ where
     D: DeadLetterSink,
     EventOf<G>: Send + Sync + 'static,
 {
-    /// Drive the publish loop until `shutdown` resolves, then drain
-    /// any in-flight dispatch before returning.
+    /// Drive the publish loop until shutdown or an indeterminate consumer exit.
+    /// Normal shutdown drains queued dispatch before returning.
     ///
     /// Wires the bounded dispatch channel (F2 / mission
     /// ghr-d64c8076, Approach A2): sizes an `mpsc::channel` per
@@ -355,9 +360,10 @@ where
     /// (`Terminal` dead-lettered, `Retryable` logged, neither
     /// aborts); installs a synchronous fan-out callback on
     /// [`InProcessEventBus::register`] (CHE-0024:R2 + CHE-0051:R2)
-    /// forwarding via non-blocking `try_send`; awaits `shutdown`,
-    /// drops the sender to drain the consumer to `None`, then awaits
-    /// its completion.
+    /// forwarding via non-blocking `try_send`. Observes consumer completion
+    /// alongside `shutdown`; on shutdown drops the sender and joins the
+    /// draining consumer. Unknown outcomes stop dependent dispatch and return
+    /// without waiting for the external shutdown signal.
     ///
     /// One `run` impl exists per concrete bus type (CHE-0024:R2).
     ///
@@ -368,8 +374,8 @@ where
     /// **Back-pressure.** A saturated channel drops the envelope with
     /// `tracing::warn!`; `publish().await` never blocks.
     ///
-    /// **Drain on shutdown.** The consumer drains fully before this
-    /// future resolves.
+    /// **Drain on shutdown.** The consumer drains before this future resolves,
+    /// unless indeterminate completion requires stopping dependent dispatch.
     ///
     /// # Hazards
     ///
@@ -385,10 +391,11 @@ where
     ///
     /// # Errors
     ///
-    /// Never returns `Err` — failures are dead-lettered or logged
-    /// inside the consumer; the signature reserves future bus-level
-    /// errors per CHE-0051:R8. Per **COM-0025:R1**, `Retryable` retry
-    /// orchestration is the consumer's responsibility, not `run`'s.
+    /// Returns indeterminate dispatch failures after stopping dependent dispatch.
+    /// Consumer task failure is also indeterminate: the supervisor cannot
+    /// establish whether a write completed before the task failed. The original
+    /// join error is retained as its diagnostic source. Ordinary retryable
+    /// policy errors remain logged without automatic retry.
     pub async fn run<Sd>(self, shutdown: Sd) -> Result<(), AgentError>
     where
         Sd: Future<Output = ()> + Send,
@@ -399,7 +406,7 @@ where
 
         let (tx, rx) = mpsc::channel::<EventEnvelope<EventOf<G>>>(self.dispatch_buffer_capacity);
 
-        let consumer = tokio::spawn(run_dispatch_consumer(
+        let mut consumer = tokio::spawn(run_dispatch_consumer(
             rx,
             policies,
             Arc::clone(&gateway),
@@ -410,19 +417,16 @@ where
             enqueue_or_log(&tx, envelope);
         });
 
-        shutdown.await;
-        drop(self.bus);
-        match consumer.await {
-            Ok(()) => Ok(()),
-            Err(join_err) => {
-                tracing::error!(
-                    error = %join_err,
-                    "dispatch consumer task panicked or was cancelled; \
-                     App::run returning Ok per CHE-0051:R8 (bus-loop liveness)",
-                );
-                Ok(())
+        let result = tokio::select! {
+            result = &mut consumer => result,
+            () = shutdown => {
+                drop(self.bus);
+                consumer.await
             }
-        }
+        };
+        result.map_err(|error| {
+            AgentError::Store(cherry_pit_core::StoreError::Indeterminate(Box::new(error)))
+        })?
     }
 
     /// Drive the publish loop until `Ctrl-C` is received.
@@ -665,6 +669,177 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    async fn indeterminate_consumer_stops_and_releases_queue() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        let calls = Arc::new(AtomicUsize::new(0));
+        let counted = Arc::clone(&calls);
+        let adapter = make_adapter::<BackPressurePolicy, _, _, GatewayStub>(
+            BackPressurePolicy,
+            move |(), _, _| {
+                counted.fetch_add(1, Ordering::SeqCst);
+                async {
+                    Err(AgentError::Store(StoreError::Indeterminate(
+                        "unknown".into(),
+                    )))
+                }
+            },
+            "unknown",
+            "Out",
+        );
+        let (tx, rx) = mpsc::channel(2);
+        tx.try_send(back_pressure_envelope(1)).unwrap();
+        tx.try_send(back_pressure_envelope(2)).unwrap();
+        let consumer = run_dispatch_consumer(
+            rx,
+            Arc::new(vec![adapter]),
+            Arc::new(GatewayStub),
+            Arc::new(SinkStub),
+        );
+        let result = tokio::time::timeout(std::time::Duration::from_millis(100), consumer).await;
+        assert!(
+            result.is_ok(),
+            "unknown must stop without waiting for sender closure"
+        );
+        assert!(tx.is_closed());
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn indeterminate_run_returns_before_external_shutdown() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        let mut app = fresh_app_inproc();
+        let publish = app.bus.test_publisher();
+        let calls = Arc::new(AtomicUsize::new(0));
+        let weak_calls = Arc::downgrade(&calls);
+        let counted = Arc::clone(&calls);
+        app.register_policy(
+            BackPressurePolicy,
+            move |(), _, _| {
+                counted.fetch_add(1, Ordering::SeqCst);
+                async {
+                    Err(AgentError::Store(StoreError::Indeterminate(
+                        std::io::Error::other("unknown diagnostic").into(),
+                    )))
+                }
+            },
+            "unknown",
+            "Out",
+        );
+        let run = app.run(std::future::pending());
+        let publish_events = async {
+            while !publish(&[back_pressure_envelope(1), back_pressure_envelope(2)]) {
+                tokio::task::yield_now().await;
+            }
+        };
+        let (result, ()) = tokio::time::timeout(std::time::Duration::from_secs(2), async {
+            tokio::join!(run, publish_events)
+        })
+        .await
+        .expect("App::run observes consumer failure without shutdown");
+        let error = result.expect_err("unknown cannot complete successfully");
+        assert_eq!(error.category(), ErrorCategory::ReconciliationRequired);
+        assert_eq!(
+            error.source().unwrap().source().unwrap().to_string(),
+            "unknown diagnostic"
+        );
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+        assert!(!publish(&[back_pressure_envelope(3)]));
+        drop(calls);
+        assert!(
+            weak_calls.upgrade().is_none(),
+            "consumer released policy ownership"
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn panic_after_persist_is_indeterminate_and_releases_consumer() {
+        use cherry_pit_core::testing::InMemoryEventStore;
+        let mut app = fresh_app_inproc();
+        let publish = app.bus.test_publisher();
+        let store = Arc::new(InMemoryEventStore::<E>::new());
+        let written_id = Arc::new(std::sync::Mutex::new(None));
+        let retained = Arc::new(());
+        let weak_retained = Arc::downgrade(&retained);
+        let policy_store = Arc::clone(&store);
+        let policy_id = Arc::clone(&written_id);
+        app.register_policy(
+            BackPressurePolicy,
+            move |(), _, ctx| {
+                let store = Arc::clone(&policy_store);
+                let written_id = Arc::clone(&policy_id);
+                let retained = Arc::clone(&retained);
+                async move {
+                    let (id, _) = store.create(vec![E::Happened], ctx).await.unwrap();
+                    assert!(written_id.lock().unwrap().replace(id).is_none());
+                    drop(retained);
+                    panic!("panic after accepted write");
+                }
+            },
+            "panic-after-write",
+            "Out",
+        );
+        let run = app.run(std::future::pending());
+        let publish_events = async {
+            while !publish(&[back_pressure_envelope(1), back_pressure_envelope(2)]) {
+                tokio::task::yield_now().await;
+            }
+        };
+        let (result, ()) = tokio::time::timeout(std::time::Duration::from_secs(2), async {
+            tokio::join!(run, publish_events)
+        })
+        .await
+        .expect("supervisor observes panic without external shutdown");
+        let id = written_id
+            .lock()
+            .unwrap()
+            .expect("write completed before panic");
+        assert_eq!(store.load(id).await.unwrap().len(), 1);
+        assert!(weak_retained.upgrade().is_none());
+        assert!(!publish(&[back_pressure_envelope(3)]));
+        let error = result.expect_err("panic cannot acknowledge completion");
+        assert_eq!(error.category(), ErrorCategory::ReconciliationRequired);
+        let join = error
+            .source()
+            .unwrap()
+            .source()
+            .unwrap()
+            .downcast_ref::<tokio::task::JoinError>()
+            .expect("original join diagnostic retained");
+        assert!(join.is_panic());
+        assert!(join.to_string().contains("panic after accepted write"));
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn run_drains_published_queue_on_external_shutdown() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        let mut app = fresh_app_inproc();
+        let publish = app.bus.test_publisher();
+        let calls = Arc::new(AtomicUsize::new(0));
+        let counted = Arc::clone(&calls);
+        app.register_policy(
+            BackPressurePolicy,
+            move |(), _, _| {
+                counted.fetch_add(1, Ordering::SeqCst);
+                async { Ok(()) }
+            },
+            "normal",
+            "Out",
+        );
+        let shutdown = async {
+            assert!(publish(&[
+                back_pressure_envelope(1),
+                back_pressure_envelope(2)
+            ]));
+        };
+        tokio::time::timeout(std::time::Duration::from_secs(2), app.run(shutdown))
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(calls.load(Ordering::SeqCst), 2);
+        assert!(!publish(&[back_pressure_envelope(3)]));
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
     async fn run_returns_on_shutdown_signal() {
         let app = fresh_app_inproc();
         let result = app.run(async {}).await;
@@ -780,7 +955,8 @@ mod tests {
         let join = tokio::time::timeout(Duration::from_secs(5), consumer)
             .await
             .expect("dispatch consumer must terminate within timeout");
-        join.expect("consumer task must not panic");
+        join.expect("consumer task must not panic")
+            .expect("dispatch succeeds");
 
         let final_count = dispatched.load(Ordering::SeqCst);
         assert!(
@@ -845,7 +1021,8 @@ mod tests {
         let join = tokio::time::timeout(Duration::from_secs(5), consumer)
             .await
             .expect("dispatch consumer must terminate after sender drop");
-        join.expect("consumer task must not panic");
+        join.expect("consumer task must not panic")
+            .expect("dispatch succeeds");
 
         assert_eq!(
             dispatched.load(Ordering::SeqCst),

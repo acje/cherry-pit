@@ -123,7 +123,7 @@ def admitted_environment():
                 "unsupported intake context: ghr-7wc6p.11.2 local host/checkout")
     toolchain = home / f".rustup/toolchains/1.98.0-{host}"
     identities = {
-        ROOT / "Cargo.lock": "8a10bcb0c67834b4b4da113608ca054e344a1cfee4edf1a61f9ef8dbfd1c41f1",
+        ROOT / "Cargo.lock": "7c4f67c97b40f01c19fe08153bf86142c94bf1aa2f31268d593bbadbe60ceb60",
     }
     identities.update({toolchain / path: digest for path, digest in LINUX_IDENTITIES.items()} if linux else {
         home / ".cargo/config.toml": "afc3cdc00f48ced4b8928dd4bbd49a2b7537ff324829de840fc4239fefe1b9ac",

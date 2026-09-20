@@ -2,6 +2,11 @@
 
 ## Authority and scope
 
+Cross-repository operational authority is
+[gh-report trunk delivery](../gh-report/docs/trunk-delivery.md) in the canonical
+sibling checkout (`Mattilsynet/gh-report`, `docs/trunk-delivery.md`). Follow that
+single policy for adoption and release; local source governance remains here.
+
 This producer derives from `Mattilsynet/gh-report` revision
 `c8507377b2748a015148751ce288be2bad9ec708`. Read
 [docs/governance.md](docs/governance.md) before changing a governed boundary.

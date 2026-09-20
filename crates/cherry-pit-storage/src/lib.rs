@@ -60,7 +60,7 @@ mod fs;
 mod lock;
 mod signature;
 
-pub use error::PersistenceError;
+pub use error::{PersistenceError, RetryClass};
 pub use fs::{atomic_write_bytes, atomic_write_text};
 pub use lock::{
     DEFAULT_LOCK_FILENAME, DEFAULT_LOCK_TTL, LockMetadata, RunLock, acquire, lock_path,

@@ -22,6 +22,7 @@ tracing = { workspace = true }
 uuid = { workspace = true }
 
 [dev-dependencies]
+pardosa = { workspace = true, features = ["unstable-test-support"] }
 cherry-pit-core = { workspace = true, features = ["testing"] }
 pardosa-cherry-pit-test-support = { path = "../pardosa-cherry-pit-test-support" }
 tempfile = { workspace = true }
