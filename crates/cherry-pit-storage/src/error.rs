@@ -47,8 +47,11 @@ pub enum PersistenceError {
     /// Returned when the underlying store backend (e.g. NATS) is
     /// unreachable or otherwise infrastructurally unavailable. Transient:
     /// a retry may succeed once the backend recovers.
-    #[error("backend unavailable: {reason}")]
-    BackendUnavailable { reason: String },
+    #[error("backend unavailable: {source}")]
+    BackendUnavailable {
+        #[source]
+        source: Box<dyn std::error::Error + Send + Sync + 'static>,
+    },
 
     /// Returned when a store-level invariant (one-fiber-per-key) is
     /// violated. Structural: not retryable, indicates a bug or corrupted
@@ -167,7 +170,7 @@ mod retry_class_tests {
     fn retry_class_preserves_existing_variants() {
         assert_eq!(
             PersistenceError::BackendUnavailable {
-                reason: "down".to_string()
+                source: "down".into()
             }
             .retry_class(),
             RetryClass::Retryable
