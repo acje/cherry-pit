@@ -14,4 +14,4 @@ pub mod state;
 pub use config::{ConfigError, ServeOptions, ServeOptionsBuilder};
 pub use error::ServerError;
 pub use runtime::{bind_serving_port, build_router, start};
-pub use state::{CachedPage, PageUpdateEvent, ServerState};
+pub use state::{CachedPage, PageUpdateEvent, ServerState, populate_route_aliases};

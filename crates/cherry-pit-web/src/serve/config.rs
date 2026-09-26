@@ -60,6 +60,7 @@ pub enum ConfigError {
 pub struct ServeOptionsBuilder {
     csp_override: Option<String>,
     error_page_key: Option<String>,
+    enforce_zstd: bool,
 }
 
 impl ServeOptionsBuilder {
@@ -74,6 +75,13 @@ impl ServeOptionsBuilder {
     #[must_use]
     pub fn error_page_key(mut self, key: impl Into<String>) -> Self {
         self.error_page_key = Some(key.into());
+        self
+    }
+
+    /// Set whether zstd compression is enforced for non-front-page routes.
+    #[must_use]
+    pub fn enforce_zstd(mut self, enforce: bool) -> Self {
+        self.enforce_zstd = enforce;
         self
     }
 
@@ -113,6 +121,7 @@ impl ServeOptionsBuilder {
         Ok(ServeOptions {
             csp_override: self.csp_override,
             error_page_key: self.error_page_key,
+            enforce_zstd: self.enforce_zstd,
         })
     }
 }
@@ -122,20 +131,18 @@ impl ServeOptionsBuilder {
 /// Cannot be constructed directly — only via
 /// [`ServeOptionsBuilder::build()`]. All fields are private with
 /// read-only accessor methods.
-///
-/// Not `Clone` by design: prevents extracting inner values to
-/// construct options that bypass validation.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct ServeOptions {
     csp_override: Option<String>,
     error_page_key: Option<String>,
+    enforce_zstd: bool,
 }
 
 impl ServeOptions {
     /// Create a new [`ServeOptionsBuilder`] with default values.
     ///
-    /// Defaults: `csp_override` `None`, `error_page_key` `None`.
+    /// Defaults: `csp_override` `None`, `error_page_key` `None`, `enforce_zstd` `false`.
     #[must_use]
     pub fn builder() -> ServeOptionsBuilder {
         ServeOptionsBuilder::default()
@@ -152,6 +159,12 @@ impl ServeOptions {
     pub fn error_page_key(&self) -> Option<&str> {
         self.error_page_key.as_deref()
     }
+
+    /// Whether zstd compression is enforced for non-front-page routes.
+    #[must_use]
+    pub fn enforce_zstd(&self) -> bool {
+        self.enforce_zstd
+    }
 }
 
 #[cfg(test)]
@@ -163,11 +176,18 @@ mod tests {
         let options = ServeOptions::builder().build().unwrap();
         assert!(options.csp_override().is_none());
         assert!(options.error_page_key().is_none());
+        assert!(!options.enforce_zstd());
     }
 
     #[test]
     fn builder_default_produces_ok() {
         assert!(ServeOptions::builder().build().is_ok());
+    }
+
+    #[test]
+    fn builder_sets_enforce_zstd() {
+        let options = ServeOptions::builder().enforce_zstd(true).build().unwrap();
+        assert!(options.enforce_zstd());
     }
 
     #[test]
