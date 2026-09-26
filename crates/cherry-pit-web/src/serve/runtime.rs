@@ -31,6 +31,7 @@ use axum::http::{HeaderMap, HeaderValue, Method, StatusCode, header};
 use axum::middleware::{self, Next};
 use axum::response::{IntoResponse, Response};
 use axum::routing::get;
+use axum::serve::ListenerExt;
 use futures_util::{SinkExt, StreamExt};
 use tokio::net::TcpListener;
 use tower_http::limit::RequestBodyLimitLayer;
@@ -44,7 +45,7 @@ use crate::middleware::compression::{Encoding, negotiate_encoding};
 use crate::middleware::http::if_none_match_matches;
 use crate::middleware::ws_auth::{WS_MAX_MESSAGE_SIZE, WsPolicy, validate_ws_origin};
 use crate::middleware::{
-    DEFAULT_CSP, LayerLimits, SVG_CSP, http_trace_layer, normalize_request_path, security_headers,
+    DEFAULT_CSP, LayerLimits, http_trace_layer, normalize_request_path, security_headers,
 };
 
 /// Server-side ping interval for WebSocket keepalive (seconds).
@@ -213,23 +214,10 @@ fn serve_page(
     status: StatusCode,
     skip_etag_check: bool,
 ) -> Response {
-    let has_compressed = page.body.zstd().is_some();
-
     if !skip_etag_check && if_none_match_matches(request_headers, &page.etag) {
         let mut resp = Response::new(axum::body::Body::empty());
         *resp.status_mut() = StatusCode::NOT_MODIFIED;
-        resp.headers_mut()
-            .insert(axum::http::header::ETAG, page.etag.clone());
-        resp.headers_mut().insert(
-            axum::http::header::CACHE_CONTROL,
-            HeaderValue::from_static("no-cache"),
-        );
-        if has_compressed {
-            resp.headers_mut().insert(
-                axum::http::header::VARY,
-                HeaderValue::from_static("Accept-Encoding"),
-            );
-        }
+        *resp.headers_mut() = page.headers_304.clone();
         return resp;
     }
 
@@ -237,58 +225,32 @@ fn serve_page(
         .get(axum::http::header::ACCEPT_ENCODING)
         .map_or(Encoding::Identity, negotiate_encoding);
 
-    let Some((body_bytes, content_encoding, content_length)) = (match encoding {
-        Encoding::Zstd => match page.body.zstd() {
-            Some(b) => Some((b.clone(), Some("zstd"), page.content_length_zstd.clone())),
-            None => page
-                .body
-                .identity_bytes()
-                .map(|b| (b, None, Some(page.content_length.clone()))),
-        },
-        Encoding::Identity => page
-            .body
-            .identity_bytes()
-            .map(|b| (b, None, Some(page.content_length.clone()))),
-    }) else {
-        let mut resp = Response::new(axum::body::Body::empty());
-        *resp.status_mut() = StatusCode::INTERNAL_SERVER_ERROR;
-        return resp;
+    let (body_bytes, headers) = match encoding {
+        Encoding::Zstd => {
+            if let Some(b) = page.body.zstd() {
+                (b.clone(), &page.headers_zstd)
+            } else if let Some(b) = page.body.identity_bytes() {
+                (b, &page.headers_raw)
+            } else {
+                let mut resp = Response::new(axum::body::Body::empty());
+                *resp.status_mut() = StatusCode::INTERNAL_SERVER_ERROR;
+                return resp;
+            }
+        }
+        Encoding::Identity => {
+            if let Some(b) = page.body.identity_bytes() {
+                (b, &page.headers_raw)
+            } else {
+                let mut resp = Response::new(axum::body::Body::empty());
+                *resp.status_mut() = StatusCode::INTERNAL_SERVER_ERROR;
+                return resp;
+            }
+        }
     };
 
     let mut resp = Response::new(axum::body::Body::from(body_bytes));
     *resp.status_mut() = status;
-    resp.headers_mut()
-        .insert(axum::http::header::CONTENT_TYPE, page.content_type.clone());
-    resp.headers_mut()
-        .insert(axum::http::header::ETAG, page.etag.clone());
-    resp.headers_mut().insert(
-        axum::http::header::CACHE_CONTROL,
-        HeaderValue::from_static("no-cache"),
-    );
-    if let Some(cl) = content_length {
-        resp.headers_mut()
-            .insert(axum::http::header::CONTENT_LENGTH, cl);
-    }
-    if let Some(enc) = content_encoding {
-        resp.headers_mut().insert(
-            axum::http::header::CONTENT_ENCODING,
-            HeaderValue::from_static(enc),
-        );
-    }
-    if has_compressed {
-        resp.headers_mut().insert(
-            axum::http::header::VARY,
-            HeaderValue::from_static("Accept-Encoding"),
-        );
-    }
-
-    if page.content_type == "image/svg+xml" {
-        resp.headers_mut().insert(
-            axum::http::header::CONTENT_SECURITY_POLICY,
-            HeaderValue::from_static(SVG_CSP),
-        );
-    }
-
+    *resp.headers_mut() = headers.clone();
     resp
 }
 
@@ -296,45 +258,20 @@ fn serve_page(
 ///
 /// Only inspects the final segment after the last `/` to avoid false
 /// positives from dotted directory names (e.g., `v2.0/about` → `false`).
+#[cfg(test)]
 fn has_extension(key: &str) -> bool {
     key.rsplit('/')
         .next()
         .is_some_and(|last| last.contains('.'))
 }
 
-/// Resolve a cache key through the fallback chain.
-///
-/// Resolution order:
-/// 1. Direct match: `cache.get(key)`
-/// 2. If `has_trailing_slash` or no extension: `cache.get("{key}/index.html")`
-///    (skipped if key already ends with `/index.html` or is `index.html`)
-/// 3. If no trailing slash and no extension: `cache.get("{key}.html")`
+/// Resolve a cache key directly from the pre-populated HTML cache.
 fn resolve_cache_key<'a>(
     cache: &'a std::collections::HashMap<String, super::state::CachedPage>,
     key: &str,
-    has_trailing_slash: bool,
+    _has_trailing_slash: bool,
 ) -> Option<&'a super::state::CachedPage> {
-    if let Some(page) = cache.get(key) {
-        return Some(page);
-    }
-
-    let no_ext = !has_extension(key);
-
-    if (has_trailing_slash || no_ext) && key != "index.html" && !key.ends_with("/index.html") {
-        let index_key = format!("{key}/index.html");
-        if let Some(page) = cache.get(&index_key) {
-            return Some(page);
-        }
-    }
-
-    if !has_trailing_slash && no_ext {
-        let html_key = format!("{key}.html");
-        if let Some(page) = cache.get(&html_key) {
-            return Some(page);
-        }
-    }
-
-    None
+    cache.get(key)
 }
 
 /// Axum fallback handler that serves pages from the in-memory HTML cache.
@@ -351,6 +288,7 @@ fn resolve_cache_key<'a>(
 async fn cache_fallback<S: ServerState>(
     State(state): State<Arc<S>>,
     Extension(error_page_key): Extension<Option<Arc<str>>>,
+    Extension(options): Extension<Arc<ServeOptions>>,
     request: Request,
 ) -> Response {
     if request.method() != Method::GET && request.method() != Method::HEAD {
@@ -368,6 +306,21 @@ async fn cache_fallback<S: ServerState>(
         warn!(path = %raw_path, "rejected path: failed normalisation");
         return (StatusCode::BAD_REQUEST, "bad request").into_response();
     };
+
+    if options.enforce_zstd() && normalized.key != "index.html" {
+        let encoding = request
+            .headers()
+            .get(header::ACCEPT_ENCODING)
+            .map_or(Encoding::Identity, negotiate_encoding);
+        if encoding != Encoding::Zstd {
+            return (
+                StatusCode::NOT_ACCEPTABLE,
+                [(header::CONTENT_TYPE, "text/plain; charset=utf-8")],
+                "must support zstd level 19 compression",
+            )
+                .into_response();
+        }
+    }
 
     let cache_guard = state.html_cache().load();
     let Some(cache) = cache_guard.as_ref() else {
@@ -504,6 +457,10 @@ pub async fn start<S: ServerState>(
         listener
     };
 
+    let listener = listener.tap_io(|tcp_stream| {
+        let _ = tcp_stream.set_nodelay(true);
+    });
+
     axum::serve(listener, app)
         .with_graceful_shutdown(shutdown)
         .await
@@ -577,6 +534,7 @@ pub fn build_router<S: ServerState>(
     let csp: HeaderValue = HeaderValue::from_str(options.csp_override().unwrap_or(DEFAULT_CSP))
         .expect("CSP validated by builder");
     let error_page_key: Option<Arc<str>> = options.error_page_key().map(Into::into);
+    let serve_options = Arc::new(options.clone());
 
     let builtin_routes = Router::new()
         .route("/favicon.ico", get(favicon))
@@ -603,6 +561,8 @@ pub fn build_router<S: ServerState>(
         .merge(probe_routes)
         .with_state(state)
         .layer(Extension(error_page_key))
+        .layer(Extension(Arc::clone(&serve_options)))
+        .layer(Extension(options.clone()))
         .layer(Extension(ws_policy))
         .layer(Extension(ws_semaphore))
         .layer(http_trace_layer())
@@ -689,9 +649,9 @@ async fn readyz<S: ServerState>(State(state): State<Arc<S>>) -> impl IntoRespons
 #[cfg(test)]
 mod tests {
     use super::super::config::ServeOptions;
-    use super::super::state::{CachedPage, PageUpdateEvent};
+    use super::super::state::{CachedPage, PageUpdateEvent, populate_route_aliases};
     use super::*;
-    use crate::middleware::WebSocketOriginPolicy;
+    use crate::middleware::{SVG_CSP, WebSocketOriginPolicy};
     use arc_swap::ArcSwap;
     use std::collections::HashMap;
 
@@ -779,6 +739,7 @@ mod tests {
                 CachedPage::new(name, body.as_bytes().to_vec()),
             );
         }
+        populate_route_aliases(&mut map);
         state.html_cache.store(Arc::new(Some(map)));
         state
     }
@@ -2483,6 +2444,7 @@ mod tests {
             "about/index.html".to_string(),
             CachedPage::new("about/index.html", b"<html>about</html>".to_vec()),
         );
+        populate_route_aliases(&mut cache);
         assert!(resolve_cache_key(&cache, "about", true).is_some());
     }
 
@@ -2493,6 +2455,7 @@ mod tests {
             "about/index.html".to_string(),
             CachedPage::new("about/index.html", b"<html>about</html>".to_vec()),
         );
+        populate_route_aliases(&mut cache);
         assert!(resolve_cache_key(&cache, "about", false).is_some());
     }
 
@@ -2503,6 +2466,7 @@ mod tests {
             "about.html".to_string(),
             CachedPage::new("about.html", b"<html>about</html>".to_vec()),
         );
+        populate_route_aliases(&mut cache);
         assert!(resolve_cache_key(&cache, "about", false).is_some());
     }
 
@@ -3597,6 +3561,258 @@ mod tests {
 
         release.notify_one();
         assert_eq!(hold.await.unwrap(), 200, "the held request must complete");
+        handle.abort();
+    }
+
+    #[tokio::test]
+    async fn dual_front_page_serves_raw_to_non_zstd_and_zstd_to_zstd_clients() {
+        let state = state_with_cache(&[("index.html", "<html>front page content</html>")]);
+        let app = build_router_with(state, &default_config(), None);
+
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let handle = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        wait_for_server(addr).await;
+
+        let client = reqwest::Client::new();
+
+        let raw_resp = client
+            .get(format!("http://{addr}/index.html"))
+            .header("Accept-Encoding", "gzip, deflate")
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(raw_resp.status(), 200);
+        assert!(raw_resp.headers().get("content-encoding").is_none());
+        assert_eq!(
+            raw_resp.text().await.unwrap(),
+            "<html>front page content</html>"
+        );
+
+        let zstd_resp = client
+            .get(format!("http://{addr}/index.html"))
+            .header("Accept-Encoding", "zstd")
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(zstd_resp.status(), 200);
+        assert_eq!(
+            zstd_resp
+                .headers()
+                .get("content-encoding")
+                .unwrap()
+                .to_str()
+                .unwrap(),
+            "zstd"
+        );
+
+        handle.abort();
+    }
+
+    #[tokio::test]
+    async fn zstd_enforcement_gate_rejects_non_zstd_and_permits_front_page() {
+        let state = state_with_cache(&[
+            ("index.html", "<html>front page</html>"),
+            ("report.html", "<html>detailed report</html>"),
+        ]);
+        let options = ServeOptions::builder().enforce_zstd(true).build().unwrap();
+        let app = build_router_with(state, &options, None);
+
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let handle = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        wait_for_server(addr).await;
+
+        let client = reqwest::Client::new();
+
+        let rejected = client
+            .get(format!("http://{addr}/report.html"))
+            .header("Accept-Encoding", "gzip")
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(rejected.status(), 406);
+        assert_eq!(
+            rejected
+                .headers()
+                .get("content-type")
+                .unwrap()
+                .to_str()
+                .unwrap(),
+            "text/plain; charset=utf-8"
+        );
+        assert_eq!(
+            rejected.text().await.unwrap(),
+            "must support zstd level 19 compression"
+        );
+
+        let accepted_zstd = client
+            .get(format!("http://{addr}/report.html"))
+            .header("Accept-Encoding", "zstd")
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(accepted_zstd.status(), 200);
+
+        let front_page_root = client
+            .get(format!("http://{addr}/"))
+            .header("Accept-Encoding", "identity")
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(front_page_root.status(), 200);
+        assert_eq!(
+            front_page_root.text().await.unwrap(),
+            "<html>front page</html>"
+        );
+
+        let front_page_index = client
+            .get(format!("http://{addr}/index.html"))
+            .header("Accept-Encoding", "identity")
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(front_page_index.status(), 200);
+        assert_eq!(
+            front_page_index.text().await.unwrap(),
+            "<html>front page</html>"
+        );
+
+        handle.abort();
+    }
+
+    #[tokio::test]
+    async fn start_with_tcp_nodelay_accepts_traffic() {
+        let state = state_with_cache(&[("index.html", "<html>nodelay ok</html>")]);
+        let (addr_tx, addr_rx) = tokio::sync::oneshot::channel();
+        let (shutdown_tx, shutdown_rx) = tokio::sync::oneshot::channel::<()>();
+        let options = default_config();
+
+        let handle = tokio::spawn(async move {
+            start(
+                0,
+                "127.0.0.1",
+                None,
+                async {
+                    let _ = shutdown_rx.await;
+                },
+                state,
+                test_limits(),
+                WsPolicy::permissive_for_tests(),
+                &options,
+                Some(addr_tx),
+                None,
+            )
+            .await
+            .unwrap();
+        });
+
+        let addr = addr_rx.await.unwrap();
+        wait_for_server(addr).await;
+
+        let resp = reqwest::get(format!("http://{addr}/index.html"))
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), 200);
+        assert_eq!(resp.text().await.unwrap(), "<html>nodelay ok</html>");
+
+        let _ = shutdown_tx.send(());
+        let _ = handle.await;
+    }
+
+    #[tokio::test]
+    async fn prebaked_headers_serve_page_cached_responses() {
+        let state = state_with_cache(&[
+            ("index.html", "<html>index</html>"),
+            ("logo.svg", "<svg></svg>"),
+        ]);
+        let app = build_router_with(state, &default_config(), None);
+
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let handle = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        wait_for_server(addr).await;
+
+        let client = reqwest::Client::new();
+        let resp = client
+            .get(format!("http://{addr}/index.html"))
+            .send()
+            .await
+            .unwrap();
+        let etag = resp
+            .headers()
+            .get("etag")
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .to_string();
+
+        let not_modified = client
+            .get(format!("http://{addr}/index.html"))
+            .header("If-None-Match", &etag)
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(not_modified.status(), 304);
+        assert_eq!(
+            not_modified
+                .headers()
+                .get("etag")
+                .unwrap()
+                .to_str()
+                .unwrap(),
+            etag
+        );
+        assert_eq!(
+            not_modified
+                .headers()
+                .get("cache-control")
+                .unwrap()
+                .to_str()
+                .unwrap(),
+            "no-cache"
+        );
+
+        let svg_resp = client
+            .get(format!("http://{addr}/logo.svg"))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(svg_resp.status(), 200);
+        assert_eq!(
+            svg_resp
+                .headers()
+                .get("content-security-policy")
+                .unwrap()
+                .to_str()
+                .unwrap(),
+            SVG_CSP
+        );
+
+        handle.abort();
+    }
+
+    #[tokio::test]
+    async fn route_alias_directory_and_html_prepopulated() {
+        let state = state_with_cache(&[
+            ("docs/index.html", "<html>docs index</html>"),
+            ("guide.html", "<html>user guide</html>"),
+        ]);
+        let app = build_router_with(state, &default_config(), None);
+
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let handle = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        wait_for_server(addr).await;
+
+        let resp_dir = reqwest::get(format!("http://{addr}/docs")).await.unwrap();
+        assert_eq!(resp_dir.status(), 200);
+        assert_eq!(resp_dir.text().await.unwrap(), "<html>docs index</html>");
+
+        let resp_guide = reqwest::get(format!("http://{addr}/guide")).await.unwrap();
+        assert_eq!(resp_guide.status(), 200);
+        assert_eq!(resp_guide.text().await.unwrap(), "<html>user guide</html>");
+
         handle.abort();
     }
 }

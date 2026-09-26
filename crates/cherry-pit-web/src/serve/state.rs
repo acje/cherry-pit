@@ -21,10 +21,11 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use arc_swap::ArcSwap;
-use axum::http::HeaderValue;
+use axum::http::{HeaderMap, HeaderValue, header};
 use bytes::Bytes;
 use tracing::warn;
 
+use crate::middleware::SVG_CSP;
 use crate::middleware::compression::{MAX_PRECOMPRESS_BYTES, compress_zstd, compute_etag};
 
 /// Trait abstracting the shared state required by the in-process HTTP server.
@@ -155,6 +156,13 @@ pub enum CachedBody {
         /// (SEC-0003 decompression-bomb discipline).
         raw_len: usize,
     },
+    /// Both zstd-compressed and raw body copies (dual front page variant).
+    Dual {
+        /// The pre-compressed zstd body, served directly to zstd clients.
+        zstd: Bytes,
+        /// The raw response body, served directly to non-zstd clients without runtime decompression.
+        raw: Bytes,
+    },
 }
 
 impl CachedBody {
@@ -162,7 +170,7 @@ impl CachedBody {
     #[must_use]
     pub fn zstd(&self) -> Option<&Bytes> {
         match self {
-            Self::Compressed { zstd, .. } => Some(zstd),
+            Self::Compressed { zstd, .. } | Self::Dual { zstd, .. } => Some(zstd),
             Self::RawOnly { .. } => None,
         }
     }
@@ -177,6 +185,7 @@ impl CachedBody {
     pub fn identity_bytes(&self) -> Option<Bytes> {
         match self {
             Self::RawOnly { body } => Some(body.clone()),
+            Self::Dual { raw, .. } => Some(raw.clone()),
             Self::Compressed { zstd, raw_len } => decode_bounded(zstd, *raw_len),
         }
     }
@@ -213,7 +222,7 @@ fn decode_bounded(zstd: &[u8], expected_len: usize) -> Option<Bytes> {
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct CachedPage {
-    /// The response body, in exactly one of its two legal shapes.
+    /// The response body, in exactly one of its legal shapes.
     pub body: CachedBody,
     /// Pre-computed `Content-Type` header value.
     pub content_type: HeaderValue,
@@ -228,6 +237,12 @@ pub struct CachedPage {
     /// Pre-computed `Content-Length` for the zstd body (`None` when no
     /// zstd variant exists).
     pub content_length_zstd: Option<HeaderValue>,
+    /// Pre-baked headers for zstd-encoded response.
+    pub headers_zstd: HeaderMap,
+    /// Pre-baked headers for uncompressed (raw) response.
+    pub headers_raw: HeaderMap,
+    /// Pre-baked headers for 304 Not Modified response.
+    pub headers_304: HeaderMap,
 }
 
 impl CachedPage {
@@ -271,7 +286,54 @@ impl CachedPage {
             None
         };
         let content_length_zstd = body_zstd.as_ref().map(|b| content_length_header(b.len()));
+
+        let has_compressed = body_zstd.is_some();
+
+        let mut headers_304 = HeaderMap::new();
+        headers_304.insert(header::ETAG, etag.clone());
+        headers_304.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-cache"));
+        if has_compressed {
+            headers_304.insert(header::VARY, HeaderValue::from_static("Accept-Encoding"));
+        }
+
+        let mut headers_raw = HeaderMap::new();
+        headers_raw.insert(header::CONTENT_TYPE, content_type.clone());
+        headers_raw.insert(header::ETAG, etag.clone());
+        headers_raw.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-cache"));
+        headers_raw.insert(header::CONTENT_LENGTH, content_length.clone());
+        if has_compressed {
+            headers_raw.insert(header::VARY, HeaderValue::from_static("Accept-Encoding"));
+        }
+        if content_type == "image/svg+xml" {
+            headers_raw.insert(
+                header::CONTENT_SECURITY_POLICY,
+                HeaderValue::from_static(SVG_CSP),
+            );
+        }
+
+        let mut headers_zstd = HeaderMap::new();
+        headers_zstd.insert(header::CONTENT_TYPE, content_type.clone());
+        headers_zstd.insert(header::ETAG, etag.clone());
+        headers_zstd.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-cache"));
+        if let Some(ref cl_zstd) = content_length_zstd {
+            headers_zstd.insert(header::CONTENT_LENGTH, cl_zstd.clone());
+            headers_zstd.insert(header::CONTENT_ENCODING, HeaderValue::from_static("zstd"));
+            headers_zstd.insert(header::VARY, HeaderValue::from_static("Accept-Encoding"));
+        } else {
+            headers_zstd.insert(header::CONTENT_LENGTH, content_length.clone());
+        }
+        if content_type == "image/svg+xml" {
+            headers_zstd.insert(
+                header::CONTENT_SECURITY_POLICY,
+                HeaderValue::from_static(SVG_CSP),
+            );
+        }
+
         let cached_body = match body_zstd {
+            Some(zstd) if filename == "index.html" => CachedBody::Dual {
+                zstd: Bytes::from(zstd),
+                raw: Bytes::from(body),
+            },
             Some(zstd) => CachedBody::Compressed {
                 zstd: Bytes::from(zstd),
                 raw_len,
@@ -286,7 +348,53 @@ impl CachedPage {
             etag,
             content_length,
             content_length_zstd,
+            headers_zstd,
+            headers_raw,
+            headers_304,
         }
+    }
+}
+
+/// Pre-populate route aliases in the HTML cache for clean URL resolution.
+///
+/// Inserts aliases:
+/// - `{dir}/index.html` -> `{dir}`
+/// - `{name}.html` -> `{name}`
+///
+/// Existing direct keys are never overwritten.
+pub fn populate_route_aliases<S: std::hash::BuildHasher>(
+    cache: &mut HashMap<String, CachedPage, S>,
+) {
+    let mut aliases = Vec::new();
+
+    for (key, page) in cache.iter() {
+        let Some(dir) = key.strip_suffix("/index.html") else {
+            continue;
+        };
+        if !dir.is_empty() && !cache.contains_key(dir) {
+            aliases.push((dir.to_string(), page.clone()));
+        }
+    }
+
+    for (k, v) in aliases {
+        cache.entry(k).or_insert(v);
+    }
+
+    let mut html_aliases = Vec::new();
+    for (key, page) in cache.iter() {
+        if key == "index.html" || key.ends_with("/index.html") {
+            continue;
+        }
+        let Some(name) = key.strip_suffix(".html") else {
+            continue;
+        };
+        if !name.is_empty() && !cache.contains_key(name) {
+            html_aliases.push((name.to_string(), page.clone()));
+        }
+    }
+
+    for (k, v) in html_aliases {
+        cache.entry(k).or_insert(v);
     }
 }
 
@@ -645,7 +753,7 @@ mod tests {
     #[test]
     fn compressed_page_identity_bytes_round_trip_byte_identical() {
         let original = b"<html><body>Hello, world!</body></html>";
-        let page = CachedPage::new("index.html", original.to_vec());
+        let page = CachedPage::new("page.html", original.to_vec());
         assert!(
             matches!(page.body, CachedBody::Compressed { .. }),
             "compressible small body must drop raw and retain zstd only"
@@ -660,11 +768,108 @@ mod tests {
     #[test]
     fn compressed_page_etag_and_content_length_available_without_raw() {
         let original = b"<html><body>Hello, world!</body></html>";
-        let page = CachedPage::new("index.html", original.to_vec());
+        let page = CachedPage::new("page.html", original.to_vec());
         assert!(matches!(page.body, CachedBody::Compressed { .. }));
         assert_eq!(page.content_length, original.len().to_string());
         let etag = page.etag.to_str().unwrap();
         assert!(etag.starts_with("W/\""));
+    }
+
+    #[test]
+    fn index_html_creates_dual_variant_with_raw_and_zstd() {
+        let original = b"<html><body>Hello, world!</body></html>";
+        let page = CachedPage::new("index.html", original.to_vec());
+        assert!(
+            matches!(page.body, CachedBody::Dual { .. }),
+            "index.html must create CachedBody::Dual"
+        );
+        assert!(page.body.zstd().is_some());
+        let identity = page
+            .body
+            .identity_bytes()
+            .expect("identity_bytes must succeed without decompression");
+        assert_eq!(identity, original[..]);
+    }
+
+    #[test]
+    fn cached_page_prebaked_headers() {
+        let page = CachedPage::new("index.html", b"<html>hello</html>".to_vec());
+        assert_eq!(page.headers_304.get(header::ETAG).unwrap(), &page.etag);
+        assert_eq!(
+            page.headers_304.get(header::CACHE_CONTROL).unwrap(),
+            "no-cache"
+        );
+        assert_eq!(
+            page.headers_304.get(header::VARY).unwrap(),
+            "Accept-Encoding"
+        );
+
+        assert_eq!(
+            page.headers_raw.get(header::CONTENT_TYPE).unwrap(),
+            "text/html; charset=utf-8"
+        );
+        assert_eq!(
+            page.headers_raw.get(header::CONTENT_LENGTH).unwrap(),
+            &page.content_length
+        );
+
+        assert_eq!(
+            page.headers_zstd.get(header::CONTENT_ENCODING).unwrap(),
+            "zstd"
+        );
+        assert_eq!(
+            page.headers_zstd.get(header::CONTENT_LENGTH).unwrap(),
+            page.content_length_zstd.as_ref().unwrap()
+        );
+
+        let svg_page = CachedPage::new("icon.svg", b"<svg></svg>".to_vec());
+        assert_eq!(
+            svg_page
+                .headers_raw
+                .get(header::CONTENT_SECURITY_POLICY)
+                .unwrap(),
+            SVG_CSP
+        );
+        assert_eq!(
+            svg_page
+                .headers_zstd
+                .get(header::CONTENT_SECURITY_POLICY)
+                .unwrap(),
+            SVG_CSP
+        );
+    }
+
+    #[test]
+    fn populate_route_aliases_inserts_dir_and_clean_html_aliases() {
+        let mut cache = HashMap::new();
+        cache.insert(
+            "index.html".to_string(),
+            CachedPage::new("index.html", b"root".to_vec()),
+        );
+        cache.insert(
+            "dir/index.html".to_string(),
+            CachedPage::new("dir/index.html", b"dir index".to_vec()),
+        );
+        cache.insert(
+            "about.html".to_string(),
+            CachedPage::new("about.html", b"about".to_vec()),
+        );
+
+        populate_route_aliases(&mut cache);
+
+        assert!(cache.contains_key("dir"));
+        assert_eq!(
+            cache.get("dir").unwrap().etag,
+            cache.get("dir/index.html").unwrap().etag
+        );
+
+        assert!(cache.contains_key("about"));
+        assert_eq!(
+            cache.get("about").unwrap().etag,
+            cache.get("about.html").unwrap().etag
+        );
+
+        assert!(!cache.contains_key("index"));
     }
 
     #[test]

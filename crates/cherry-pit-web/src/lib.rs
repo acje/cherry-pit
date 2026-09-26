@@ -51,5 +51,5 @@ pub use projection::{
     ServerConfigBuilder, ServerError, ValidatedConfig, build_projection_router,
 };
 pub use router::build_router;
-pub use serve::{CachedPage, PageUpdateEvent, ServerState};
+pub use serve::{CachedPage, PageUpdateEvent, ServerState, populate_route_aliases};
 pub use state::AppState;

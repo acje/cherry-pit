@@ -98,6 +98,17 @@ pub(crate) fn negotiate_encoding(accept: &HeaderValue) -> Encoding {
         return Encoding::Identity;
     };
 
+    if s == "zstd" {
+        return Encoding::Zstd;
+    }
+
+    if !s.contains(';') {
+        if s.split(',').any(|part| part.trim() == "zstd") {
+            return Encoding::Zstd;
+        }
+        return Encoding::Identity;
+    }
+
     let mut zstd_acceptable = false;
 
     for part in s.split(',') {
@@ -296,5 +307,20 @@ mod tests {
     fn repeated_acceptable_zstd_still_negotiates_zstd() {
         let v = HeaderValue::from_static("zstd;q=0.5, zstd;q=0.9");
         assert_eq!(negotiate_encoding(&v), Encoding::Zstd);
+    }
+
+    #[test]
+    fn fast_path_negotiate_encoding_exact_zstd() {
+        let h = HeaderValue::from_static("zstd");
+        assert_eq!(negotiate_encoding(&h), Encoding::Zstd);
+    }
+
+    #[test]
+    fn fast_path_negotiate_encoding_tokens_without_params() {
+        let h = HeaderValue::from_static("gzip, zstd, br");
+        assert_eq!(negotiate_encoding(&h), Encoding::Zstd);
+
+        let h_no_zstd = HeaderValue::from_static("gzip, br, deflate");
+        assert_eq!(negotiate_encoding(&h_no_zstd), Encoding::Identity);
     }
 }
