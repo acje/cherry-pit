@@ -36,6 +36,10 @@ fn indeterminate_store_mapping_preserves_category_and_source() {
 }
 
 fn dispatch_store_error<E: std::error::Error + Send + Sync>(error: StoreError) -> DispatchError<E> {
+    #[expect(
+        clippy::wildcard_enum_match_arm,
+        reason = "all other store errors mapped to infrastructure"
+    )]
     match error {
         unknown @ StoreError::Indeterminate(_) => DispatchError::Indeterminate(Box::new(unknown)),
         StoreError::ConcurrencyConflict {

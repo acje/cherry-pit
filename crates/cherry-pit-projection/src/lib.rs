@@ -309,11 +309,17 @@ where
         aggregate_id: AggregateId,
         correlation: &cherry_pit_core::CorrelationContext,
     ) -> ProjectionResult<(P, Option<NonZeroU64>)> {
-        let stream = self.store.load(aggregate_id).await.map_err(|e| match e {
-            unknown @ cherry_pit_core::StoreError::Indeterminate(_) => {
-                ProjectionError::Indeterminate(Box::new(unknown))
+        let stream = self.store.load(aggregate_id).await.map_err(|e| {
+            #[expect(
+                clippy::wildcard_enum_match_arm,
+                reason = "all other store errors mapped to infrastructure"
+            )]
+            match e {
+                unknown @ cherry_pit_core::StoreError::Indeterminate(_) => {
+                    ProjectionError::Indeterminate(Box::new(unknown))
+                }
+                other => ProjectionError::Infrastructure(Box::new(other)),
             }
-            other => ProjectionError::Infrastructure(Box::new(other)),
         })?;
         cherry_pit_core::EventEnvelope::validate_stream(aggregate_id, &stream)
             .map_err(|e| ProjectionError::CorruptData(Box::new(e)))?;

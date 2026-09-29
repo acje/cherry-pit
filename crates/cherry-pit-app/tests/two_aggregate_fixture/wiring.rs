@@ -14,6 +14,10 @@ use super::infra::{BarGateway, FooGateway};
 fn policy_error<E: std::error::Error + Send + Sync + 'static>(
     error: cherry_pit_core::DispatchError<E>,
 ) -> cherry_pit_app::AgentError {
+    #[expect(
+        clippy::wildcard_enum_match_arm,
+        reason = "all other dispatch errors mapped to policy error"
+    )]
     match error {
         cherry_pit_core::DispatchError::Indeterminate(source) => {
             cherry_pit_app::AgentError::Store(cherry_pit_core::StoreError::Indeterminate(source))

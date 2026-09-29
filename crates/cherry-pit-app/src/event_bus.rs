@@ -55,6 +55,10 @@ type HandlerFn<E> = Arc<dyn Fn(&EventEnvelope<E>) + Send + Sync>;
 /// `publish` never produces `Err(BusError)` — no fallible in-process
 /// transport. A panicking handler propagates; per CHE-0051:R7,
 /// dead-letter routing of failed policy outputs is `App`'s job.
+#[expect(
+    clippy::rc_buffer,
+    reason = "copy-on-write event handler list is modified during registration"
+)]
 pub struct InProcessEventBus<E: DomainEvent> {
     #[cfg(test)]
     handlers: Arc<Mutex<Arc<Vec<HandlerFn<E>>>>>,

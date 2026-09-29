@@ -313,6 +313,7 @@ where
 /// failures surface as `tracing::error!` and do NOT abort the
 /// consumer (CHE-0051:R7 + CHE-0046:R7). One bad envelope must not
 /// stop the bus.
+#[expect(clippy::rc_buffer, reason = "shared erased dispatcher list")]
 async fn run_dispatch_consumer<E, G, D>(
     mut rx: mpsc::Receiver<EventEnvelope<E>>,
     policies: Arc<Vec<Box<dyn ErasedPolicyDispatcher<E, G>>>>,

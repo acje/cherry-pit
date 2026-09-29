@@ -105,6 +105,10 @@ async fn phantom_304_free_outcomes_do_not_exhaust_the_live_regulated_path() {
 
     let mut successes = 0usize;
     while let Some(outcome) = rx.recv().await {
+        #[expect(
+            clippy::wildcard_enum_match_arm,
+            reason = "test assertion matches success outcome"
+        )]
         match outcome {
             JobOutcome::Success { .. } => successes += 1,
             other => panic!("expected success, got {other:?}"),

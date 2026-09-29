@@ -882,6 +882,10 @@ mod tests {
 
         let mut old_keys = Vec::new();
         while let Some(o) = old_rx.recv().await {
+            #[expect(
+                clippy::wildcard_enum_match_arm,
+                reason = "test assertion matches success outcome"
+            )]
             match o {
                 JobOutcome::Success { domain_key, .. } => old_keys.push(domain_key),
                 _ => panic!("expected success on old pool"),
@@ -889,6 +893,10 @@ mod tests {
         }
         let mut new_keys = Vec::new();
         while let Some(o) = new_rx.recv().await {
+            #[expect(
+                clippy::wildcard_enum_match_arm,
+                reason = "test assertion matches success outcome"
+            )]
             match o {
                 JobOutcome::Success { domain_key, .. } => new_keys.push(domain_key),
                 _ => panic!("expected success on new (regulated) pool"),

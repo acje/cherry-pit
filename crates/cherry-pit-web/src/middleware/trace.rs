@@ -101,8 +101,9 @@ mod tests {
 
     #[test]
     fn http_trace_layer_is_clone() {
+        fn assert_clone<T: Clone>(_: &T) {}
         let layer = http_trace_layer();
-        let _cloned = layer.clone();
+        assert_clone(&layer);
     }
 
     #[test]

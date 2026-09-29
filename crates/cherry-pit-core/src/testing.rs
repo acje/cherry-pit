@@ -648,6 +648,10 @@ pub mod conformance {
                  store.rs:269-272)",
             );
         };
+        #[expect(
+            clippy::wildcard_enum_match_arm,
+            reason = "test assertion matches specific error variant"
+        )]
         match err {
             StoreError::ConcurrencyConflict {
                 aggregate_id,
@@ -1119,6 +1123,10 @@ mod tests {
             CorrelationContext::none(),
         ))
         .unwrap_err();
+        #[expect(
+            clippy::wildcard_enum_match_arm,
+            reason = "test assertion matches specific error variant"
+        )]
         match err {
             StoreError::ConcurrencyConflict {
                 aggregate_id,
@@ -1286,12 +1294,13 @@ mod tests {
                     evs(1),
                     CorrelationContext::none(),
                 )).unwrap_err();
-                match err {
-                    StoreError::ConcurrencyConflict {
-                        aggregate_id,
-                        expected_sequence,
-                        actual_sequence,
-                    } => {
+        #[expect(clippy::wildcard_enum_match_arm, reason = "test assertion matches specific error variant")]
+        match err {
+            StoreError::ConcurrencyConflict {
+                aggregate_id,
+                expected_sequence,
+                actual_sequence,
+            } => {
                         prop_assert_eq!(aggregate_id, id);
                         prop_assert_eq!(expected_sequence, stale);
                         prop_assert_eq!(actual_sequence, real);

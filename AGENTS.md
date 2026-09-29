@@ -46,6 +46,27 @@ GitHub, organization, credential, report and tenant policy stays in consumers.
   Preserve explicit correlation and single-writer ownership. Failure of a probe
   is unknown/error, never evidence of absence. Cancellation is not rollback.
 
+## Resource Contracts & Bounds (FLEET-RES-01)
+
+Changes to ingestion, buffering, concurrency, retries, recursion, or hot paths
+must define and satisfy explicit resource bounds:
+- **Items and bytes accounted separately**: A bounded channel alone does not bound
+  memory; admit work before unbounded allocation or payload retention.
+- **Permit lifetimes & RAII**: Permits and resource charges must stay alive for the
+  actual resource lifetime, including error paths and cancellations. Release exactly
+  once via RAII.
+- **Admission control**: Work admission must be bounded. If admission waits, bound
+  the number of waiters and what they retain.
+- **Progress, cancellation & shutdown**:
+  - Individual work units, retries, and recursion depth must be bounded.
+  - Service lifetime loops require reachable, supervised shutdown and bounded work
+    between shutdown checks.
+  - Dropping task handles does not cancel asynchronous tasks; use explicit cancellation
+    tokens and await task completion during shutdown.
+- **Atomic file write protocol (CHE-0032)**:
+  All durable state written to disk must use the atomic sequence:
+  `write temporary file` $\rightarrow$ `fsync file` $\rightarrow$ `atomic rename` $\rightarrow$ `fsync parent directory`.
+
 ## Verification tiers
 
 Derived from source `AGENTS.md` at the revision above; command scope is retained,
@@ -81,6 +102,31 @@ runtime. Exit 124 is an incomplete verdict requiring hang investigation, neither
 a pass nor a test failure. Re-evaluate the bound with recorded conditions when
 the workload or machine changes. Claims are tier-scoped; a documentation-only
 window with `git diff --check` is not a MID or BOUNDARY pass.
+
+## Rustdoc budget gate
+
+Run the same native check from the repository root locally and in CI:
+
+```sh
+comment-free --check-doc-budget --doc-advisory-words 80 --doc-max-words 120 --max-warning-files 0 .
+```
+
+Requires comment-free 0.2.0 at the canonical revision below:
+
+```sh
+cargo +1.98.0 install --git https://github.com/acje/comment-free --rev e45de7ef3b0fcd9a1ec299b9026b14fb5b0cf534 --locked comment-free
+```
+
+The read-only native gate recursively scans Rust sources under `.` with the
+tool's build/hidden pruning: 80 prose words is advisory; 120 is enforced.
+Fenced code is excluded by the tool. Summary-only output retains full totals
+while suppressing finding details; diagnostics remain visible.
+Native gate exits are 0 for pass, 1 for enforced breach, and 2 for
+unknown/error, including undecided payloads or empty scope. Policy and its
+implementation/tests/proofs belong upstream; repository checks establish
+integration only. No rewrite mode runs.
+Macro-generated docs without spelled `doc` tokens remain outside detection;
+this is not proof of semantic documentation coverage or process-memory bounds.
 
 ## Required acceptance work beyond Cargo's four commands
 

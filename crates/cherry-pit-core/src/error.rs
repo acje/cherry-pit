@@ -597,6 +597,10 @@ mod tests {
             expected_sequence: expected,
             actual_sequence: actual,
         };
+        #[expect(
+            clippy::wildcard_enum_match_arm,
+            reason = "test assertion matches specific error variant"
+        )]
         match dispatch_err {
             DispatchError::ConcurrencyConflict {
                 aggregate_id,
@@ -615,6 +619,10 @@ mod tests {
             expected_sequence: expected,
             actual_sequence: actual,
         };
+        #[expect(
+            clippy::wildcard_enum_match_arm,
+            reason = "test assertion matches specific error variant"
+        )]
         match store_err {
             StoreError::ConcurrencyConflict {
                 aggregate_id,

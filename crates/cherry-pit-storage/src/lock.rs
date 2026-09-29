@@ -846,6 +846,10 @@ mod tests {
         drop(f);
 
         let err = read_lock(&path).unwrap_err();
+        #[expect(
+            clippy::wildcard_enum_match_arm,
+            reason = "test assertion matches specific error variant"
+        )]
         match &err {
             PersistenceError::LockFailed { reason } => {
                 assert!(

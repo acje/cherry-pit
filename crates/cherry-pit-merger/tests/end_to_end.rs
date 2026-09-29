@@ -242,6 +242,10 @@ async fn append_strict_misses_route_to_arm_error() {
         )
         .await
         .expect_err("should miss");
+    #[expect(
+        clippy::wildcard_enum_match_arm,
+        reason = "test assertion matches RoutingMiss variant"
+    )]
     match err {
         CounterError::RoutingMiss(k) => assert_eq!(k, "ghost"),
         other => panic!("expected RoutingMiss, got {other:?}"),
