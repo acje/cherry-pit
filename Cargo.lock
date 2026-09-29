@@ -1458,7 +1458,7 @@ dependencies = [
 [[package]]
 name = "pardosa"
 version = "0.5.5"
-source = "git+https://github.com/acje/pardosa?rev=49ea5ec42a782aa9303b0e6eab2659d59d181e69#49ea5ec42a782aa9303b0e6eab2659d59d181e69"
+source = "git+https://github.com/acje/pardosa?rev=d1b9ca45bb539db9c46330b40a636d97a5c7cf38#d1b9ca45bb539db9c46330b40a636d97a5c7cf38"
 dependencies = [
  "blake3",
  "crc32c",
@@ -1499,7 +1499,7 @@ dependencies = [
 [[package]]
 name = "pardosa-derive"
 version = "0.5.5"
-source = "git+https://github.com/acje/pardosa?rev=49ea5ec42a782aa9303b0e6eab2659d59d181e69#49ea5ec42a782aa9303b0e6eab2659d59d181e69"
+source = "git+https://github.com/acje/pardosa?rev=d1b9ca45bb539db9c46330b40a636d97a5c7cf38#d1b9ca45bb539db9c46330b40a636d97a5c7cf38"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2245,7 +2245,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand",
- "getrandom 0.4.3",
+ "getrandom 0.3.4",
  "once_cell",
  "rustix",
  "windows-sys 0.61.2",
