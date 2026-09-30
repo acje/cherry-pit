@@ -1,7 +1,53 @@
 # Cherry-pit contributor instructions
 
-## Authority and scope
+Repo-specific operational notes. General agent/OODA doctrine, bash hygiene,
+and the Rust no-`//`-comments house style live in the global
+`~/.config/opencode/AGENTS.md` (auto-loaded) — not repeated here.
 
+## Section 1: Canonical Fleet Doctrine
+
+### OODA Loop Roles
+- **Copernicus** (Observe): Raw evidence gathering from environment, code, and external specs. Pure sensor; produces no hypotheses.
+- **Feynman** (Orient): Produces ranked hypotheses with falsifiers; stress-tests against concrete examples.
+- **Moltke** (Decide): Standing mission commander. Emits executable mission contracts, sets intent, boundaries, and abort criteria.
+- **Hopper** (Act): Executes missions using Kent Beck TDD (red-green-refactor) with verify-before-claim discipline.
+- **Linus** (Review): Mandatory pre-merge Rust reviewer for idiom conformance, type safety, unsafe soundness, and supply chain.
+- **Hamilton** (Assurance): Architectural alignment and assurance reviewer running during CI wait windows.
+- **Gardener** (GC): Post-mission cleanup specialist; reclaims transient scaffolding and closes completed mission beads.
+
+### Priority Hierarchy
+Tradeoffs strictly resolve in this five-tier priority order:
+1. **Maintainability**: Pure trunk development, small deployable increments, minimal cognitive overhead, low complexity.
+2. **Correctness by design**: Make illegal states unrepresentable via types, explicit state machines, and private invariant constructors.
+3. **Response times**: Latency-sensitive read paths and prompt fact propagation across boundaries.
+4. **Energy efficiency in code**: Minimize redundant polling, hot loops, unnecessary serialization, and idle CPU/memory burn.
+5. **Features**: New functionality ranks last and must never compromise the higher tiers.
+
+### Non-Interactive Shell Commands & Bash Hygiene
+Subagents execute non-interactively. Commands that prompt for user confirmation stall execution indefinitely.
+- Always use non-interactive and force flags: `cp -f`, `rm -f`, `rm -rf`.
+- Streaming and batch mode: use `--batch`, `-y`, or `--quiet` where available.
+- Stream separation: machine-readable findings route to `stdout`; diagnostics and logs route to `stderr`.
+
+### Zero Plain Comments
+In Rust source (`*.rs`), plain comments (`//` or `/* */`) are forbidden.
+- Rationale belongs in commit messages, ADRs, or bead descriptions.
+- Use `///` or `//!` contract doc-comments only when defining public API documentation (with required `# Errors`, `# Panics`, `# Safety` sections).
+- Suppress lints with `#[expect(lint, reason = "...")]` rather than plain comments.
+
+### Doctrine: "Make tools fast to iterate fast"
+Developer and verification tooling must be compiled, ultra-fast Rust binaries operating directly on ASTs and files rather than slow interpreted wrappers or token-heavy in-context simulation. Fast tools enable high-frequency local feedback loops (INNER cadence) without friction.
+
+### Doctrine: "Zero compliance theatre"
+High-assurance testing techniques—such as property-based testing (proptest), fuzzing (cargo-fuzz), formal model checking, or fault injection—must be applied purposefully at critical serialization, concurrency, and storage boundaries (high-risk seams), not sprayed ubiquitously as box-ticking ceremony. Where type invariants and deterministic unit tests suffice, do not add compliance overhead.
+
+## Section 2: Target-Specific Profile
+
+### Target Classification & Entrypoint
+- Target class: `service-unattended` (as mapped in `sf-sdlc.toml`).
+- Canonical verification entrypoint: `scripts/verify.sh`
+
+### Authority and Scope
 Cross-repository operational authority is
 [gh-report trunk delivery](../gh-report/docs/trunk-delivery.md) in the canonical
 sibling checkout (`Mattilsynet/gh-report`, `docs/trunk-delivery.md`). Follow that
@@ -21,33 +67,7 @@ Dev/test dependencies may exercise the outer adapters. Do not reverse-reexport
 the persistent adapter from neutral projection or vendor the Pardosa substrate.
 GitHub, organization, credential, report and tenant policy stays in consumers.
 
-## Rust policy
-
-- Use the pinned **1.98.0** toolchain, MSRV **1.98**, edition **2024**, resolver
-  **3**. Keep toolchain, Cargo MSRV and Clippy MSRV aligned; retain `Cargo.lock`.
-- Members inherit root dependencies and `[lints] workspace = true`. The current
-  source manifest's `pedantic = warn` and explicit warning roster are the bar,
-  with `-D warnings` during verification. The source five-group Clippy proposal
-  is deferred, not active policy. Do not import it or its migration allowances.
-- Use stable-default rustfmt. Per-site lint exceptions need
-  `#[expect(lint, reason = "…")]`; use `#[allow(lint, reason = "…")]` only when
-  an expectation would be unfulfilled. No blanket module allows. No inner
-  `allow(dead_code)` or `expect(dead_code)`, including `cfg_attr` forms.
-- Every crate root forbids unsafe code. No new unsafe exception without its
-  own reviewed decision. Dependencies' unsafe is a separate intake concern.
-- New Rust prose comments are contract documentation only: public API rustdoc
-  and required error/panic/safety contracts. Do not mass-rewrite byte-identical
-  imported source merely to tidy pre-existing comments during extraction.
-- Source `AGENTS.md` and RST-0006:R1 mandate closed public error enums. Read the
-  source conflict notes in governance before interpreting older open-enum prose.
-  Do not silently change imported APIs to reconcile documentary inconsistencies.
-- Domain handling/apply stays synchronous; I/O belongs at typed ports/adapters.
-  Serialization is a consuming-boundary requirement, not a `DomainEvent` bound.
-  Preserve explicit correlation and single-writer ownership. Failure of a probe
-  is unknown/error, never evidence of absence. Cancellation is not rollback.
-
-## Resource Contracts & Bounds (FLEET-RES-01)
-
+### Resource Contracts & Bounds (FLEET-RES-01)
 Changes to ingestion, buffering, concurrency, retries, recursion, or hot paths
 must define and satisfy explicit resource bounds:
 - **Items and bytes accounted separately**: A bounded channel alone does not bound
@@ -67,53 +87,74 @@ must define and satisfy explicit resource bounds:
   All durable state written to disk must use the atomic sequence:
   `write temporary file` $\rightarrow$ `fsync file` $\rightarrow$ `atomic rename` $\rightarrow$ `fsync parent directory`.
 
-## Verification tiers
-
+### Verification Cadences (Three-Tier Cadence)
 Derived from source `AGENTS.md` at the revision above; command scope is retained,
 not the source's machine-specific timings or application-only checks. Complete
 dependency build-script/proc-macro intake before Cargo execution. Never delete,
 ignore or feature-gate tests to get green. `cargo test` includes doctests;
 retain compile-fail, property, durability, fixtures and adapter conformance tests.
 
-**INNER:** changed crate, each increment/review round. Both commands must exit 0:
+- **INNER** (every hopper TDD increment and per-review-round re-verification;
+  changed crate ONLY; exit-code criterion: test + clippy exit 0):
+  ```sh
+  CARGO_TERM_PROGRESS_WHEN=never cargo test --quiet --no-fail-fast -p <crate> --locked --message-format=short
+  CARGO_TERM_PROGRESS_WHEN=never cargo clippy --quiet -p <crate> --all-targets --locked --message-format=short -- -D warnings
+  ```
+  `--all-targets` is mandatory on clippy to catch test/bench/example lints.
+  `--workspace` and `--all-features` are forbidden at this tier.
 
-```sh
-CARGO_TERM_PROGRESS_WHEN=never cargo test --quiet --no-fail-fast -p <crate> --locked --message-format=short
-CARGO_TERM_PROGRESS_WHEN=never cargo clippy --quiet -p <crate> --all-targets --locked --message-format=short -- -D warnings
-```
+- **MID** (once at sub-mission completion before done-claim; changed crates
+  plus their reverse-dependent closure; exit-code criterion: test + clippy exit 0):
+  Compute reverse dependents mechanically. Pass each package as an explicit
+  `-p <crate>` to both INNER commands. All selected tests and all-target Clippy
+  must exit 0. Neither INNER nor MID uses `--workspace` or `--all-features`.
 
-**MID:** once at sub-mission completion, changed crates plus the mechanically
-computed reverse-dependent workspace closure (including test consumers). Pass
-each package as an explicit `-p <crate>` to both INNER commands. All selected
-tests and all-target Clippy must exit 0. Neither INNER nor MID uses
-`--workspace` or `--all-features`.
+- **BOUNDARY** (once per epic before epic done-claim; full workspace; exit 0 across all):
+  ```sh
+  cargo build --workspace --all-features --locked
+  timeout 900 cargo test --quiet --no-fail-fast --workspace --all-features --locked
+  cargo clippy --quiet --workspace --all-targets --all-features --locked --message-format=short -- -D warnings
+  cargo fmt --all -- --check
+  sh scripts/verify.sh
+  ```
+  - `timeout 900` is mandatory on the test line. Exit 124 is `Outcome::Surprise`,
+    NEVER a test failure. Investigate the stall; do not fold it into a failure count.
+  - `--no-fail-fast` is mandatory on the test line to ensure full blast-radius
+    visibility in a single pass.
 
-**BOUNDARY:** once at producer/epic acceptance, all four commands must exit 0:
+### Rust Policy & Toolchain
+- Use the pinned **1.98.0** toolchain, MSRV **1.98**, edition **2024**, resolver
+  **3**. Keep toolchain, Cargo MSRV and Clippy MSRV aligned; retain `Cargo.lock`.
+- Members inherit root dependencies and `[lints] workspace = true`. The current
+  source manifest's `pedantic = warn` and explicit warning roster are the bar,
+  with `-D warnings` during verification. The source five-group Clippy proposal
+  is deferred, not active policy. Do not import it or its migration allowances.
+- Use stable-default rustfmt. Per-site lint exceptions need
+  `#[expect(lint, reason = "…")]`; use `#[allow(lint, reason = "…")]` only when
+  an expectation would be unfulfilled. No blanket module allows. No inner
+  `allow(dead_code)` or `expect(dead_code)`, including `cfg_attr` forms.
+- Every crate root forbids unsafe code. No new unsafe exception without its
+  own reviewed decision. Dependencies' unsafe is a separate intake concern.
+- New Rust prose comments are contract documentation only: public API rustdoc
+  and required error/panic/safety contracts.
+- Source `AGENTS.md` and RST-0006:R1 mandate closed public error enums. Read the
+  source conflict notes in governance before interpreting older open-enum prose.
+  Do not silently change imported APIs to reconcile documentary inconsistencies.
+- Domain handling/apply stays synchronous; I/O belongs at typed ports/adapters.
+  Serialization is a consuming-boundary requirement, not a `DomainEvent` bound.
+  Preserve explicit correlation and single-writer ownership. Failure of a probe
+  is unknown/error, never evidence of absence. Cancellation is not rollback.
 
-```sh
-cargo build --workspace --all-features --locked
-timeout 900 cargo test --quiet --no-fail-fast --workspace --all-features --locked
-cargo clippy --quiet --workspace --all-targets --all-features --locked --message-format=short -- -D warnings
-cargo fmt --all -- --check
-sh scripts/verify.sh
-```
+### Supply Chain Gates
+`cargo deny check` and `cargo audit` are supply-chain gates; run before publishing or bumping dependencies.
 
-The 900-second timeout is the source contract's bound, not a measured destination
-runtime. Exit 124 is an incomplete verdict requiring hang investigation, neither
-a pass nor a test failure. Re-evaluate the bound with recorded conditions when
-the workload or machine changes. Claims are tier-scoped; a documentation-only
-window with `git diff --check` is not a MID or BOUNDARY pass.
-
-## Rustdoc budget gate
-
+### Rustdoc Budget Gate
 Run the same native check from the repository root locally and in CI:
-
 ```sh
 comment-free --check-doc-budget --doc-advisory-words 80 --doc-max-words 120 --max-warning-files 0 .
 ```
 
 Requires comment-free 0.2.0 at the canonical revision below:
-
 ```sh
 cargo +1.98.0 install --git https://github.com/acje/comment-free --rev e45de7ef3b0fcd9a1ec299b9026b14fb5b0cf534 --locked comment-free
 ```
@@ -129,8 +170,26 @@ integration only. No rewrite mode runs.
 Macro-generated docs without spelled `doc` tokens remain outside detection;
 this is not proof of semantic documentation coverage or process-memory bounds.
 
-## Required acceptance work beyond Cargo's four commands
+### TigerStyle Construction-Path Inventory
+Invariant-bearing domain types must enforce "illegal states unrepresentable"
+by design. For each changed constrained type, review all construction routes:
+1. Public fields / struct literals (reject if fields allow inconsistent mutation).
+2. Constructors & builders (`new()`, `builder()`).
+3. `Default::default()` (must yield a valid domain state or be omitted).
+4. Conversions (`From`, `TryFrom`).
+5. Serde deserialization (custom validation if raw wire data could bypass invariants).
+6. Mutation routes (setters, `DerefMut`).
 
+Independent booleans remain valid booleans; genuine optionality remains `Option`.
+Do not invent artificial domain restrictions where none exist.
+
+### Closed Error Enum Policy (C4.5/C4.6)
+Public error enums MUST NOT carry `#[non_exhaustive]`. Variant sets are complete
+within a major semver line, making unhandled error states unrepresentable at
+compile time. Enforced mechanically via `non-exhaustive-check` from the canonical
+`tripwires` repository.
+
+### Required Acceptance Work Beyond Cargo's Four Commands
 Standalone gates use `python3.12 -B tools/verify.py static|graph|supply-chain`.
 `rust` and `non-exhaustive` use the scoped local intake admission recorded in
 `ghr-7wc6p.11.2`, with a direct installed compiler and sanitized environment.
@@ -152,23 +211,14 @@ The unsafe-root guard deliberately accepts only whitespace and line comments
 before a literal first `#![forbid(unsafe_code)]` attribute. Block-comment,
 conditional and string-literal spellings do not establish this invariant.
 
-GitHub inspection on 2026-09-20 reports both repositories public, zero destination
-self-hosted runners and zero repository secrets. Source checkout uses the pinned
-public revision without a custom credential. Hosted audit/deny provisioning uses
-official pinned musl archives and member checksums from `ghr-02ld2`, checked
-before installation/execution. Version checks are not provenance evidence.
-`tools/verify.py provision` is limited to the explicit hosted Linux context;
-it does not compile or overwrite existing tools. Final review and actual Linux
-CI remain required. No permission changes follow.
-
 Mandatory commander-dispatched adversarial Linus review precedes producer
 commit/merge. Preserve actual required reviews and checks; no fabricated
 approvals or bypasses. Record unresolved source-rule/code tensions for review.
 
-## Local data and coordination
-
+### Local Data and Coordination
 Preserve `.git`, `.beads` audit/scaffold, unrelated untracked files and secrets.
 Do not stage the Beads database or runtime audit. Pin Beads discovery explicitly
-and check the returned prefix/path. The active extraction contract and origin
-ledger are in **gh-report's** pinned store (`ghr-7wc6p.1`), not this repository's
-ambient store. No new tracking framework is needed.
+and check the returned prefix/path via `bd -C <repo-root>`.
+Database resides at `.beads/embeddeddolt`.
+The active extraction contract and origin ledger are in **gh-report's** pinned
+store (`ghr-7wc6p.1`), not this repository's ambient store.
