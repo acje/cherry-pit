@@ -95,6 +95,7 @@ cargo build --workspace --all-features --locked
 timeout 900 cargo test --quiet --no-fail-fast --workspace --all-features --locked
 cargo clippy --quiet --workspace --all-targets --all-features --locked --message-format=short -- -D warnings
 cargo fmt --all -- --check
+sh scripts/verify.sh
 ```
 
 The 900-second timeout is the source contract's bound, not a measured destination
