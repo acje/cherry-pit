@@ -1,18 +1,13 @@
 //! Comparative evidence harness: CURRENT (`BudgetGate` via
 //! [`run_worker_pool`](cherry_pit_wq::run_worker_pool)) vs increment A
-//! (composable [`Regulator`] path, `BudgetRegulator` adapter) vs increment
-//! B ([`TokenBucketRegulator`]), driven through the same adversarial
-//! free/charged draw schedule (CHE-0101 / CHE-0055 mission).
+//! (composable [`Regulator`] path, `BudgetRegulator` adapter) vs
+//! increment B ([`TokenBucketRegulator`]), all driven through the same
+//! adversarial free/charged draw schedule (CHE-0101 / CHE-0055 mission).
 //!
-//! `run_worker_pool`'s `worker_loop` calls `budget_gate.acquire()` and
-//! never calls `BudgetGate::refund` (see
-//! `crates/cherry-pit-wq/src/worker_pool.rs::worker_loop`) — there is no
-//! executor-outcome signal (`JobExecutor::execute` returns
-//! `Result<R, String>`, no free/charged distinction) that could drive a
-//! refund. This harness therefore exercises `BudgetGate` directly with
-//! the same no-refund-ever pattern `worker_loop` has, rather than routing
-//! through `run_worker_pool` itself — that IS the CURRENT design's
-//! phantom-304 behaviour, not a simplification of it.
+//! `worker_loop` never calls `BudgetGate::refund`, so the harness drives
+//! the gates directly with the same no-refund-ever pattern. Full
+//! rationale: docs/testing/property-and-limit-rationale.md (stable names
+//! `p1_*`, `phantom_304_headline_contrast`, `l4_*`, `f3_seam_*`).
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -65,11 +60,10 @@ impl Clock for FakeClock {
 
 /// Drive `schedule.len()` draws through CURRENT's actual no-refund
 /// pattern: `BudgetGate::acquire`, never `BudgetGate::refund`, for every
-/// draw regardless of `schedule`'s free/charged flag. `schedule.len()`
-/// must not exceed `limit` — this harness intentionally stays inside the
-/// non-blocking region of `acquire` (see module doc); the blocking
-/// cooldown-then-reset codepath already has dedicated coverage in
-/// `budget.rs`.
+/// draw regardless of `schedule`'s free/charged flag; `schedule.len()`
+/// must not exceed `limit` so every draw stays in `acquire`'s
+/// non-blocking region (the blocking cooldown-then-reset path has its
+/// own coverage in `budget.rs`).
 fn drive_current(limit: u64, schedule: &[bool]) -> u64 {
     let rt = current_thread_rt();
     let gate = BudgetGate::new(limit, Duration::from_mins(1));
@@ -147,11 +141,6 @@ fn limit_and_schedule() -> impl Strategy<Value = (u64, Vec<bool>)> {
 proptest! {
     #![proptest_config(ProptestConfig { cases: 128, .. ProptestConfig::default() })]
 
-    /// F1 property (iii) — draw-on-confirmed-charge conservation, increment
-    /// A: `settle(Free)` releases the permit it admitted under;
-    /// `settle(Charged)` leaves it consumed. `gate.calls_made()` after the
-    /// schedule must equal exactly the count of `charged` (non-free) draws
-    /// — free draws leave zero residue.
     #[test]
     fn p1_a_budget_regulator_conserves_on_free_settle((limit, schedule) in limit_and_schedule()) {
         let charged = schedule.iter().filter(|&&free| !free).count() as u64;
@@ -160,14 +149,6 @@ proptest! {
         prop_assert!(calls_made <= limit, "F1 property (i): permits never exceed authoritative budget");
     }
 
-    /// F1 property (ii), CURRENT — headline evidence. `run_worker_pool`'s
-    /// `worker_loop` never calls `BudgetGate::refund` (see module doc), so
-    /// `calls_made()` after any schedule equals `schedule.len()` regardless
-    /// of how many draws were actually free. When `schedule.len() == limit`
-    /// and every draw is free, CURRENT reaches full epoch exhaustion purely
-    /// from free (304) draws — phantom exhaustion, the historical bug this
-    /// mission captures as evidence rather than fixes (out_of_scope: do not
-    /// modify the frozen path).
     #[test]
     fn p1_current_budget_gate_conflates_free_and_charged((limit, schedule) in limit_and_schedule()) {
         let calls_made = drive_current(limit, &schedule);
@@ -179,15 +160,6 @@ proptest! {
         prop_assert!(calls_made <= limit, "F1 property (i): permits never exceed authoritative budget");
     }
 
-    /// F1 property (i) + B's structural contrast: [`TokenBucketRegulator`]
-    /// is documented RATE-only with a no-op `settle` (`token_bucket.rs`) —
-    /// it debits every admitted draw regardless of the free/charged flag,
-    /// by construction, because there is no charge-tracking state to
-    /// conflate. `consumed <= capacity_tokens` (property i) holds under
-    /// burst load; B does not attempt (and structurally cannot corrupt) A's
-    /// free/charged conservation invariant because it never models that
-    /// axis at all — see `phantom_304_headline_contrast` below for the
-    /// decisive cross-design pause-behaviour contrast.
     #[test]
     fn p1_b_token_bucket_debits_uniformly_regardless_of_flag((limit, schedule) in limit_and_schedule()) {
         let consumed = drive_b(limit, &schedule);
@@ -197,24 +169,10 @@ proptest! {
 }
 
 /// F1 headline contrast (fixed illustrative case, not proptest-shrunk):
-/// 5 free-only (304) draws against a limit/capacity of 5.
-///
-/// - CURRENT: `calls_made() == 5` — the epoch is fully exhausted purely by
-///   free draws; the *next* real call would require the full
-///   `wait_duration` cooldown-then-reset sleep (`budget.rs::acquire`),
-///   regardless of the fact that zero real charges occurred. This is the
-///   phantom-304 bug.
-/// - A: `calls_made() == 0` — every free draw was refunded via
-///   `settle(Free)`; zero phantom cost, full headroom retained.
-/// - B: consumes all 5 tokens (no free/charged distinction exists), but
-///   refill is a *continuous pure function of elapsed time* — advancing
-///   the clock by exactly one token's worth of time admits one more draw
-///   immediately, with no discrete "wait the full cooldown" stall the way
-///   CURRENT's elected-resetter path requires. B eliminates the phantom
-///   *pause* class structurally (no `resetting` election field exists in
-///   `TokenBucketRegulator`, contrasted with `BudgetGate`'s `resetting:
-///   AtomicBool`), even though it does not model per-draw free/charged
-///   accounting the way A does.
+/// 5 free-only (304) draws against a limit/capacity of 5. The CURRENT
+/// (phantom exhaustion), A (zero residue), and B (continuous elapsed-time
+/// refill, no discrete pause) behaviours are detailed in
+/// docs/testing/property-and-limit-rationale.md.
 #[test]
 fn phantom_304_headline_contrast() {
     let schedule = vec![true; 5];
@@ -250,11 +208,9 @@ fn phantom_304_headline_contrast() {
 }
 
 /// Layer 4 — CURRENT needs `epochs` simulated full-epoch cooldowns to
-/// admit an all-free draw storm, purely from phantom-304 conflation;
-/// A (`settle(Free)`) needs zero. `tokio::time::pause`/`advance` drives
-/// simulated multi-hour epoch cycles deterministically (no wall-clock
-/// cost). This generalises `phantom_304_headline_contrast` from a single
-/// epoch to a multi-hour storm, the shape Layer 4 asks for.
+/// admit an all-free draw storm (phantom-304), while A needs zero.
+/// `tokio::time::pause`/`advance` drives multi-hour epoch cycles
+/// deterministically. Generalises `phantom_304_headline_contrast`.
 #[tokio::test]
 async fn l4_current_needs_n_epoch_resets_for_phantom_304_storm_while_a_needs_zero() {
     tokio::time::pause();
@@ -303,11 +259,10 @@ async fn l4_current_needs_n_epoch_resets_for_phantom_304_storm_while_a_needs_zer
 
 /// Layer 4 — B: budget conservation and reset-cycle correctness across a
 /// simulated multi-hour idle gap. `capacity_tokens == refill_per_sec *
-/// 3600` is chosen so exactly one simulated hour regenerates exactly one
-/// capacity's worth — advancing by exactly that amount must refill to
-/// precisely `capacity_tokens` (not more, not less: no overshoot, no
-/// unbounded accumulation), and a draw beyond that within the same burst
-/// must not admit instantly.
+/// 3600`, so one simulated hour regenerates exactly one capacity's worth
+/// — advancing by exactly that amount refills to precisely
+/// `capacity_tokens` (no overshoot), and a draw beyond that within the
+/// same burst must not admit instantly.
 #[test]
 fn l4_b_token_bucket_conserves_and_caps_across_simulated_multi_hour_idle_gap() {
     let rt = current_thread_rt();
@@ -390,16 +345,12 @@ impl Regulator for RetryAfterTestDouble {
 }
 
 /// F3 — seam acceptance: [`RetryAfterTestDouble`] is dyn-compatible and
-/// composes into the same ordered `&[Arc<dyn Regulator>]` chain as a real
+/// composes into an ordered `&[Arc<dyn Regulator>]` chain beside a real
 /// adapter ([`BudgetRegulator`]); it rejects (parks) admission until its
-/// simulated Retry-After deadline elapses, then admits.
+/// Retry-After deadline elapses, then admits.
 ///
-/// CURRENT has no equivalent injection path: [`cherry_pit_wq::run_worker_pool`]'s
-/// signature takes `budget_gate: Arc<BudgetGate>, rate_limit_state:
-/// Arc<RateLimitState>` — two fixed concrete types, not a slice of trait
-/// objects — so there is no way to substitute or add a Retry-After-aware
-/// gate into the CURRENT worker pool without changing its signature
-/// (a compile-time API fact, not a runtime behaviour to assert).
+/// Why CURRENT has no equivalent injection path is a compile-time API
+/// fact — see docs/testing/property-and-limit-rationale.md.
 #[test]
 fn f3_seam_accepts_test_double_retry_after_regulator_current_has_no_injection_path() {
     let clock = FakeClock::new();

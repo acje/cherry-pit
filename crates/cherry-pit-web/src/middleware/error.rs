@@ -12,20 +12,16 @@
 //! | `Rejected(E)`                           | 422    | —             | CHE-0015    |
 //! | `ConcurrencyConflict` (dispatch/store)  | 409    | —             | CHE-0041:R3 |
 //! | `AggregateNotFound`                     | 404    | —             | R10         |
-//! | `Infrastructure` (dispatch/store)       | 503    | `Retry-After` | R10, below  |
+//! | `Infrastructure` (dispatch/store)       | 503    | `Retry-After` | R10         |
 //! | `StoreLocked`                           | 503    | `Retry-After` | R10         |
 //! | `CorruptData`                           | 500    | —             | R10         |
 //! | `BusError`                               | 503    | `Retry-After` | CHE-0021:R3 |
 //! | post-persist cancellation                | 202    | —             | CHE-0046:R5 |
 //!
-//! `DispatchError::Infrastructure` sits at the dispatch layer, not the
-//! store layer R10 enumerates, but maps to the same signal by the
-//! same retryable reasoning; 500 stays reserved for terminal
-//! `CorruptData`.
-//!
-//! `Rejected(E)`'s `Display` is preserved in full via
-//! [`ErrorBody::message`] (CHE-0015): a `Serialize` bound on the
-//! gateway error generic would tighten CHE-0049 R1.
+//! Dispatch-layer `Infrastructure` → 503 (500 reserved for terminal
+//! `CorruptData`) and lossless `Rejected` `Display` without a
+//! `Serialize` bound: rationale in
+//! docs/testing/property-and-limit-rationale.md.
 
 use std::error::Error;
 use std::fmt::Display;

@@ -1,21 +1,13 @@
 //! Per-aggregate event ordering proptest for F2 (mission
 //! ghr-d64c8076).
 //!
-//! Property: under the F2 design — synchronous bus fan-out
-//! (CHE-0024:§7) feeding a bounded `tokio::sync::mpsc` channel drained
-//! by one sequential consumer — envelopes arrive in **publish order**,
-//! so per-aggregate order is preserved. Trivially true: if
-//! `(agg=a, seq=n)` publishes before `(agg=a, seq=n+1)`, `n` enters the
-//! channel first and the consumer pulls it first (FIFO `mpsc`). The
-//! proptest **observes** this under a random schedule across multiple
-//! aggregates, confirming the orphan-`handle.spawn` design (pre-F2)
-//! that violated it is gone.
+//! Under the F2 design — synchronous bus fan-out (CHE-0024:§7) into a
+//! bounded `tokio::sync::mpsc` channel drained by one sequential
+//! consumer — envelopes arrive in publish order, so per-aggregate order
+//! is preserved.
 //!
-//! Scope: exercises the bus → `enqueue_or_log` → channel → consumer
-//! pipeline directly (`run_dispatch_consumer` is unit-tested in
-//! `app.rs::tests`). Channel capacity is generous (`8 * N`) so
-//! back-pressure does not drop envelopes here — tested separately in
-//! `app.rs::tests::full_dispatch_channel_drops_overflow_…`.
+//! Rationale and scope: docs/testing/property-and-limit-rationale.md
+//! (`per_aggregate_dispatch_order_matches_publish_order`).
 
 use std::num::NonZeroU64;
 use std::sync::{Arc, Mutex};
@@ -85,9 +77,6 @@ proptest! {
         ..ProptestConfig::default()
     })]
 
-    /// The consumer pulls envelopes from the channel in publish order.
-    /// Per-aggregate ordering follows trivially: filtering a sequence
-    /// that preserves global order also preserves per-aggregate order.
     #[test]
     fn per_aggregate_dispatch_order_matches_publish_order(shuffled in schedule_strategy()) {
         let rt = tokio::runtime::Builder::new_multi_thread()

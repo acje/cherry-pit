@@ -10,18 +10,11 @@
 //! - **`max_inflight_requests`** — in-flight requests, 503-shed (not
 //!   queued) via [`http_concurrency_limit`] (SEC-0003:R3).
 //!
-//! The WS connection cap is deliberately **not** here. It lives on
-//! SEC-0012's `WsPolicy` beside the Origin policy, because a surface
-//! that mounts a `/ws` upgrade needs both to be safe and carrying them
-//! separately let `serve` take the cap and omit the policy — see the
-//! reversal recorded in SEC-0012's Consequences (CHE-0062:R1/R2).
-//!
-//! [`LayerLimits`] omits [`Default`]: a defaulted permissive value is
-//! a SEC-0003 footgun. Tests use
-//! [`LayerLimits::permissive_for_tests`]; production names both
-//! values, [`NonZeroUsize`] hard upper bounds
-//! (`NonZeroUsize::MAX` unbounded in practice), each unconditionally
-//! honoured per CHE-0062:R4.
+//! [`LayerLimits`] has no `Default`: name both caps at construction
+//! (tests use [`LayerLimits::permissive_for_tests`]); `NonZeroUsize::MAX`
+//! is effectively unbounded; each cap is unconditionally enforced
+//! (CHE-0062:R4). WS-cap placement rationale:
+//! docs/testing/property-and-limit-rationale.md.
 
 use std::num::NonZeroUsize;
 use std::sync::Arc;
@@ -48,22 +41,17 @@ use tokio::sync::Semaphore;
 /// };
 /// ```
 ///
-/// Consumers build `LayerLimits` from any source — application config,
-/// environment, hard-coded defaults. The library does not inspect that
-/// source (CHE-0062:R3 — no consumer config type crosses the boundary).
+/// Consumers build `LayerLimits` from any source; the library never
+/// inspects that source (CHE-0062:R3). Both fields are
+/// [`NonZeroUsize`]: a zero cap admits no request at all — a disabled
+/// layer in intent, forbidden by CHE-0062:R4 and unrepresentable here
+/// rather than rejected by a runtime guard (SEC-0014:R4).
 ///
-/// Both fields are [`NonZeroUsize`]: a cap of zero admits no request at
-/// all, which is a disabled layer in fact and is forbidden in intent by
-/// CHE-0062:R4. It is unrepresentable here rather than rejected by a
-/// runtime guard (SEC-0014:R4).
-///
-/// The struct is `Copy`: two `NonZeroUsize`s, no heap. Pass by value at
-/// the call site; the router builder copies the values into the
-/// per-instance semaphores it constructs.
-///
-/// Adding a future field is a semver-major event for cherry-pit-web
-/// (CHE-0062:R6); the crate is internal and `Cargo.lock` is committed
-/// per the crate README, so the workspace tolerates this.
+/// The struct is `Copy` (two `NonZeroUsize`s, no heap); the router
+/// builder copies the values into the per-instance semaphores it
+/// constructs. Adding a future field is a semver-major event for
+/// cherry-pit-web (CHE-0062:R6); the crate is internal and `Cargo.lock`
+/// is committed per the crate README, so the workspace tolerates this.
 #[derive(Debug, Clone, Copy)]
 pub struct LayerLimits {
     /// Maximum inbound request body in bytes, applied as a ceiling at
@@ -107,22 +95,16 @@ impl LayerLimits {
 
 /// 503-shedding HTTP concurrency limiter middleware.
 ///
-/// Bounds the number of in-flight HTTP requests at the router level.
-/// Returns `503 Service Unavailable` immediately on exhaustion (sheds
-/// load) rather than queueing — preserves the "shed, don't queue"
-/// accept/shed topology of the original `gh-report` donor
-/// implementation this layer supersedes, per SEC-0003:R3.
-///
-/// `tower::limit::ConcurrencyLimit` is deliberately **not** used: that
-/// layer queues, which violates the "shed, don't queue" obligation in
-/// CHE-0062:R1.
-///
-/// Wired via [`axum::middleware::from_fn`] in
-/// [`super::super::build_router`] (cqrs surface) and
+/// Bounds in-flight HTTP requests at the router level; returns
+/// `503 Service Unavailable` immediately on exhaustion (sheds load,
+/// never queues — the accept/shed topology of the `gh-report` donor it
+/// supersedes, per SEC-0003:R3; `tower::limit::ConcurrencyLimit` is not
+/// used because it queues, violating CHE-0062:R1). Wired via
+/// [`axum::middleware::from_fn`] in
+/// [`super::super::build_router`] (cqrs) and
 /// [`super::super::projection::build_projection_router`] (read surface,
-/// gated on the `projection` feature). The per-instance
-/// `Arc<Semaphore>` is captured by the closure so the permit pool
-/// lives for the router's lifetime.
+/// gated on `projection`); the closure captures the per-instance
+/// `Arc<Semaphore>` so the permit pool lives for the router's lifetime.
 pub(crate) async fn http_concurrency_limit(
     semaphore: Arc<Semaphore>,
     request: Request,

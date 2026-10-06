@@ -35,10 +35,6 @@ use crate::event::{DomainEvent, EventEnvelope};
 /// per implementation; after recovery the store MUST satisfy every
 /// invariant documented here.
 ///
-/// Doctest type-checks the trait surface without `.await` — RPITIT
-/// (CHE-0018:R2) needs a runtime, and this crate has zero async-runtime
-/// deps (CHE-0029:R4).
-///
 /// ```
 /// use std::num::NonZeroU64;
 /// use cherry_pit_core::{AggregateId, CorrelationContext, EventStore};
