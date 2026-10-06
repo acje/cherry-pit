@@ -3,5 +3,6 @@
   "backend": "dolt",
   "dolt_mode": "embedded",
   "dolt_database": "cherry_pit",
-  "project_id": "c4af9504-e7cc-43f8-a3ba-29d4126a694e"
+  "project_id": "c4af9504-e7cc-43f8-a3ba-29d4126a694e",
+  "last_bd_version": "1.3.1"
 }
