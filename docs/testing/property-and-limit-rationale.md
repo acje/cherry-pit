@@ -159,3 +159,87 @@ Anchored at `dispatch_infrastructure_maps_to_503_retryable` and
 Anchored at `EventStore` (trait-level doctest). The doctest type-checks the
 trait surface without `.await`: RPITIT (CHE-0018:R2) needs a runtime, and
 `cherry-pit-core` has zero async-runtime deps (CHE-0029:R4).
+
+## Dispatch erasure and telemetry (crates/cherry-pit-app/src/dispatch.rs)
+
+- Policies are stored as `Vec<Box<dyn ErasedPolicyDispatcher<G>>>` — a
+  per-policy adapter. Erasure sits at the dispatcher boundary, never on
+  the infra `Policy` port (CHE-0005:R1 forbids erasing infra ports);
+  the dispatcher itself is the erasure point.
+- `correlation_for`'s `tracing::debug!` is the paired runtime-telemetry
+  mechanism for the correlation branch the type system cannot constrain
+  (SEC-0005:R4), satisfying GND-0005:R1+R2 for CHE-0051:R6 / CHE-0039:R1–R3.
+- `DispatcherList` is unit-tested but not yet driven by `App::run`.
+
+## WebSocket policy carrier history (crates/cherry-pit-web/src/middleware/ws_auth.rs)
+
+The two knobs (`max_connections`, `origin_policy`) are fused in
+`WsPolicy` deliberately. They were once split across `LayerLimits`
+(availability) and `WsAuthLimits` (authenticity) to keep CISQ primaries
+MECE; that split let `serve::build_router` take the WS cap and never take
+a policy, so no origin-strict WebSocket ran in production for the eight
+weeks SEC-0012:R2 declared `Strict` the default. Grouping the knobs one
+capability needs to be safe makes the omission a compile error rather
+than an absence nobody can see (reversal recorded in SEC-0012's
+Consequences).
+
+## Scheduler store composition (crates/pardosa-cherry-pit-test-support/src/scheduler_store.rs)
+
+`PgnoSchedulerStore` delegates to `PgnoEventStore<SchedulerEventDto>`
+rather than adding a generic `PgnoEventStore<Ev, Dto, Converter>` variant:
+the `SchedulerEvent <-> SchedulerEventDto` mapping is a fixed 1:1
+relationship with exactly one consumer, so a converter parameter would
+add an indirection layer (a converter trait plus its own bound set) only
+this single call site would instantiate. Delegation reuses the substrate
+(per-aggregate locking, optimistic-concurrency sequence checks,
+single-event-only atomicity, restart recovery) with zero duplicated
+logic; only the boundary conversion is new.
+
+## F1 phantom-304 historical cause (crates/cherry-pit-wq/tests/f1_phantom_304.rs)
+
+Historically `worker_loop_regulated` hardcoded
+`regulator.settle(SettleOutcome::Charged)` for every admitted job
+regardless of whether the result actually consumed the guarded resource.
+This drove the F1 34x overcount / spurious 1h-freeze bug: a job whose
+real-world effect was free (e.g. GitHub 304 not-modified) still charged
+the budget permit. The acceptance test drives the live regulated path
+with a `charge_of` reporting every outcome as `SettleOutcome::Free` and
+asserts conservation (epoch limit 1, long cooldown).
+
+## Origin-proptest donor provenance (crates/cherry-pit-web/tests/projection_proptest.rs)
+
+The preflight and WS-origin proptest families derive from donor
+`server.rs:3745`–3835 (pure-function path block) and `server.rs:3800`–
+3835 (Origin/Host strategy). The pure-function block was 256 cases in
+the donor; the HTTP-integration origin block trades case breadth for
+end-to-end coverage at `ORIGIN_CASES = 64` (~192 server lifecycles,
+~10–20 s wall-clock). Property intent is carried by the stable test
+names; the donor line pointers were removed from the macro bodies.
+
+## WebSocket origin policy — ambient-credentials rationale (crates/cherry-pit-web/src/middleware/ws_auth.rs)
+
+Source-exact (8ae55f5): ambient credentials are the textbook CSWSH
+vector — the browser attaches the victim's cookies to a cross-origin
+upgrade — but they are not the only one, and a service that sets no
+cookies is not therefore safe. The socket pushes data *after* the
+handshake, so a successful cross-origin upgrade is a read primitive
+over whatever the surface publishes regardless of how the request was
+authenticated.
+
+This paragraph was compressed out of the `WebSocketOriginPolicy` enum
+doc during the comment-free budget reduction while the block sat at the
+120-word enforced limit; it is preserved here so the SEC-0012 decision
+reasoning stays discoverable.
+
+## r3_apply idempotence anchor (crates/cherry-pit-projection/src/lib.rs)
+
+Anchor: `r3_apply_is_idempotent_over_a_fixed_event_stream`.
+Source-exact (8ae55f5): CHE-0048:R3 — `apply` is deterministic and
+idempotent over a fixed event stream: replaying the same envelope
+sequence twice against fresh projections yields equal final states.
+Two independent replays exercise the property without depending on
+driver-internal retry semantics.
+
+This paragraph was compressed out of the `r3_apply` proptest doc
+comment during the budget reduction; the property intent is carried by
+the stable test name, and the full rationale is preserved here.

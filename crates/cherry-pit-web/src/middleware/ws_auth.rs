@@ -1,31 +1,19 @@
 //! SEC-0012 WebSocket policy carrier and Origin validation.
 //!
-//! Realises **SEC-0012** for every cherry-pit-web surface that mounts a
-//! WS upgrade — the projection adapter and the generic serve runtime:
+//! Realises SEC-0012 for every surface mounting a WS upgrade: the
+//! projection adapter and the generic serve runtime.
 //!
 //! - [`WebSocketOriginPolicy`] — typed policy enum. `Strict` (default)
-//!   rejects absent `Origin` at WS upgrade with `403 FORBIDDEN`.
+//!   rejects absent `Origin` at WS upgrade with `403 FORBIDDEN`;
 //!   `AllowAbsent` is the documented escape hatch for non-browser
-//!   clients; consumers electing it accept CWE-346 / CWE-1385 risk
-//!   per SEC-0012:R3.
+//!   clients, electing CWE-346 / CWE-1385 risk per SEC-0012:R3.
 //! - [`WsPolicy`] — the carrier, holding `max_connections` alongside
 //!   `origin_policy` (SEC-0012:R1).
 //!
-//! The two knobs are fused deliberately. They were once split across
-//! `LayerLimits` (availability) and `WsAuthLimits` (authenticity) to
-//! keep CISQ primaries MECE; that split let `serve::build_router` take
-//! the WS cap and never take a policy, so no origin-strict WebSocket
-//! ran in production for the eight weeks SEC-0012:R2 declared `Strict`
-//! the default. A carrier now groups the knobs one capability needs to
-//! be safe, so the omission is a compile error rather than an absence
-//! nobody can see. See SEC-0012's Consequences for the full reversal.
-//!
 //! Both types carry `#[non_exhaustive]` per COM-0021:R1 for additive,
-//! semver-minor evolution.
-//!
-//! [`validate_ws_origin`] and its [`Authority`] parser live here — the
-//! single home for WS origin validation across both the static-serve
-//! runtime and the projection adapter (CHE-0086:R8).
+//! semver-minor evolution. [`validate_ws_origin`] and its [`Authority`]
+//! parser are the single home for WS origin validation across both the
+//! static-serve runtime and the projection adapter (CHE-0086:R8).
 
 use std::num::NonZeroUsize;
 
@@ -40,22 +28,11 @@ pub(crate) const WS_MAX_MESSAGE_SIZE: usize = 4096;
 ///
 /// The default ([`WebSocketOriginPolicy::Strict`]) closes the
 /// CWE-346 / CWE-1385 Cross-Site WebSocket Hijacking (CSWSH) hole at
-/// the trust boundary: an attacker-origin page cannot open a WS to the
-/// target, because the absent or mismatched `Origin` is rejected
-/// before the handshake completes.
-///
-/// Ambient credentials are the textbook CSWSH vector — the browser
-/// attaches the victim's cookies to a cross-origin upgrade — but they
-/// are not the only one, and a service that sets no cookies is not
-/// therefore safe. The socket pushes data *after* the handshake, so a
-/// successful cross-origin upgrade is a read primitive over whatever
-/// the surface publishes regardless of how the request was
-/// authenticated.
-///
-/// Future variants land additively per SEC-0012:R4; the
-/// `#[non_exhaustive]` attribute reserves the surface for them
-/// (e.g. an `AllowMatching` allowlist variant) without breaking
-/// downstream `match` arms.
+/// the trust boundary: an absent or mismatched `Origin` is rejected
+/// before the handshake completes. Cross-origin success is a read
+/// primitive over whatever the surface publishes, independent of
+/// authentication. Future variants land additively per SEC-0012:R4;
+/// `#[non_exhaustive]` reserves the surface for them.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum WebSocketOriginPolicy {
@@ -86,26 +63,17 @@ impl Default for WebSocketOriginPolicy {
 }
 
 /// Per-surface WebSocket policy, attached at router construction by
-/// every cherry-pit-web surface that mounts a `/ws` upgrade
-/// (SEC-0012:R1, R4).
+/// every surface mounting a `/ws` upgrade (SEC-0012:R1, R4).
 ///
-/// Carries the two knobs a WS upgrade needs to be safe:
-/// `max_connections` (the SEC-0003:R3 connection cap, unconditional
-/// per CHE-0062:R4) and `origin_policy` (the SEC-0005 authenticity
-/// election, consumer-discretionary per SEC-0012:R5). Fusing an
-/// electable knob with an unconditional one makes neither
-/// electable-by-omission — a consumer must name both.
-///
-/// Construct via [`WsPolicy::new`], which yields `Strict` without the
-/// caller having to name it, or [`WsPolicy::permissive_for_tests`].
-/// The `#[non_exhaustive]` attribute (COM-0021:R1) blocks the
-/// struct-literal idiom outside the crate, matching
-/// [`super::LayerLimits`]; consumers cannot accidentally rely on a
-/// field set that future versions will extend per SEC-0012:R4.
-///
-/// [`Default`] is deliberately absent: `max_connections` has no
-/// defensible default, and a defaulted availability cap is the same
-/// SEC-0003 footgun [`super::LayerLimits`] avoids.
+/// Carries both knobs a WS upgrade needs to be safe:
+/// `max_connections` (SEC-0003:R3 cap, unconditional per CHE-0062:R4)
+/// and `origin_policy` (SEC-0012:R5). Fusing an electable knob with an
+/// unconditional one makes neither electable-by-omission. Construct via
+/// [`WsPolicy::new`] (`Strict` by construction) or
+/// [`WsPolicy::permissive_for_tests`]. `#[non_exhaustive]`
+/// (COM-0021:R1) blocks the struct-literal idiom outside the crate;
+/// [`Default`] is deliberately absent — `max_connections` has no
+/// defensible default.
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct WsPolicy {

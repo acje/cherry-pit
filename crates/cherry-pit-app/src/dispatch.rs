@@ -5,22 +5,14 @@
 //! — no `Default`, no shared state); call `policy.react` synchronously
 //! (CHE-0018:R1); invoke the caller's dispatch closure per output
 //! (CHE-0051:R4, CHE-0017:R2); on `Terminal` `AgentError`, route to the
-//! dead-letter sink (CHE-0051:R7, CHE-0024:R5, CHE-0046:R2) —
-//! `Retryable` errors are returned to the caller untouched, which
-//! `run_dispatch_consumer` (`cherry-pit-app::app`) logs and drops at
-//! its terminal sink — no gateway retry is wired at this layer
-//! (CHE-0046:R7).
-//!
-//! This satisfies GND-0005:R1 + R2 for CHE-0051:R6/CHE-0039:R1–R3;
-//! `correlation_for`'s `tracing::debug!` (line 91) is the paired
-//! runtime-telemetry mechanism for the branch the type system can't
-//! constrain (SEC-0005:R4).
+//! dead-letter sink (CHE-0051:R7, CHE-0024:R5, CHE-0046:R2) — `Retryable`
+//! errors return to the caller untouched, which `run_dispatch_consumer`
+//! logs and drops at its terminal sink — no gateway retry is wired at
+//! this layer (CHE-0046:R7).
 //!
 //! Policies are stored as `Vec<Box<dyn ErasedPolicyDispatcher<G>>>` —
-//! a per-policy adapter, not `Box<dyn Policy>`; CHE-0005:R1 forbids
-//! erasing infra ports, so erasure sits at the dispatcher boundary.
-//!
-//! `DispatcherList` is unit-tested but not yet driven by `App::run`.
+//! a per-policy adapter; erasure sits at the dispatcher boundary, not
+//! on the infra `Policy` port (CHE-0005:R1).
 
 use std::future::Future;
 use std::pin::Pin;

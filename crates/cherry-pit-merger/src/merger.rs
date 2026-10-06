@@ -67,31 +67,23 @@ where
     Arm: MergerArm<A>,
 {
     /// Spawn the merger task and return a [`MergerHandle`] plus the
-    /// underlying [`tokio::task::JoinHandle`]. Composition root holds
-    /// the join handle to keep the task alive; the handle is the
-    /// dispatch surface for every caller.
+    /// underlying [`tokio::task::JoinHandle`]. The composition root
+    /// holds the join handle to keep the task alive; the handle is the
+    /// dispatch surface for every caller. The channel is bounded
+    /// ([`MERGER_CHANNEL_CAPACITY`]); a saturated queue back-pressures
+    /// producers via [`mpsc::Sender::send`] rather than dropping
+    /// commands.
     ///
-    /// The channel is bounded ([`MERGER_CHANNEL_CAPACITY`]); a
-    /// saturated queue back-pressures producers via
-    /// [`mpsc::Sender::send`] rather than dropping commands.
+    /// # Single-writer-through-merger (CHE-0006)
     ///
-    /// # Single-writer-through-merger convention (CHE-0006)
-    ///
-    /// `store` is consumed as an [`Arc`] by value. The single-writer
-    /// guarantee this crate provides (the I1 TOCTOU serialization —
-    /// see [`crate::shared`]) holds only through the returned
-    /// [`MergerHandle`]: every command MUST route through the handle,
-    /// never directly against a retained clone of the same `Arc<S>`.
-    /// `Arc` is `Clone` by definition (INHERENT-RUST — this is not
-    /// sealable at the trait/method surface); a composition root that
-    /// keeps a second clone of the store `Arc` passed into `spawn` and
-    /// calls `store.create()`/`store.append()` directly bypasses the
-    /// merger's single-task serialization entirely. Correct wiring
-    /// passes the store `Arc` to `spawn` and then drops (or never
-    /// retains) any other clone of it; only [`MergerHandle`] should
-    /// remain as the write path. A full compile-time seal would need a
-    /// non-`Clone` owning-store token threaded through construction —
-    /// a separate, larger design, out of scope here (DEFERRED).
+    /// `store` is consumed as an [`Arc`] by value; the I1 TOCTOU
+    /// serialization holds only through the returned [`MergerHandle`].
+    /// Every command MUST route through the handle — never against a
+    /// retained clone of the same `Arc<S>`. Pass the store `Arc` to
+    /// `spawn`, then drop (or never retain) any other clone; only
+    /// [`MergerHandle`] remains the write path. A compile-time seal
+    /// would need a non-`Clone` owning-store token (a larger design,
+    /// deferred).
     #[must_use]
     pub fn spawn(
         arm: Arm,

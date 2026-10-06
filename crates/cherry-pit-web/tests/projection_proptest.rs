@@ -122,15 +122,11 @@ async fn try_upgrade(
 }
 
 proptest! {
-    /// Donor `server.rs:3745` — `normalize_request_path` never panics on
-    /// arbitrary Unicode input.
     #[test]
     fn path_never_panics(input in "\\PC{0,500}") {
         let _normalized = normalize_request_path(&input);
     }
 
-    /// Donor `server.rs:3752` — output key never contains `..`, null
-    /// bytes, or backslashes.
     #[test]
     fn path_output_key_never_contains_dangerous_sequences(input in "\\PC{0,500}") {
         if let Some(result) = normalize_request_path(&input) {
@@ -149,8 +145,6 @@ proptest! {
         }
     }
 
-    /// Donor `server.rs:3771` — inputs whose percent-decoded form
-    /// contains `..` are rejected.
     #[test]
     fn path_rejects_traversal_after_decode(
         prefix in "[a-z]{0,5}",
@@ -160,7 +154,6 @@ proptest! {
         prop_assert!(normalize_request_path(&input).is_none());
     }
 
-    /// Donor `server.rs:3781` — output key never starts with a slash.
     #[test]
     fn path_output_key_never_starts_with_slash(input in "\\PC{0,500}") {
         if let Some(result) = normalize_request_path(&input) {
@@ -241,11 +234,6 @@ const ORIGIN_CASES: u32 = 64;
 proptest! {
     #![proptest_config(ProptestConfig { cases: ORIGIN_CASES, .. ProptestConfig::default() })]
 
-    /// Donor `server.rs:3808` (reframed) — server never panics on
-    /// arbitrary header combinations. We assert that `try_upgrade`
-    /// returns *some* defined outcome (either accept or 403 reject);
-    /// any other status would be reported as `Err(...)` and fail the
-    /// case.
     #[test]
     fn origin_never_panics((origin, host) in origin_host_strategy()) {
         let rt = tokio::runtime::Builder::new_current_thread()
@@ -261,8 +249,6 @@ proptest! {
         prop_assert!(outcome.is_ok(), "unexpected outcome: {outcome:?}");
     }
 
-    /// Donor `server.rs:3825` (reframed) — with no `Origin` header the
-    /// upgrade is accepted (non-browser client, not subject to CSWSH).
     #[test]
     fn origin_no_origin_always_true(_host in "[a-z0-9.]{1,20}") {
         let rt = tokio::runtime::Builder::new_current_thread()
@@ -278,9 +264,6 @@ proptest! {
         prop_assert_eq!(accepted, Ok(true), "no-Origin upgrade must be accepted");
     }
 
-    /// Donor `server.rs:3835` (reframed) — cross-origin upgrades are
-    /// rejected with 403. We synthesise distinct hostnames and check
-    /// `try_upgrade` returns `Ok(false)`.
     #[test]
     fn origin_cross_origin_rejected(
         origin_host in "[a-z]{3,8}\\.[a-z]{2,4}",

@@ -353,50 +353,27 @@ where
     /// Drive the publish loop until shutdown or an indeterminate consumer exit.
     /// Normal shutdown drains queued dispatch before returning.
     ///
-    /// Wires the bounded dispatch channel (F2 / mission
-    /// ghr-d64c8076, Approach A2): sizes an `mpsc::channel` per
-    /// [`Self::with_dispatch_buffer_capacity`] (default
-    /// [`DEFAULT_DISPATCH_BUFFER_CAPACITY`]); spawns one sequential
-    /// consumer per CHE-0051:R7 + CHE-0024:R5 + CHE-0046:R7
-    /// (`Terminal` dead-lettered, `Retryable` logged, neither
-    /// aborts); installs a synchronous fan-out callback on
-    /// [`InProcessEventBus::register`] (CHE-0024:R2 + CHE-0051:R2)
-    /// forwarding via non-blocking `try_send`. Observes consumer completion
-    /// alongside `shutdown`; on shutdown drops the sender and joins the
-    /// draining consumer. Unknown outcomes stop dependent dispatch and return
-    /// without waiting for the external shutdown signal.
-    ///
-    /// One `run` impl exists per concrete bus type (CHE-0024:R2).
-    ///
-    /// **Ordering.** Bus delivery is publication-order (CHE-0024:§7);
-    /// the consumer runs `dispatch_one` serially — no cross-envelope
-    /// parallelism.
-    ///
-    /// **Back-pressure.** A saturated channel drops the envelope with
-    /// `tracing::warn!`; `publish().await` never blocks.
-    ///
-    /// **Drain on shutdown.** The consumer drains before this future resolves,
-    /// unless indeterminate completion requires stopping dependent dispatch.
-    ///
-    /// # Hazards
-    ///
-    /// The bus callback runs synchronously inside `publish()`
-    /// (CHE-0024:§7 holds) but only `try_send`s; dispatch runs on the
-    /// consumer task and may finish after `publish().await` returns —
-    /// consistent with CHE-0024:R1 persist-then-publish.
+    /// Wires a bounded dispatch channel (`mpsc::channel` per
+    /// [`Self::with_dispatch_buffer_capacity`]); spawns one sequential
+    /// consumer (`Terminal` dead-lettered, `Retryable` logged per
+    /// CHE-0051:R7, CHE-0024:R5, CHE-0046:R7); registers a synchronous
+    /// fan-out callback on [`InProcessEventBus::register`] (`try_send`);
+    /// observes consumer completion alongside `shutdown`, dropping the
+    /// sender and joining the consumer. Unknown outcomes stop dependent
+    /// dispatch and return without waiting for the external shutdown
+    /// signal. Delivery is publication-order (CHE-0024:§7) and serial;
+    /// saturation drops with `tracing::warn!` so `publish()` never
+    /// blocks; dispatch may finish after `publish().await`.
     ///
     /// # Panics
     ///
-    /// Panics outside an active tokio runtime (`tokio::spawn`
-    /// requires one). Wrap your main in `#[tokio::main]`.
+    /// Panics outside an active tokio runtime; wrap in `#[tokio::main]`.
     ///
     /// # Errors
     ///
-    /// Returns indeterminate dispatch failures after stopping dependent dispatch.
-    /// Consumer task failure is also indeterminate: the supervisor cannot
-    /// establish whether a write completed before the task failed. The original
-    /// join error is retained as its diagnostic source. Ordinary retryable
-    /// policy errors remain logged without automatic retry.
+    /// Consumer-task failure retains the join error as source (write
+    /// completion unestablished); retryable policy errors are logged,
+    /// no auto-retry.
     pub async fn run<Sd>(self, shutdown: Sd) -> Result<(), AgentError>
     where
         Sd: Future<Output = ()> + Send,

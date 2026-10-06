@@ -2,22 +2,16 @@
 //! [`EventStore`] via [`assert_projection_conformance`].
 //!
 //! Third of three SM-4 registrants. The harness probes the
-//! [`Projection`] trait contract (CHE-0048:R3 replay-equivalence,
-//! fold determinism). The backing [`EventStore`] is the L2a bridge
-//! crate's [`PgnoEventStore`], so replay is exercised over envelopes
-//! that round-trip through a real on-disk pardosa fiber container
-//! rather than an in-process `Vec` (CHE-0100 R3).
-//!
-//! Pairing with `PgnoEventStore` (rather than `InMemoryEventStore`,
-//! which would also satisfy the harness signature) proves the fold is
-//! stable across the serde boundary, per SM-4 SC#10 ("registrants must
-//! exercise a non-trivial adapter pairing").
+//! [`Projection`] trait contract (CHE-0048:R3 replay-equivalence, fold
+//! determinism) over envelopes that round-trip through a real on-disk
+//! pardosa fiber container rather than an in-process `Vec` (CHE-0100
+//! R3). Pairing with `PgnoEventStore` rather than `InMemoryEventStore`
+//! proves fold stability across the serde boundary, per SM-4 SC#10.
 //!
 //! [`PardosaProjectionStore`] (this crate's PERSISTENT backend,
 //! CHE-0048:R1/R10) is exercised separately below: persist/load/delete
-//! round-trip and snapshot-then-checkpoint write ordering, against a
-//! real `.pgno` file — the commutativity/dedup-under-resume coverage
-//! this file's doc comment previously flagged as future work.
+//! round-trip and snapshot-then-checkpoint write ordering against a
+//! real `.pgno` file.
 
 use std::num::NonZeroU64;
 

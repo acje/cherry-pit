@@ -1,34 +1,18 @@
 //! Layer 2 (F2) — loom exhaustive-interleaving models of the CURRENT
 //! election path vs increment B's lock-free debit.
 //!
-//! `budget.rs`'s `BudgetGate` and `token_bucket.rs`'s `TokenBucketRegulator`
-//! are the frozen/graduated production types (`std::sync::atomic`) — they
-//! cannot be loom-model-checked directly without recompiling their internals
-//! against `loom::sync::atomic` (which would require `#[cfg(loom)]` shims in
-//! `src/budget.rs`, out of scope: the frozen path must not be touched, per
-//! this mission's `out_of_scope`/`abort_if`). This file instead builds SMALL
-//! structural analogues, under loom's own atomics, that reproduce each
-//! design's actual synchronization *shape*:
-//!
-//! - [`MiniElectionGate`] mirrors `BudgetGate::acquire`'s three-branch CAS
-//!   loop verbatim in structure: (1) CAS-increment while under limit: (2)
-//!   CAS `false -> true` on a `resetting` flag to elect a single resetter,
-//!   which resets the counter and clears the flag; (3) losers spin-wait for
-//!   the flag to clear. This is the coordination CURRENT requires: THREE
-//!   pieces of shared mutable state (`calls`, `resetting`, plus the
-//!   spin/park choreography) that every thread must serialize through once
-//!   the epoch is exhausted.
-//! - [`MiniTokenBucketDebit`] mirrors `TokenBucketRegulator::try_debit_one`'s
-//!   single CAS loop: ONE atomic counter, no election flag, no separate
-//!   reset step — a thread either wins its own CAS or retries, with no
-//!   shared "am I the elected resetter" state at all.
-//!
-//! Both models are checked under `loom::model` with an external counter
-//! recording how many distinct interleavings loom explores, giving a direct
-//! quantitative contrast: CURRENT's extra coordination state produces a
-//! larger explored state space for the same thread count than B's model,
-//! which is the loom-level analogue of `spec/fizzbee/budget_gate.fizz`
-//! (81 nodes/39 states) vs `token_bucket.fizz` (61/61) in Layer 3.
+//! `BudgetGate` and `TokenBucketRegulator` are frozen production types
+//! (`std::sync::atomic`); they cannot be loom-model-checked directly
+//! without recompiling their internals against `loom::sync::atomic`
+//! (which would require `#[cfg(loom)]` shims, out of scope). This file
+//! builds SMALL structural analogues under loom's own atomics that
+//! reproduce each design's actual synchronization shape: every thread
+//! must serialize through CURRENT's three pieces of shared mutable
+//! state; B's model has one atomic counter and no elected-resetter
+//! state. Both are checked under `loom::model` with an external counter
+//! of explored interleavings, giving a direct quantitative contrast —
+//! the loom-level analogue of `spec/fizzbee/budget_gate.fizz` (81/39)
+//! vs `token_bucket.fizz` (61/61).
 //!
 //! Run with: `RUSTFLAGS="--cfg loom" cargo test --release --test loom_election`.
 

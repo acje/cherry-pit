@@ -1,20 +1,13 @@
 //! Acceptance test for ghr-fe9bb970 / CHE-0055:R17 — the F1 phantom-304
 //! property on the LIVE `run_worker_pool_regulated` path.
 //!
-//! Historically `worker_loop_regulated` hardcoded
-//! `regulator.settle(SettleOutcome::Charged)` for every admitted job,
-//! regardless of whether the executor's result actually consumed the
-//! guarded resource. This drove the F1 34x overcount / spurious 1h freeze
-//! bug: a job whose real-world effect was free (e.g. GitHub 304
-//! not-modified) still charged the budget permit.
-//!
-//! This test drives the REAL `run_worker_pool_regulated` (no mock of the
-//! settle wiring) with an executor whose `charge_of` reports every
-//! outcome as [`SettleOutcome::Free`], and asserts the budget conserves:
-//! with an epoch limit of 1 and a long cooldown, a regression back to the
-//! hardcoded `Charged` settle would exhaust the budget after the first
-//! job and stall the remaining 9 admissions for the full cooldown,
-//! blowing the bounded timeout below.
+//! Drives the real `run_worker_pool_regulated` (no mock of the settle
+//! wiring) with an executor whose `charge_of` reports every outcome as
+//! [`SettleOutcome::Free`], and asserts the budget conserves: with an
+//! epoch limit of 1 and a long cooldown, a regression to the hardcoded
+//! `Charged` settle would exhaust the budget after the first job and
+//! stall the remaining admissions for the full cooldown, blowing the
+//! bounded timeout.
 
 use std::sync::Arc;
 use std::time::Duration;

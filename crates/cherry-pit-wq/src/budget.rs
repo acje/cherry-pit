@@ -48,35 +48,22 @@ pub enum Replenished {
 
 /// Source-agnostic replenish contract for [`BudgetGate`].
 ///
-/// When a policy is attached, it REPLACES the gate's fixed cooldown
-/// sleep at an epoch transition: the elected worker calls
-/// [`Self::replenish`], which waits until the guarded resource has
-/// actually replenished and reports the ceiling for the next epoch. The
-/// gate then applies that ceiling and resets the call counter as one
-/// transition, so an epoch can never resume on a ceiling sized from a
-/// pre-replenish reading.
-///
-/// Vocabulary is deliberately source-neutral (CHE-0084, CHE-0055:R9,
-/// COM-0012:R5): the wait duration and ceiling policy belong to the
-/// adapter that owns the upstream resource's semantics, never to this
-/// crate.
-///
-/// Implementations must not construct a runtime (CHE-0055:R5) — they run
-/// on the caller's ambient runtime. The returned future is boxed at this
-/// boundary to keep the trait dyn-compatible without `#[async_trait]`,
-/// which is forbidden fleet-wide.
+/// When attached, a policy REPLACES the gate's fixed cooldown sleep at
+/// an epoch transition: the elected worker calls [`Self::replenish`],
+/// which waits for replenishment and reports the next ceiling;
+/// the gate applies that ceiling and resets the counter as one
+/// transition. Vocabulary is source-neutral (CHE-0084, CHE-0055:R9,
+/// COM-0012:R5): wait duration and ceiling policy belong to the owning
+/// adapter. Implementations must not construct a runtime (CHE-0055:R5);
+/// the returned future is boxed for dyn-compatibility without
+/// `#[async_trait]`, forbidden fleet-wide.
 ///
 /// # Panics
 ///
-/// A panic inside [`Self::replenish`] is a fail-closed path, not a
-/// resume path. The panic unwinds out of [`BudgetGate::acquire`] to the
-/// elected caller, and while unwinding the gate's epoch-transition guard
-/// runs: it clears the election flag and wakes the parked waiters, so a
-/// successor can be elected rather than the epoch deadlocking on a
-/// permanently-held election. Neither the call counter nor the epoch
-/// ceiling is touched on this path, so no epoch can reopen on a ceiling
-/// the policy never established — the successor sees exactly the
-/// pre-panic counter and ceiling.
+/// A panic inside [`Self::replenish`] is fail-closed: it unwinds out
+/// of [`BudgetGate::acquire`]; the epoch-transition guard clears the
+/// election flag and wakes parked waiters so a successor is elected —
+/// no epoch can reopen on a ceiling the policy never established.
 pub trait ReplenishPolicy: Send + Sync + 'static {
     /// Wait for the guarded resource to replenish, then report the
     /// ceiling for the next epoch.
@@ -247,21 +234,18 @@ impl BudgetGate {
 
     /// Acquire one API call permit.
     ///
-    /// Returns immediately if budget is available. If the epoch limit is
-    /// reached, exactly one caller is elected to perform the epoch
-    /// transition; the rest wait on `epoch_advanced` without holding any
-    /// async mutex across the wait.
-    ///
-    /// The elected caller either consults an attached [`ReplenishPolicy`]
-    /// — which waits for the guarded resource to replenish and supplies
-    /// the next epoch's ceiling — or, with no policy attached, sleeps the
-    /// fixed `wait_duration` and retains the current ceiling.
+    /// Returns immediately when budget is available. At the epoch limit,
+    /// exactly one caller is elected to perform the epoch transition; the
+    /// rest wait on `epoch_advanced` without holding an async mutex. The
+    /// elected caller either consults an attached [`ReplenishPolicy`]
+    /// (wait for the resource to replenish + next ceiling) or, with none,
+    /// sleeps the fixed `wait_duration` and retains the current ceiling.
     ///
     /// Returns `false` when the epoch did NOT reopen: `cancel` fired
-    /// while this caller was parked in the transition, or an attached
-    /// policy reported [`Replenished::Unavailable`]. In both cases the
-    /// counter is not reset and callers must exit rather than resume work
-    /// on a stale ceiling — the seam fails closed.
+    /// while parked, or the policy reported
+    /// [`Replenished::Unavailable`]. The counter is not reset and callers
+    /// must exit rather than resume on a stale ceiling — the seam fails
+    /// closed.
     #[must_use = "false means the epoch did not reopen; caller must exit, not resume work"]
     pub async fn acquire(&self, cancel: &CancellationToken) -> bool {
         loop {

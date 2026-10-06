@@ -47,29 +47,20 @@ use crate::middleware::limits::http_concurrency_limit;
 /// [`ProjectionSource::subscribe`]).
 ///
 /// State-typed: `P: ProjectionSource` is generic (CHE-0005 R1 +
-/// CHE-0049 R12, no trait objects). Compose with
+/// CHE-0049 R12, no trait objects); compose with
 /// [`crate::build_router`] via [`Router::merge`].
 ///
-/// `limits` sizes the two HTTP layers per CHE-0062:R4 / SEC-0003
-/// R1/R3: body ceiling (413) and in-flight cap (503-shedding). The
-/// in-flight cap is applied to the data plane only — `/v1/healthz` and
-/// `/v1/readyz` are merged outside it, and inside the body ceiling and
-/// CSP layers, so that a saturated data plane cannot fail a liveness
-/// probe. A probe reports whether the process is alive, never whether
-/// it is busy.
-///
-/// `ws_policy` carries the WS connection cap (503 via
-/// [`handlers::ws_handler`]) and the Origin policy (SEC-0012:R1):
-/// default `Strict` rejects absent/mismatched `Origin` with 403
-/// (SEC-0012:R2); `AllowAbsent` accepts CWE-346/1385 risk
-/// (SEC-0012:R3).
-///
-/// `extra_routes` is a stateless [`Router`] merged after
-/// `.with_state(state)`; pass [`Router::new()`] for none.
-///
-/// Backpressure (CHE-0049 R11) is drop-and-resync: on
-/// `broadcast::RecvError::Lagged` the socket closes with code 1001;
-/// clients re-fetch the snapshot (CHE-0048:R2) and re-attach WS.
+/// `limits` sizes the body ceiling (413) and in-flight cap
+/// (503-shedding, data plane only — probes merge outside it and inside
+/// the body ceiling and CSP layers, so a saturated data plane cannot
+/// fail a liveness probe). `ws_policy` carries the WS connection cap
+/// (503 via [`handlers::ws_handler`]) and the Origin policy
+/// (SEC-0012:R1): default `Strict` rejects absent/mismatched `Origin`
+/// with 403 (SEC-0012:R2); `AllowAbsent` accepts CWE-346/1385 risk.
+/// `extra_routes` is stateless, merged after `.with_state(state)`.
+/// Backpressure (CHE-0049 R11): drop-and-resync on
+/// `broadcast::RecvError::Lagged` — socket closes 1001, clients
+/// re-fetch (CHE-0048:R2).
 pub fn build_projection_router<P>(
     state: ProjectionState<P>,
     limits: LayerLimits,

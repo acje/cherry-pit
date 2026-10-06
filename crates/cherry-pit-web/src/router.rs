@@ -31,36 +31,29 @@ use crate::middleware::limits::http_concurrency_limit;
 use crate::middleware::{LayerLimits, extract_correlation, extract_idempotency_key};
 use crate::state::AppState;
 
-/// Build the cherry-pit-web router.
-///
-/// Mounts routes under `/v1/` (CHE-0049 R9) and merges `extra_routes`
-/// at the top level. The SEC-0003 availability layers and the
-/// correlation echo wrap the merged router, so `extra_routes` are
-/// covered too (CHE-0062:R4 — unconditional at every ingestion point;
-/// CHE-0049:R5 — every response echoes the correlation identifier).
-/// `limits.max_body_bytes` is a **ceiling**: consumers may nest a
-/// tighter `RequestBodyLimitLayer` on their own route groups, and
-/// still compose their own auth and rate-limit policy there
-/// (CHE-0049:R2).
-/// Returned [`Router`] has state applied ([`Router::with_state`]) —
-/// ready for `axum::serve` or composition. Generic dispatch is
-/// mandatory (CHE-0049 R1, CHE-0050 R4); `Box<dyn _>` forbidden.
+/// Build the cherry-pit-web router: mounts routes under `/v1/`
+/// (CHE-0049 R9) and merges `extra_routes`. SEC-0003 layers wrap every
+/// ingestion point (CHE-0062:R4); every response echoes the correlation
+/// id (CHE-0049:R5). `limits.max_body_bytes` is a ceiling; consumers
+/// may nest a tighter layer on their own route groups and compose their
+/// own auth and rate-limit policy there (CHE-0049:R2). The returned
+/// [`Router`] carries state. Generic dispatch mandatory, `Box<dyn
+/// _>` forbidden (CHE-0049 R1, CHE-0050 R4).
 ///
 /// # Type parameters
 ///
-/// `G` — consumer's [`CommandGateway`]. `S` — consumer's
-/// [`EventStore`], `Event` matches [`Aggregate::Event`]. `R` —
-/// consumer's [`CommandRouter`] impl, bound to `G` (CHE-0050 R2).
+/// `G` — [`CommandGateway`]; `S` — [`EventStore`], `Event` matching
+/// [`Aggregate::Event`]; `R` — [`CommandRouter`] impl bound to `G`
+/// (CHE-0050 R2).
 ///
 /// # Parameters
 ///
 /// - `state` — typed application state (CHE-0049:R1, CHE-0050:R2).
-/// - `limits` — SEC-0003 availability-layer sizing applied to the
-///   whole surface: body ceiling ([`RequestBodyLimitLayer`]), inflight
-///   cap ([`http_concurrency_limit`], 503-shedding) per CHE-0062:R1/R4.
-///   Tests use [`LayerLimits::permissive_for_tests`].
-/// - `extra_routes` — stateless [`Router`] merged inside the SEC-0003
-///   stack (CHE-0049:R2); pass [`Router::new`] when unused.
+/// - `limits` — SEC-0003 sizing (body ceiling, in-flight 503)
+///   CHE-0062:R1/R4; tests use
+///   [`LayerLimits::permissive_for_tests`].
+/// - `extra_routes` — stateless [`Router`] merged inside the stack
+///   (CHE-0049:R2); [`Router::new`] when unused.
 ///
 /// # Example
 ///

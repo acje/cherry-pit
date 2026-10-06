@@ -91,23 +91,18 @@ where
 /// Fetch a page from the current snapshot.
 ///
 /// Returns:
-/// - **200** with body + Content-Type + `ETag` + zstd-encoded body when
-///   the client advertises `Accept-Encoding: zstd`.
+/// - **200** with body + Content-Type + `ETag` (zstd-encoded when the
+///   client advertises `Accept-Encoding: zstd`).
 /// - **304** when `If-None-Match` matches the page's weak `ETag`.
 /// - **405** for non-GET/HEAD methods.
 /// - **503** when no snapshot has been published yet.
-/// - **404** when the snapshot does not contain the requested key.
+/// - **404** when the snapshot lacks the requested key.
 ///
 /// `path` is the captured wildcard segment from `/v1/{*path}`, routed
 /// through [`normalize_request_path`] before lookup — the same
-/// normalisation the serve surface applies (CHE-0086:R8).
-///
-/// axum does **not** normalise `..` or `%2e%2e`; matchit matches the
-/// wildcard literally. Nothing here touches a filesystem — the key is
-/// a lookup into a published in-memory snapshot, so a traversal
-/// sequence could only ever have missed and 404'd. Normalising anyway
-/// keeps one path contract across both read surfaces rather than two
-/// that happen to agree.
+/// normalisation the serve surface applies (CHE-0086:R8). axum does not
+/// normalise `..`/`%2e%2e`; the key is a lookup into a published
+/// in-memory snapshot, not a filesystem path.
 pub(crate) async fn snapshot_get<P>(
     State(state): State<ProjectionState<P>>,
     request: axum::http::Request<axum::body::Body>,

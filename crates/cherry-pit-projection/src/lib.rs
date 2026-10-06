@@ -619,12 +619,6 @@ mod tests {
     proptest::proptest! {
         #![proptest_config(proptest::test_runner::Config::with_cases(256))]
 
-
-        /// CHE-0048:R3 — `apply` is deterministic and idempotent over a
-        /// fixed event stream: replaying the same envelope sequence twice
-        /// against fresh projections yields equal final states. Two
-        /// independent replays exercise the property without depending on
-        /// driver-internal retry semantics.
         #[test]
         fn r3_apply_is_idempotent_over_a_fixed_event_stream(count in 1_u64..32) {
             let rt = tokio::runtime::Runtime::new().expect("runtime");

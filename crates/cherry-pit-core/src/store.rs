@@ -10,30 +10,23 @@ use crate::event::{DomainEvent, EventEnvelope};
 /// (CHE-0005:R1, CHE-0016:R1–R2, CHE-0018:R2, CHE-0019:R1, CHE-0020:R2–R3,
 /// CHE-0025:R1–R2, CHE-0033:R1–R3).
 ///
-/// Single source of truth for aggregate state: each history is an
-/// ordered, gap-free, duplicate-free sequence of [`EventEnvelope`]s keyed
-/// by `(AggregateId, sequence)`. The `Event` associated type binds one
-/// store to one domain event type (compile-time cross-aggregate
-/// deserialization proof). Secondary (driven) port; concrete
-/// implementations (in-memory for tests, pgno-backed via
-/// `cherry-pit-gateway`) live in infrastructure crates.
-///
-/// The store, not the caller, creates [`EventEnvelope`]s and assigns new
-/// `AggregateId`s via [`create`](Self::create) (CHE-0016:R1–R2,
-/// CHE-0020). Single-writer aggregates are assumed; `expected_sequence`
-/// on [`append`](Self::append) is defense-in-depth, not the primary
-/// guard.
+/// Single source of truth: each history is an ordered, gap-free,
+/// duplicate-free [`EventEnvelope`] sequence keyed by
+/// `(AggregateId, sequence)`, bound to one `Event` type per store.
+/// A driven port: the store creates envelopes and assigns `AggregateId`s
+/// via [`create`](Self::create) (CHE-0016:R1–R2, CHE-0020).
+/// Single-writer aggregates are assumed; `expected_sequence` on
+/// [`append`](Self::append) is defense-in-depth.
 ///
 /// # Distributed failure model (COM-0025:R1)
 ///
-/// Crash/recovery are trait-level (they straddle individual calls);
-/// timeout, cancellation, retry, duplicate-delivery, and replay are
-/// documented per-method below. Implementors MUST be crash-safe: a kill
-/// between or mid-call MUST NOT violate the invariants on
-/// [`load`](Self::load) — atomicity of [`append`](Self::append) is the
-/// load-bearing primitive. Recovery is an operational runbook documented
-/// per implementation; after recovery the store MUST satisfy every
-/// invariant documented here.
+/// Crash/recovery are trait-level; timeouts, retries, cancellations,
+/// duplicate delivery, replay are documented per method. Implementors
+/// MUST be crash-safe: a kill between or mid-call MUST NOT violate the
+/// invariants on [`load`](Self::load) — [`append`](Self::append)
+/// atomicity is the load-bearing primitive. Recovery is an operational
+/// runbook per implementation; after recovery the store MUST satisfy
+/// every invariant documented here.
 ///
 /// ```
 /// use std::num::NonZeroU64;
@@ -91,37 +84,31 @@ pub trait EventStore: Send + Sync + 'static {
 
     /// Create a new aggregate — the store assigns the next ID.
     ///
-    /// Auto-increments a `u64` counter for the ID, creates
-    /// [`EventEnvelope`]s from the raw domain events, and persists
-    /// them. Returns the assigned [`AggregateId`] and the created
-    /// envelopes.
+    /// Auto-increments a `u64` counter, creates [`EventEnvelope`]s from
+    /// the raw events, persists them, returning the assigned
+    /// [`AggregateId`] and the created envelopes.
     ///
     /// # Errors
     ///
     /// [`StoreError::Infrastructure`](crate::StoreError::Infrastructure)
     /// if `events` is empty (an aggregate needs ≥1 event) or on timeout
     /// ([`Retryable`](crate::ErrorCategory::Retryable), CHE-0046:R1) —
-    /// see "Retry" for the duplicate-creation hazard.
+    /// see Retry.
     ///
     /// # Cancellation
     ///
-    /// Dropping the future MAY cancel `create` at any point; if dropped
-    /// post-persistence the caller MUST treat the aggregate as
-    /// potentially-created. Atomicity matches
-    /// [`append`](Self::append): guaranteed per-call for the single
-    /// event a call actually persists, not as an all-or-nothing
-    /// guarantee across an arbitrary multi-event `events` batch (that
-    /// stronger guarantee is store-dependent and not part of the
-    /// portable `EventStore` contract).
+    /// Dropping the future MAY cancel `create` at any point; if
+    /// post-persistence, the caller MUST treat the aggregate as
+    /// potentially-created. Atomicity is per-call, not cross-batch
+    /// (store-dependent).
     ///
-    /// # Retry / duplicate delivery
+    /// # Retry
     ///
-    /// NOT idempotent — each success produces a fresh `AggregateId`,
-    /// and no concurrency-token parameter exists, so a naive retry or a
-    /// duplicate call MAY produce a second aggregate. Callers needing
-    /// safe retry MUST supply an
+    /// NOT idempotent — each success produces a fresh [`AggregateId`]
+    /// with no concurrency token, so a naive retry or a duplicate call
+    /// MAY produce a second aggregate. Safe retry MUST use an
     /// [`IdempotencyKey`](crate::IdempotencyKey) at the command-bus
-    /// layer (CHE-0041) rather than retrying `create` directly.
+    /// layer (CHE-0041), not retry `create` directly.
     fn create(
         &self,
         events: Vec<Self::Event>,
@@ -130,52 +117,35 @@ pub trait EventStore: Send + Sync + 'static {
 
     /// Append new events to an existing aggregate's stream.
     ///
-    /// The aggregate must already exist via [`create`](Self::create).
-    /// Empty `events` is a no-op returning `Ok(vec![])`. Returns the
-    /// created envelopes.
-    ///
-    /// # Atomicity
-    ///
-    /// The `EventStore` contract guarantees PER-CALL atomicity: a
-    /// call's persisted events are durably committed as a unit or the
-    /// call fails and observes none of them. It does NOT guarantee
-    /// multi-event all-or-nothing durability as a portable property of
-    /// every implementation — that stronger guarantee is
-    /// store-dependent (some backends, e.g. the pardosa/pgno
-    /// substrate, accept and durably commit exactly one event per
-    /// call).
-    ///
-    /// `expected_sequence` is the caller's last-loaded sequence
-    /// ([`NonZeroU64`], always ≥1 since [`create`](Self::create)
-    /// produces ≥1 event). A mismatch against the actual last sequence
-    /// rejects the append with `StoreError::ConcurrencyConflict` — this
-    /// is also the duplicate-delivery defence (CHE-0041:R3): a
-    /// re-submitted duplicate append fails this check rather than
-    /// extending the stream.
+    /// Requires prior [`create`](Self::create); empty `events` no-ops as
+    /// `Ok(vec![])`. Returns the created envelopes.
     ///
     /// # Errors
     ///
-    /// `StoreError::Infrastructure` if the aggregate was never created,
-    /// or on timeout ([`Retryable`](crate::ErrorCategory::Retryable),
-    /// CHE-0046:R1).
+    /// `StoreError::Infrastructure` if never created or on timeout
+    /// ([`Retryable`](crate::ErrorCategory::Retryable), CHE-0046:R1);
     /// [`StoreError::ConcurrencyConflict`](crate::StoreError::ConcurrencyConflict)
     /// on `expected_sequence` mismatch (also `Retryable`).
     ///
+    /// # Atomicity
+    ///
+    /// Per-call: the call's events commit durably as a unit or it fails
+    /// and observes none. Not multi-event all-or-nothing portably (some
+    /// backends commit one event per call).
+    ///
     /// # Cancellation
     ///
-    /// Dropping the future MUST NOT leave a partial-event observable
-    /// to any subsequent [`load`](Self::load) — for the events a call
-    /// does persist, resolution is "all persisted" or "none
-    /// persisted", never a torn single event; see "Atomicity" above
-    /// for the scope of that guarantee across a multi-event batch.
+    /// Dropping the future MUST NOT leave a partial event observable to
+    /// any later [`load`](Self::load) — all or none, never torn.
     ///
     /// # Retry
     ///
-    /// Idempotent under correct `expected_sequence` use: a retry
-    /// observing the same expected-vs-actual sequence succeeds once. A
-    /// retry after a successful-but-lost response sees the new
-    /// sequence and is rejected with `ConcurrencyConflict`; the caller
-    /// reloads via [`load`](Self::load) and retries or surfaces it.
+    /// Idempotent under correct `expected_sequence`: retry with
+    /// identical expected-vs-actual succeeds once; after a
+    /// successful-but-lost response the new sequence is rejected with
+    /// `ConcurrencyConflict`; caller reloads. `expected_sequence`
+    /// (caller's last-loaded [`NonZeroU64`], ≥1) is also the
+    /// duplicate-delivery defence (CHE-0041:R3).
     fn append(
         &self,
         id: AggregateId,

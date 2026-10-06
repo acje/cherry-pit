@@ -206,11 +206,6 @@ proptest! {
         .. ProptestConfig::default()
     })]
 
-    /// I1 TOCTOU regression pin (proptest variant).
-    ///
-    /// Generates a fan-out size `n` in `4..=48` and a `Vec<u32>` of
-    /// per-command bumps; asserts the four invariants. Counterexamples
-    /// shrink to the smallest `n` that exhibits the regression.
     #[test]
     fn concurrent_same_domain_key_creates_exactly_one_aggregate(
         n in 4usize..=48,

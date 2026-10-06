@@ -263,25 +263,10 @@ fn remap_envelope(
 ///
 /// `DurableScheduler` pins its store parameter to the CONCRETE
 /// `cherry_pit_core::SchedulerEvent` (not `GenomeSafe` — CHE-0029:R4/R6
-/// forbids deriving it there). This store satisfies that pin on the
-/// outside while persisting through the same `.pgno` /
-/// `ObservedFiberStore` facade [`PgnoEventStore`] uses, by internally
-/// converting every event to/from [`SchedulerEventDto`] at the
-/// boundary.
-///
-/// # Design: composition over a generic converter
-///
-/// Implemented as a thin wrapper delegating to
-/// `PgnoEventStore<SchedulerEventDto>` rather than adding a generic
-/// `PgnoEventStore<Ev, Dto, Converter>` variant. The `SchedulerEvent
-/// <-> SchedulerEventDto` mapping is a fixed 1:1 relationship with
-/// exactly one consumer; a generic converter parameter would add an
-/// indirection layer (a converter trait plus its own bound set) that
-/// only this single call site would ever instantiate. Delegation
-/// reuses 100% of `PgnoEventStore`'s substrate logic — per-aggregate
-/// locking, optimistic-concurrency sequence checks, single-event-only
-/// atomicity, and restart recovery — with zero duplicated logic; only
-/// the boundary conversion is new code.
+/// forbids deriving it there). This store satisfies that pin while
+/// persisting through the same `.pgno` / `ObservedFiberStore` facade
+/// [`PgnoEventStore`] uses, converting every event to/from
+/// [`SchedulerEventDto`] at the boundary.
 pub struct PgnoSchedulerStore {
     inner: PgnoEventStore<SchedulerEventDto>,
 }

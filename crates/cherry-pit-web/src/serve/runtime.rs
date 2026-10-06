@@ -479,45 +479,28 @@ pub async fn start<S: ServerState>(
 /// ceiling that bounds everything including `extra_routes`.
 const BUILTIN_MAX_BODY_BYTES: usize = 1024;
 
-/// Build the [`Router`] with security headers, health endpoints, and tracing.
-///
-/// Extracted so that tests exercise the exact same router configuration as
-/// production.
+/// Build the [`Router`] with security headers, health endpoints, tracing.
 ///
 /// # Layers (outermost → innermost)
 ///
-/// 1. **Security headers** — injected on every response, probes included.
-/// 2. **Body ceiling** — `limits.max_body_bytes`, applied to every
-///    ingestion point including `extra_routes` (CHE-0062:R4).
-/// 3. **Tracing** — structured request/response logging.
-/// 4. **HTTP concurrency limit** — bounds in-flight requests via
-///    semaphore, returning 503 when the limit is reached. Applied to the
-///    data plane ONLY.
+/// Security headers, body ceiling (`limits.max_body_bytes`, every
+/// ingestion point including `extra_routes`, CHE-0062:R4), tracing,
+/// HTTP concurrency limit (in-flight 503, data plane only).
 ///
-/// `GET /healthz` and `GET /readyz` are merged outside the concurrency
-/// limit and inside every other layer: they answer 200 while the data
-/// plane sheds with 503.
-///
-/// Built-in routes nest a tighter [`BUILTIN_MAX_BODY_BYTES`] cap inside
-/// the ceiling. Route groups merged via `extra_routes` may do the same —
-/// the webhook receiver is the motivating case — but none may widen it
-/// past the ceiling.
+/// `healthz`/`readyz` merge outside the concurrency limit, answering
+/// while the data plane sheds 503. Built-in routes nest a
+/// [`BUILTIN_MAX_BODY_BYTES`] cap inside the ceiling; `extra_routes`
+/// may do the same (webhook receiver motivating) but none may widen it
+/// past the ceiling. Semaphore sizes clamp to
+/// [`tokio::sync::Semaphore::MAX_PERMITS`].
 ///
 /// `limits` carries the SEC-0003 sizing (CHE-0062:R2); `ws_policy`
 /// carries the WS connection cap and Origin election (SEC-0012:R1);
-/// `options` carries presentation only (CHE-0062:R3). Semaphore sizes
-/// are clamped to [`tokio::sync::Semaphore::MAX_PERMITS`], so an
-/// oversized limit saturates rather than panicking at construction.
+/// `options` carries presentation only (CHE-0062:R3).
 ///
 /// # Panics
 ///
 /// Panics if `options.csp_override()` is not a valid header value.
-/// [`ServeOptionsBuilder::build`](super::config::ServeOptionsBuilder::build)
-/// rejects non-ASCII and CR/LF only, which is narrower than the
-/// `HeaderValue` grammar: other ASCII control bytes — `\0` among them —
-/// are accepted by the builder and rejected here, so this panic is
-/// reachable from a builder-produced value. Narrowing the accepted input
-/// is a behaviour and API decision that has not been taken.
 pub fn build_router<S: ServerState>(
     state: Arc<S>,
     limits: LayerLimits,
@@ -3327,14 +3310,11 @@ mod tests {
         use proptest::prelude::*;
 
         proptest! {
-            /// normalize_request_path never panics on arbitrary Unicode input.
             #[test]
             fn never_panics(input in "\\PC{0,500}") {
                 let _normalized = normalize_request_path(&input);
             }
 
-            /// If normalize_request_path returns Some, the key never contains
-            /// path traversal sequences, null bytes, or backslashes.
             #[test]
             fn output_key_never_contains_dangerous_sequences(input in "\\PC{0,500}") {
                 if let Some(result) = normalize_request_path(&input) {
@@ -3353,7 +3333,6 @@ mod tests {
                 }
             }
 
-            /// If the input percent-decodes to contain "..", it must be rejected.
             #[test]
             fn rejects_traversal_after_decode(
                 prefix in "[a-z]{0,5}",
@@ -3363,7 +3342,6 @@ mod tests {
                 prop_assert!(normalize_request_path(&input).is_none());
             }
 
-            /// Output key never starts with a slash.
             #[test]
             fn output_key_never_starts_with_slash(input in "\\PC{0,500}") {
                 if let Some(result) = normalize_request_path(&input) {
@@ -3388,7 +3366,6 @@ mod tests {
         }
 
         proptest! {
-            /// validate_ws_origin never panics on arbitrary header combinations.
             #[test]
             fn never_panics((origin, host) in origin_host_strategy()) {
                 let mut headers = HeaderMap::new();
@@ -3405,7 +3382,6 @@ mod tests {
                 let _ = validate_ws_origin(&headers, &WebSocketOriginPolicy::AllowAbsent);
             }
 
-            /// If no Origin header, validate_ws_origin returns true.
             #[test]
             fn no_origin_always_true(host in "[a-z0-9.]{1,20}") {
                 let mut headers = HeaderMap::new();
@@ -3415,7 +3391,6 @@ mod tests {
                 prop_assert!(validate_ws_origin(&headers, &WebSocketOriginPolicy::AllowAbsent));
             }
 
-            /// Cross-origin requests are rejected: Origin host != Host header.
             #[test]
             fn cross_origin_rejected(
                 origin_host in "[a-z]{3,8}\\.[a-z]{2,4}",
