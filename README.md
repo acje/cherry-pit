@@ -37,7 +37,7 @@ is not an automatic retry engine. `MsgpackFileStore` is retired.
 
 ## Development
 
-Rust **1.98.0**, edition **2024**, resolver **3**. Use the committed lockfile
+Rust **1.99.0**, edition **2024**, resolver **3**. Use the committed lockfile
 and the root workspace lint configuration; pedantic is the standing bar.
 [AGENTS.md](AGENTS.md) defines scoped local verification and the producer
 acceptance gates. Scoped local dependency intake is recorded in `ghr-7wc6p.11.2`.

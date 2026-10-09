@@ -305,7 +305,7 @@ impl BatchTracker {
         }
         let prev = self
             .remaining
-            .fetch_update(Ordering::AcqRel, Ordering::Acquire, |remaining| {
+            .try_update(Ordering::AcqRel, Ordering::Acquire, |remaining| {
                 Some(remaining.saturating_sub(count))
             })
             .unwrap_or_else(|unchanged| unchanged);

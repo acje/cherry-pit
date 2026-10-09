@@ -171,7 +171,10 @@ mod tests {
     #[test]
     fn compress_zstd_produces_output() {
         let compressed = compress_zstd(b"<html>hello world</html>").unwrap();
-        assert!(!compressed.is_empty());
+        assert!(
+            !compressed.is_empty(),
+            "zstd compression must produce output"
+        );
     }
 
     #[test]

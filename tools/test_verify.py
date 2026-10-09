@@ -15,6 +15,8 @@ from unittest.mock import patch
 
 import verify
 
+REPO = Path(__file__).resolve().parent.parent
+
 
 class ProcessSupervisionTests(unittest.TestCase):
     def test_timeout_terminates_descendant_and_reaps_parent(self):
@@ -92,7 +94,14 @@ while True:
 class GraphPlants(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.metadata = verify.cargo("metadata", "--locked", "--offline", "--no-deps", "--format-version", "1")
+        src = str(REPO / "crates/cherry-pit-core/src/lib.rs")
+        names = ["cherry-pit-core", "cherry-pit-storage", "cherry-pit-test-support", "cherry-pit-wq",
+                 "cherry-pit-web", "cherry-pit-macros", "cherry-pit-util", "cherry-pit-cli",
+                 "pardosa-cherry-pit-projection"]
+        cls.metadata = json.dumps({
+            "workspace_members": names,
+            "packages": [{"id": name, "name": name,
+                          "targets": [{"kind": ["lib"], "src_path": src}]} for name in names]})
 
     def probe(self, violation=None):
         def cargo(*args):
@@ -150,13 +159,16 @@ class AdmissionTests(unittest.TestCase):
                 run.assert_not_called()
 
     def test_reviewed_context_uses_direct_compiler_and_sanitized_environment(self):
-        env = verify.intake()
-        with patch.object(verify, "run", return_value="") as run:
+        env = {"HOME": "/home/runner", "CARGO_HOME": "/home/runner/.cargo",
+               "RUSTUP_HOME": "/home/runner/.rustup", "RUSTUP_TOOLCHAIN": "1.99.0-x86_64-unknown-linux-gnu",
+               "RUSTC": "/home/runner/.rustup/toolchains/1.99.0-x86_64-unknown-linux-gnu/bin/rustc",
+               "RUSTC_WRAPPER": "", "RUSTC_WORKSPACE_WRAPPER": "", "PATH": "/usr/bin:/bin"}
+        with patch.object(verify, "intake", return_value=env), patch.object(verify, "run", return_value="") as run:
             verify.execute("rust")
         self.assertEqual(run.call_count, 4)
         for call in run.call_args_list:
             self.assertEqual(call.args[0][0], str(verify.Path(env["RUSTC"]).with_name("cargo")))
-            self.assertNotIn("+1.98.0", call.args[0])
+            self.assertNotIn("+1.99.0", call.args[0])
             self.assertEqual(call.kwargs["env"], env)
         self.assertEqual(run.call_args_list[1].kwargs["timeout"], 900)
 
@@ -183,9 +195,9 @@ class ProductionIdentityTests(unittest.TestCase):
                 self.assertRegex(digest, r"\A[0-9a-f]{64}\Z")
 
     def test_linux_cargo_matches_official_member_evidence(self):
-        """ghr-02ld2: official cargo 1.98.0 Linux archive, cargo/bin/cargo."""
+        """code-7cu: official cargo 1.99.0 Linux archive, cargo/bin/cargo."""
         self.assertEqual(verify.LINUX_IDENTITIES["bin/cargo"],
-                         "ff3022fcbd13b08434ea7afde9a0ef9d5b3f5c17b5fc7a40031be3ee000a6a24")
+                         "e951141cc55a6cd7b9876d187bd30a3720e6086b99413af95e3b8de1cdd72f14")
 
 
 class LinuxAdmissionTests(unittest.TestCase):
@@ -193,7 +205,9 @@ class LinuxAdmissionTests(unittest.TestCase):
         directory = tempfile.TemporaryDirectory()
         self.addCleanup(directory.cleanup)
         root = Path(directory.name).resolve()
-        (root / "Cargo.lock").write_bytes((verify.ROOT / "Cargo.lock").read_bytes())
+        self.lock_bytes = (REPO / "Cargo.lock").read_bytes()
+        self.lock_digest = hashlib.sha256(self.lock_bytes).hexdigest()
+        (root / "Cargo.lock").write_bytes(self.lock_bytes)
         root_mock = patch.object(verify, "ROOT", root)
         root_mock.start()
         self.addCleanup(root_mock.stop)
@@ -225,6 +239,7 @@ class LinuxAdmissionTests(unittest.TestCase):
         def resolved(path, *args, **kwargs):
             return path if str(path).startswith("/home/runner/") else resolve(path, *args, **kwargs)
         with patch.object(verify, "LINUX_IDENTITIES", {key: digest for key in verify.LINUX_IDENTITIES}), \
+             patch.object(verify, "CARGO_LOCK_DIGEST", self.lock_digest), \
              patch.object(Path, "is_file", return_value=True), patch.object(Path, "resolve", resolved), \
              self.installed(corrupt):
             return verify.intake()
@@ -233,6 +248,14 @@ class LinuxAdmissionTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "intake identity changed"):
             self.admitted(corrupt=True)
         self.admitted()
+
+    def test_changed_workspace_lock_is_refused(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            (root / "Cargo.lock").write_bytes(b"changed workspace lock fixture, not the assessed digest\n")
+            with patch.object(verify, "ROOT", root), patch.dict(os.environ, {"GITHUB_WORKSPACE": str(root)}):
+                with self.assertRaisesRegex(ValueError, "intake identity changed"):
+                    self.admitted()
 
     def test_unsupported_context_fail_revert_clean(self):
         for key, value in (("GITHUB_REPOSITORY", "other/repo"),
@@ -246,7 +269,7 @@ class LinuxAdmissionTests(unittest.TestCase):
     def test_extra_cargo_config_fail_revert_clean(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory).resolve()
-            (root / "Cargo.lock").write_bytes((verify.ROOT / "Cargo.lock").read_bytes())
+            (root / "Cargo.lock").write_bytes(self.lock_bytes)
             (root / ".cargo").mkdir()
             with patch.object(verify, "ROOT", root), patch.dict(os.environ, {"GITHUB_WORKSPACE": str(root)}):
                 for name in ("config", "config.toml"):
@@ -261,7 +284,7 @@ class LinuxAdmissionTests(unittest.TestCase):
 
     def test_linux_commands_share_sanitized_context(self):
         env = self.admitted()
-        self.assertEqual(env["RUSTC"], "/home/runner/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/rustc")
+        self.assertEqual(env["RUSTC"], "/home/runner/.rustup/toolchains/1.99.0-x86_64-unknown-linux-gnu/bin/rustc")
         self.assertEqual(env["RUSTC_WRAPPER"], "")
         self.assertNotIn("LD_PRELOAD", env)
         self.assertNotIn("CARGO_ENCODED_RUSTFLAGS", env)

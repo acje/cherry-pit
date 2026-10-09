@@ -471,7 +471,7 @@ mod tests {
         let meta = LockMetadata::current("test-run-123");
         assert_eq!(meta.run_id, "test-run-123");
         assert_eq!(meta.pid, std::process::id());
-        assert!(!meta.hostname.is_empty());
+        assert_ne!(meta.hostname, "");
     }
 
     #[test]
@@ -927,7 +927,7 @@ mod tests {
         std::fs::write(&lock_file, json).unwrap();
 
         let meta = read_lock(&lock_file).unwrap();
-        assert!(meta.hostname.is_empty());
+        assert_eq!(meta.hostname, "");
 
         let result = acquire(
             dir.path(),

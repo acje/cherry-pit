@@ -19,12 +19,13 @@ ROOT = Path(__file__).resolve().parent.parent
 SOURCE = "c8507377b2748a015148751ce288be2bad9ec708"
 TOKEN = r"([A-Z]{2,4}-[0-9]{4}):(R[0-9]+(?:\+R[0-9]+)*)"
 LINUX = "x86_64-unknown-linux-gnu"
+CARGO_LOCK_DIGEST = "0b79603add39eb67e6cf1270c72166e37a63735a01e12a1612b48965379b41ce"
 LINUX_IDENTITIES = {
-    "bin/rustc": "3690cc576ede140504698405d5d8fa3826aaadbe71699c6c4ed0a565d6f493e2",
-    "bin/cargo": "ff3022fcbd13b08434ea7afde9a0ef9d5b3f5c17b5fc7a40031be3ee000a6a24",
-    "lib/librustc_driver-28a98848f7a7c026.so": "56047570f302ba09b1abf3b2996bd1d76560c06f3c95c0fcfa7dc3decd2faa2c",
-    "lib/libLLVM.so.22.1-rust-1.98.0-stable": "b2cc5bb9aafd2c8d1fd8ad0e99fd7de09e6831ff319ac99130d737261316596e",
-    "lib/libLLVM-22-rust-1.98.0-stable.so": "9816014358f5ca85706c55cbdb44e4da930f33b842782f576b695ba66a48091b",
+    "bin/rustc": "f3834d26669b03f6855fa54bd2381443123e860167bc0c7a8dd137e5cf6e5e4f",
+    "bin/cargo": "e951141cc55a6cd7b9876d187bd30a3720e6086b99413af95e3b8de1cdd72f14",
+    "lib/librustc_driver-999a121de2f042be.so": "f45c41337f1516bb9f4d504a2a507202a01c431fc2063334913dde5480ffee03",
+    "lib/libLLVM.so.23.1-rust-1.99.0-stable": "7c2c7ebb79211f07e3b32e408a1a65b4d205656792f9c51bdbefcb21c0868cbd",
+    "lib/libLLVM-23-rust-1.99.0-stable.so": "805279dd64ec14a4d5034a0809cb9569a5247d66350d992db173d04fe0ea5300",
 }
 ASSETS = {
     "cargo-audit": (
@@ -121,16 +122,16 @@ def admitted_environment():
                 and ROOT == home / "code/cherry-pit"
                 and not os.environ.get("CHERRY_INTAKE_CONTEXT"),
                 "unsupported intake context: ghr-7wc6p.11.2 local host/checkout")
-    toolchain = home / f".rustup/toolchains/1.98.0-{host}"
+    toolchain = home / f".rustup/toolchains/1.99.0-{host}"
     identities = {
-        ROOT / "Cargo.lock": "24936ca9a64a02fc2dc42d3374da9c7aba14621074cb833eba6a8be1a7fe9790",
+        ROOT / "Cargo.lock": CARGO_LOCK_DIGEST,
     }
     identities.update({toolchain / path: digest for path, digest in LINUX_IDENTITIES.items()} if linux else {
         home / ".cargo/config.toml": "afc3cdc00f48ced4b8928dd4bbd49a2b7537ff324829de840fc4239fefe1b9ac",
-        toolchain / "bin/rustc": "a11618eca0956a8aa4372c2bc898690b513cbdfa2cb9125b2a5301e360ed5b49",
-        toolchain / "bin/cargo": "1de2e84c15443b70444eecfa959ff9099dd8c1a5606b6d9ef5bc0ea9c25bc7f9",
-        toolchain / "lib/librustc_driver-4031c0ff8e88f5d1.dylib": "275171d3d528b7f78bcad812a84658ec3bd756ce9792a329b6edefdf70884c63",
-        toolchain / "lib/libLLVM.dylib": "6da171ecd17bbe20b57b2e2d2e324b8fb2267117b504e864eb8b3012a71a6fec",
+        toolchain / "bin/rustc": "dd6f58440b3418aa9157ae3f05d71eecff741ca41bc4eec120e7e8f2d933b9a0",
+        toolchain / "bin/cargo": "fc7aa5077deca8abc0651f329e8ec1d968f520e996a93b428f9935014362b382",
+        toolchain / "lib/librustc_driver-09a1a87b4d568b8a.dylib": "17b7b2520e11aaa79087493fb8ad1140382b959eed3f00c3e8635cc000b63a4d",
+        toolchain / "lib/libLLVM.dylib": "0a09edaac7d0047e8db420bb9594359c73e602a2138def76f51197f1afd39252",
     })
     for path, expected in identities.items():
         require(path.resolve() == path and path.is_file(), f"intake nonregular/redirected path: {path}")
@@ -145,7 +146,7 @@ def admitted_environment():
     return {
         "HOME": str(home), "CARGO_HOME": str(home / ".cargo"),
         "RUSTUP_HOME": str(home / ".rustup"),
-        "RUSTUP_TOOLCHAIN": f"1.98.0-{host}",
+        "RUSTUP_TOOLCHAIN": f"1.99.0-{host}",
         "PATH": f"{toolchain}/bin:/usr/bin:/bin:/usr/sbin:/sbin",
         "RUSTC": str(toolchain / "bin/rustc"),
         "RUSTC_WRAPPER": "", "RUSTC_WORKSPACE_WRAPPER": "",
@@ -176,7 +177,7 @@ def verified_asset(name, env):
 
 def provision():
     env = intake()
-    require(env["RUSTUP_TOOLCHAIN"] == f"1.98.0-{LINUX}", "provision requires admitted Linux context")
+    require(env["RUSTUP_TOOLCHAIN"] == f"1.99.0-{LINUX}", "provision requires admitted Linux context")
     directory = Path(env["CARGO_HOME"]) / "bin"
     require(directory.is_dir() and directory.resolve() == directory, "invalid tool installation directory")
     for name in ASSETS:
@@ -190,13 +191,13 @@ def provision():
 
 
 def toolchain():
-    require(toml(ROOT / "rust-toolchain.toml")["toolchain"]["channel"] == "1.98.0"
-            and toml(ROOT / "Cargo.toml")["workspace"]["package"]["rust-version"] == "1.98"
-            and toml(ROOT / "clippy.toml")["msrv"] == "1.98",
+    require(toml(ROOT / "rust-toolchain.toml")["toolchain"]["channel"] == "1.99.0"
+            and toml(ROOT / "Cargo.toml")["workspace"]["package"]["rust-version"] == "1.99"
+            and toml(ROOT / "clippy.toml")["msrv"] == "1.99",
             "toolchain/MSRV drift (gh-report RST-0001:R6)")
     workflow = (ROOT / ".github/workflows/ci.yml").read_text()
     pins = re.findall(r"^\s+toolchain: (\S+)$", workflow, re.M)
-    require(pins and set(pins) == {"1.98.0"},
+    require(pins and set(pins) == {"1.99.0"},
             "workflow toolchain drift (gh-report RST-0001:R6)")
 
 
@@ -309,16 +310,16 @@ def execute(kind):
     env = intake()
     commands = {
         "rust": [
-            ["cargo", "+1.98.0", "build", "--workspace", "--all-features", "--locked"],
-            ["timeout", "900", "cargo", "+1.98.0", "test", "--quiet", "--no-fail-fast", "--workspace", "--all-features", "--locked"],
-            ["cargo", "+1.98.0", "clippy", "--quiet", "--workspace", "--all-targets", "--all-features", "--locked", "--", "-D", "warnings"],
-            ["cargo", "+1.98.0", "fmt", "--all", "--", "--check"],
+            ["cargo", "+1.99.0", "build", "--workspace", "--all-features", "--locked"],
+            ["timeout", "900", "cargo", "+1.99.0", "test", "--quiet", "--no-fail-fast", "--workspace", "--all-features", "--locked"],
+            ["cargo", "+1.99.0", "clippy", "--quiet", "--workspace", "--all-targets", "--all-features", "--locked", "--", "-D", "warnings"],
+            ["cargo", "+1.99.0", "fmt", "--all", "--", "--check"],
         ],
-        "non-exhaustive": [["cargo", "+1.98.0", "run", "--locked", "--quiet", "-p", "non-exhaustive-check", "--", str(ROOT)]],
+        "non-exhaustive": [["cargo", "+1.99.0", "run", "--locked", "--quiet", "-p", "non-exhaustive-check", "--", str(ROOT)]],
         "supply-chain": [["cargo-audit", "audit"], ["cargo-deny", "deny", "check"]],
     }
     failures = []
-    if kind == "supply-chain" and env["RUSTUP_TOOLCHAIN"] == f"1.98.0-{LINUX}":
+    if kind == "supply-chain" and env["RUSTUP_TOOLCHAIN"] == f"1.99.0-{LINUX}":
         for name, asset in ASSETS.items():
             path = Path(env["CARGO_HOME"]) / "bin" / name
             require(path.resolve() == path, f"redirected supply-chain tool: {path}")

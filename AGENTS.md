@@ -88,13 +88,15 @@ must define and satisfy explicit resource bounds:
   `write temporary file` $\rightarrow$ `fsync file` $\rightarrow$ `atomic rename` $\rightarrow$ `fsync parent directory`.
 
 ### Verification Cadences (Three-Tier Cadence)
+Canonical approval of a verified result repeats only per repository stable
+candidate; targeted falsifiers remain allowed against any candidate.
 Derived from source `AGENTS.md` at the revision above; command scope is retained,
 not the source's machine-specific timings or application-only checks. Complete
 dependency build-script/proc-macro intake before Cargo execution. Never delete,
 ignore or feature-gate tests to get green. `cargo test` includes doctests;
 retain compile-fail, property, durability, fixtures and adapter conformance tests.
 
-- **INNER** (every hopper TDD increment and per-review-round re-verification;
+- **INNER** (every hopper TDD increment and targeted-reviewer falsifiers;
   changed crate ONLY; exit-code criterion: test + clippy exit 0):
   ```sh
   CARGO_TERM_PROGRESS_WHEN=never cargo test --quiet --no-fail-fast -p <crate> --locked --message-format=short
@@ -109,7 +111,7 @@ retain compile-fail, property, durability, fixtures and adapter conformance test
   `-p <crate>` to both INNER commands. All selected tests and all-target Clippy
   must exit 0. Neither INNER nor MID uses `--workspace` or `--all-features`.
 
-- **BOUNDARY** (once per epic before epic done-claim; full workspace; exit 0 across all):
+- **BOUNDARY** (once per repository stable candidate; full workspace; exit 0 across all):
   ```sh
   cargo build --workspace --all-features --locked
   timeout 900 cargo test --quiet --no-fail-fast --workspace --all-features --locked
@@ -123,7 +125,7 @@ retain compile-fail, property, durability, fixtures and adapter conformance test
     visibility in a single pass.
 
 ### Rust Policy & Toolchain
-- Use the pinned **1.98.0** toolchain, MSRV **1.98**, edition **2024**, resolver
+- Use the pinned **1.99.0** toolchain, MSRV **1.99**, edition **2024**, resolver
   **3**. Keep toolchain, Cargo MSRV and Clippy MSRV aligned; retain `Cargo.lock`.
 - Members inherit root dependencies and `[lints] workspace = true`. The current
   source manifest's `pedantic = warn` and explicit warning roster are the bar,
@@ -156,7 +158,7 @@ comment-free --check-doc-budget --doc-advisory-words 80 --doc-max-words 120 --ma
 
 Requires comment-free 0.2.0 at the canonical revision below:
 ```sh
-cargo +1.98.0 install --git https://github.com/acje/comment-free --rev e45de7ef3b0fcd9a1ec299b9026b14fb5b0cf534 --locked comment-free
+cargo +1.98.0 install --git https://github.com/acje/comment-free --rev b4666626bbeee4e74ca41fd6ff1048b2f167dd27 --locked comment-free
 ```
 
 The read-only native gate recursively scans Rust sources under `.` with the
