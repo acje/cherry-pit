@@ -113,15 +113,22 @@ retain compile-fail, property, durability, fixtures and adapter conformance test
 
 - **BOUNDARY** (once per repository stable candidate; full workspace; exit 0 across all):
   ```sh
-  cargo build --workspace --all-features --locked
-  timeout 900 cargo test --quiet --no-fail-fast --workspace --all-features --locked
-  cargo clippy --quiet --workspace --all-targets --all-features --locked --message-format=short -- -D warnings
-  cargo fmt --all -- --check
   sh scripts/verify.sh
   ```
-  - `timeout 900` is mandatory on the test line. Exit 124 is `Outcome::Surprise`,
+  `scripts/verify.sh` is the single local host BOUNDARY execution owner; its
+  command spelling and order are authoritative there and are not restated here.
+  Per the native `tools/verify.py all` roster it runs the static checks
+  (toolchain, dead-code, deny-lifecycle, ADR collision, citations), the graph
+  check, the supply-chain gates (`cargo audit`, `cargo deny check`), then the
+  Rust stages — `cargo build` (workspace, all-features, locked), `cargo test`
+  with `timeout 900` and `--no-fail-fast` mandatory, Clippy (workspace,
+  all-targets, all-features, locked, `-D warnings`), and `cargo fmt --all -- --check`
+  — followed by the non-exhaustive check and the comment-free doc budget.
+  Rust stages collect failures; any required stage failure makes the native
+  run fail.
+  - `timeout 900` on the test line is mandatory. Exit 124 is `Outcome::Surprise`,
     NEVER a test failure. Investigate the stall; do not fold it into a failure count.
-  - `--no-fail-fast` is mandatory on the test line to ensure full blast-radius
+  - `--no-fail-fast` on the test line is mandatory to ensure full blast-radius
     visibility in a single pass.
 
 ### Rust Policy & Toolchain
