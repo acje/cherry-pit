@@ -306,6 +306,14 @@ def static():
         check()
 
 
+def doc_budget():
+    env = intake()
+    tool = Path(env["CARGO_HOME"]) / "bin" / "comment-free"
+    require(tool.resolve() == tool, f"redirected comment-free: {tool}")
+    run([str(tool), "--check-doc-budget", "--doc-advisory-words", "80",
+         "--doc-max-words", "120", "--max-warning-files", "0", "."], env=env)
+
+
 def execute(kind):
     env = intake()
     commands = {
@@ -349,14 +357,16 @@ def main():
     checks = {"static": static, "graph": graph, "intake": intake, "provision": provision,
               "fetch": lambda: print(cargo("fetch", "--locked"), end=""),
               "dead-code": dead_code, "deny-lifecycle": deny_lifecycle,
-              "citations": citations, "toolchain": toolchain, "adr-collision": adr_collision}
-    require(len(sys.argv) == 2, "usage: python3.12 -B tools/verify.py static|graph|intake|fetch|provision|rust|non-exhaustive|supply-chain|all")
+              "citations": citations, "toolchain": toolchain, "adr-collision": adr_collision,
+              "doc-budget": doc_budget}
+    require(len(sys.argv) == 2, "usage: python3.12 -B tools/verify.py static|graph|intake|fetch|provision|rust|non-exhaustive|supply-chain|doc-budget|all")
     kind = sys.argv[1]
     if kind == "all":
         static()
         graph()
         for group in ("supply-chain", "rust", "non-exhaustive"):
             execute(group)
+        doc_budget()
     elif kind in checks:
         checks[kind]()
     else:

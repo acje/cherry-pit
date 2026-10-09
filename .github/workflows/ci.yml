@@ -58,6 +58,12 @@ jobs:
         run: python3.12 -B tools/verify.py graph
       - name: full workspace verification (gh-report CHE-0038:R1+R2+R3+R4+R5 RST-0003:R4)
         run: python3.12 -B tools/verify.py rust
+      - name: provision canonical 1.98 toolchain for comment-free build
+        run: rustup toolchain install 1.98.0 --profile minimal
+      - name: install canonical comment-free (gh-report RST-0007:R2)
+        run: cargo +1.98.0 install --git https://github.com/acje/comment-free --rev b4666626bbeee4e74ca41fd6ff1048b2f167dd27 --locked comment-free
+      - name: bounded-source rustdoc budget (gh-report RST-0007:R2)
+        run: comment-free --check-doc-budget --doc-advisory-words 80 --doc-max-words 120 --max-warning-files 0 .
 
   non-exhaustive-check:
     name: non-exhaustive error-enum gate

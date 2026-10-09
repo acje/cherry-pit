@@ -83,7 +83,8 @@ verification and Linus review; decision status is not a test or CI verdict.
   extraction; those narratives do not reinstate deleted crates or missing APIs.
   Source CHE-0049/0050 are web-design/router decisions, not the deleted old
   destination proposals with colliding numbers.
-- **Lint policy:** source Cargo/AGENTS specify current 1.99/pedantic policy.
+- **Lint policy:** source Cargo/AGENTS pin 1.98 (rust-version 1.98,
+  rust-toolchain 1.98.0) while the local workspace advances to 1.99.
   `docs/clippy/POLICY-1.98.md` is explicitly **DEFERRED WIP — NOT ACTIVE** at its
   head; its older enablement narrative is not an instruction to adopt it.
 

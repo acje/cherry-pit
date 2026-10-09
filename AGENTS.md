@@ -196,8 +196,9 @@ Standalone gates use `python3.12 -B tools/verify.py static|graph|supply-chain`.
 `rust` and `non-exhaustive` use the scoped local intake admission recorded in
 `ghr-7wc6p.11.2`, with a direct installed compiler and sanitized environment.
 Changed inputs/context require reassessment. The explicit GitHub-hosted Linux
-x86_64 context checks official Rust artifact hashes from `ghr-02ld2`; its actual
-execution remains subject to final review and the producer PR run.
+x86_64 context checks official Rust artifact hashes from `code-7cu` (1.99
+official-member evidence); its actual execution remains subject to final review
+and the producer PR run.
 A green BOUNDARY cannot stand in for the standalone gates. Before
 producer acceptance, establish applicable source-derived supply-chain checks
 (`cargo audit`, `cargo deny check`), toolchain consistency, core dependency

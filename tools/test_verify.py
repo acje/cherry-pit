@@ -1,5 +1,6 @@
 """Non-compiling negative plants at the Cargo probe boundary."""
 
+import contextlib
 import json
 import hashlib
 import io
@@ -321,6 +322,47 @@ class AssetTests(unittest.TestCase):
                         verify.verified_asset("tool", {})
                 with patch.dict(verify.ASSETS, {"tool": asset}):
                     self.assertEqual(verify.verified_asset("tool", {}), binary)
+
+
+class NativeOwnerTests(unittest.TestCase):
+    def test_verify_sh_delegates_to_single_admitted_roster(self):
+        script = (REPO / "scripts" / "verify.sh").read_text()
+        self.assertIn("tools/verify.py all", script)
+        for line in script.splitlines():
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#"):
+                continue
+            self.assertFalse(stripped.startswith("cargo"),
+                             f"duplicate unbounded Cargo dispatch in native wrapper: {line}")
+
+
+class DocBudgetTests(unittest.TestCase):
+    def test_doc_budget_in_all_roster(self):
+        with patch.object(verify, "static"), patch.object(verify, "graph"), \
+             patch.object(verify, "execute"), patch.object(verify, "doc_budget") as doc, \
+             patch.object(sys, "argv", ["verify.py", "all"]):
+            with contextlib.redirect_stdout(io.StringIO()):
+                verify.main()
+        doc.assert_called_once()
+        with patch.object(verify, "doc_budget") as doc, \
+             patch.object(sys, "argv", ["verify.py", "doc-budget"]):
+            with contextlib.redirect_stdout(io.StringIO()):
+                verify.main()
+        doc.assert_called_once()
+
+    def test_doc_budget_uses_canonical_command_and_cargo_home_tool(self):
+        env = {"CARGO_HOME": "/home/runner/.cargo", "RUSTUP_TOOLCHAIN": "1.99.0-x86_64-unknown-linux-gnu"}
+        resolve = Path.resolve
+        with patch.object(Path, "resolve",
+                          lambda p, *a, **k: p if str(p).startswith("/home/") else resolve(p, *a, **k)), \
+             patch.object(verify, "intake", return_value=env), patch.object(verify, "run") as run:
+            verify.doc_budget()
+        args, kwargs = run.call_args
+        self.assertEqual(args[0][0], "/home/runner/.cargo/bin/comment-free")
+        self.assertEqual(args[0][1:], [
+            "--check-doc-budget", "--doc-advisory-words", "80",
+            "--doc-max-words", "120", "--max-warning-files", "0", "."])
+        self.assertEqual(kwargs["env"], env)
 
 
 if __name__ == "__main__":
