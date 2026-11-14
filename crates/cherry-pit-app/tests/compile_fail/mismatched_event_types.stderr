@@ -20,11 +20,13 @@ error[E0271]: type mismatch resolving `<InProcessEventBus<EvB> as EventBus>::Eve
 note: required by a bound in `App::<G, S, B, P, D>::new`
   --> src/app.rs
    |
+   | impl<G, S, B, P, D> App<G, S, B, P, D>
+...
    |     B: EventBus<Event = EventOf<G>>,
    |                 ^^^^^^^^^^^^^^^^^^ required by this bound in `App::<G, S, B, P, D>::new`
 ...
    |     pub fn new(gateway: G, store: S, bus: B, projections: P, dead_letter: D) -> Self {
-   |            --- required by a bound in this associated function
+   |
 
 error[E0271]: type mismatch resolving `<InProcessEventBus<EvB> as EventBus>::Event == EvA`
    --> tests/compile_fail/mismatched_event_types.rs:95:16
@@ -43,7 +45,6 @@ note: required by a bound in `App`
    --> src/app.rs
     |
     | pub struct App<G, S, B, P, D>
-    |            --- required by a bound in this struct
 ...
     |     B: EventBus<Event = EventOf<G>>,
     |                 ^^^^^^^^^^^^^^^^^^ required by this bound in `App`

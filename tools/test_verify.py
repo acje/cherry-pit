@@ -161,15 +161,15 @@ class AdmissionTests(unittest.TestCase):
 
     def test_reviewed_context_uses_direct_compiler_and_sanitized_environment(self):
         env = {"HOME": "/home/runner", "CARGO_HOME": "/home/runner/.cargo",
-               "RUSTUP_HOME": "/home/runner/.rustup", "RUSTUP_TOOLCHAIN": "1.99.0-x86_64-unknown-linux-gnu",
-               "RUSTC": "/home/runner/.rustup/toolchains/1.99.0-x86_64-unknown-linux-gnu/bin/rustc",
+               "RUSTUP_HOME": "/home/runner/.rustup", "RUSTUP_TOOLCHAIN": "1.100.0-x86_64-unknown-linux-gnu",
+               "RUSTC": "/home/runner/.rustup/toolchains/1.100.0-x86_64-unknown-linux-gnu/bin/rustc",
                "RUSTC_WRAPPER": "", "RUSTC_WORKSPACE_WRAPPER": "", "PATH": "/usr/bin:/bin"}
         with patch.object(verify, "intake", return_value=env), patch.object(verify, "run", return_value="") as run:
             verify.execute("rust")
         self.assertEqual(run.call_count, 4)
         for call in run.call_args_list:
             self.assertEqual(call.args[0][0], str(verify.Path(env["RUSTC"]).with_name("cargo")))
-            self.assertNotIn("+1.99.0", call.args[0])
+            self.assertNotIn("+1.100.0", call.args[0])
             self.assertEqual(call.kwargs["env"], env)
         self.assertEqual(run.call_args_list[1].kwargs["timeout"], 900)
 
@@ -196,9 +196,9 @@ class ProductionIdentityTests(unittest.TestCase):
                 self.assertRegex(digest, r"\A[0-9a-f]{64}\Z")
 
     def test_linux_cargo_matches_official_member_evidence(self):
-        """code-7cu: official cargo 1.99.0 Linux archive, cargo/bin/cargo."""
+        """code-7cu: official cargo 1.100.0 Linux archive, cargo/bin/cargo."""
         self.assertEqual(verify.LINUX_IDENTITIES["bin/cargo"],
-                         "e951141cc55a6cd7b9876d187bd30a3720e6086b99413af95e3b8de1cdd72f14")
+                         "84d55d77232a921da96bcf2e1f78532ef5c5221803aae4448d9e220d48ebd808")
 
 
 class LinuxAdmissionTests(unittest.TestCase):
@@ -285,7 +285,7 @@ class LinuxAdmissionTests(unittest.TestCase):
 
     def test_linux_commands_share_sanitized_context(self):
         env = self.admitted()
-        self.assertEqual(env["RUSTC"], "/home/runner/.rustup/toolchains/1.99.0-x86_64-unknown-linux-gnu/bin/rustc")
+        self.assertEqual(env["RUSTC"], "/home/runner/.rustup/toolchains/1.100.0-x86_64-unknown-linux-gnu/bin/rustc")
         self.assertEqual(env["RUSTC_WRAPPER"], "")
         self.assertNotIn("LD_PRELOAD", env)
         self.assertNotIn("CARGO_ENCODED_RUSTFLAGS", env)
@@ -351,7 +351,7 @@ class DocBudgetTests(unittest.TestCase):
         doc.assert_called_once()
 
     def test_doc_budget_uses_canonical_command_and_cargo_home_tool(self):
-        env = {"CARGO_HOME": "/home/runner/.cargo", "RUSTUP_TOOLCHAIN": "1.99.0-x86_64-unknown-linux-gnu"}
+        env = {"CARGO_HOME": "/home/runner/.cargo", "RUSTUP_TOOLCHAIN": "1.100.0-x86_64-unknown-linux-gnu"}
         resolve = Path.resolve
         with patch.object(Path, "resolve",
                           lambda p, *a, **k: p if str(p).startswith("/home/") else resolve(p, *a, **k)), \

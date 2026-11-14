@@ -14,11 +14,13 @@ note: expected this to be `G1`
 note: required by a bound in `AppState::<G, S, R>::new`
    --> src/state.rs
     |
+    | impl<G, S, R> AppState<G, S, R>
+...
     |     R: CommandRouter<Gateway = G> + Clone + Send + Sync + 'static,
     |                      ^^^^^^^^^^^ required by this bound in `AppState::<G, S, R>::new`
 ...
     |     pub fn new(gateway: G, store: S, router: R) -> Self {
-    |            --- required by a bound in this associated function
+    |
 
 error[E0271]: type mismatch resolving `<R as CommandRouter>::Gateway == G1`
    --> tests/compile_fail/build_router_mismatched_gateway.rs:175:18
@@ -35,7 +37,6 @@ note: required by a bound in `AppState`
    --> src/state.rs
     |
     | pub struct AppState<G, S, R>
-    |            -------- required by a bound in this struct
 ...
     |     R: CommandRouter<Gateway = G> + Clone + Send + Sync + 'static,
     |                      ^^^^^^^^^^^ required by this bound in `AppState`

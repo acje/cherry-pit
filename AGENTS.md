@@ -132,7 +132,7 @@ retain compile-fail, property, durability, fixtures and adapter conformance test
     visibility in a single pass.
 
 ### Rust Policy & Toolchain
-- Use the pinned **1.99.0** toolchain, MSRV **1.99**, edition **2024**, resolver
+- Use the pinned **1.100.0** toolchain, MSRV **1.100**, edition **2024**, resolver
   **3**. Keep toolchain, Cargo MSRV and Clippy MSRV aligned; retain `Cargo.lock`.
 - Members inherit root dependencies and `[lints] workspace = true`. The current
   source manifest's `pedantic = warn` and explicit warning roster are the bar,
@@ -165,7 +165,7 @@ comment-free --check-doc-budget --doc-advisory-words 80 --doc-max-words 120 --ma
 
 Requires comment-free 0.2.0 at the canonical revision below:
 ```sh
-cargo +1.99.0 install --git https://github.com/acje/comment-free --rev b4666626bbeee4e74ca41fd6ff1048b2f167dd27 --locked comment-free
+cargo +1.100.0 install --git https://github.com/acje/comment-free --rev b4666626bbeee4e74ca41fd6ff1048b2f167dd27 --locked comment-free
 ```
 
 The read-only native gate recursively scans Rust sources under `.` with the
@@ -203,7 +203,7 @@ Standalone gates use `python3.12 -B tools/verify.py static|graph|supply-chain`.
 `rust` and `non-exhaustive` use the scoped local intake admission recorded in
 `ghr-7wc6p.11.2`, with a direct installed compiler and sanitized environment.
 Changed inputs/context require reassessment. The explicit GitHub-hosted Linux
-x86_64 context checks official Rust artifact hashes from `code-7cu` (1.99
+x86_64 context checks official Rust artifact hashes from `code-7cu` (1.100
 official-member evidence); its actual execution remains subject to final review
 and the producer PR run.
 A green BOUNDARY cannot stand in for the standalone gates. Before

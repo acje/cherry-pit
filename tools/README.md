@@ -30,11 +30,11 @@ Checker edges are source-equivalent, not newly acquired. `intake` checks the
 recorded local checkout or explicit GitHub-hosted Linux x86_64 context, lock,
 compiler/loader/Cargo identities and Cargo config.
 Executing groups use the recorded sanitized environment and direct installed
-1.99.0 compiler, with no rustup dispatcher or inherited environment waiver.
+1.100.0 compiler, with no rustup dispatcher or inherited environment waiver.
 This is scoped admission, not actual Linux CI approval or a complete source-integrity
 monitor. Changed dependency sources, manifests, features, toolchain or build
 context require renewed intake. Linux official member hashes come from
-`code-7cu` (1.99 official-member evidence);
+`code-7cu` (1.100.0 official-member evidence);
 the pinned source dtolnay action installs through rustup's verified distribution.
 Every Cargo invocation then uses the absolute verified executable and fresh
 allowlisted environment; extra Cargo configs (home and checkout ancestors),

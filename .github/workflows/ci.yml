@@ -46,7 +46,7 @@ jobs:
         run: python3.12 -B tools/verify.py static
       - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8
         with:
-          toolchain: 1.99.0
+          toolchain: 1.100.0
           components: clippy, rustfmt
       - name: verify admitted execution context (CPP-0001:R7)
         run: python3.12 -B tools/verify.py intake
@@ -58,10 +58,10 @@ jobs:
         run: python3.12 -B tools/verify.py graph
       - name: full workspace verification (gh-report CHE-0038:R1+R2+R3+R4+R5 RST-0003:R4)
         run: python3.12 -B tools/verify.py rust
-      - name: provision canonical 1.99 toolchain for comment-free build
-        run: rustup toolchain install 1.99.0 --profile minimal
+      - name: provision canonical 1.100 toolchain for comment-free build
+        run: rustup toolchain install 1.100.0 --profile minimal
       - name: install canonical comment-free (gh-report RST-0007:R2)
-        run: cargo +1.99.0 install --git https://github.com/acje/comment-free --rev b4666626bbeee4e74ca41fd6ff1048b2f167dd27 --locked comment-free
+        run: cargo +1.100.0 install --git https://github.com/acje/comment-free --rev b4666626bbeee4e74ca41fd6ff1048b2f167dd27 --locked comment-free
       - name: bounded-source rustdoc budget (gh-report RST-0007:R2)
         run: comment-free --check-doc-budget --doc-advisory-words 80 --doc-max-words 120 --max-warning-files 0 .
 
@@ -73,7 +73,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8
         with:
-          toolchain: 1.99.0
+          toolchain: 1.100.0
       - name: verify admitted execution context (CPP-0001:R7)
         run: python3.12 -B tools/verify.py intake
       - name: fetch locked sources without build execution (CPP-0001:R7)
@@ -100,7 +100,7 @@ jobs:
         run: python3.12 -B tools/verify.py deny-lifecycle
       - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8
         with:
-          toolchain: 1.99.0
+          toolchain: 1.100.0
       - name: verify admitted execution context (CPP-0001:R7)
         run: python3.12 -B tools/verify.py intake
       - name: verified official audit and deny assets (CPP-0001:R7)

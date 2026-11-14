@@ -16,7 +16,7 @@ members = [
 
 [workspace.package]
 edition = "2024"
-rust-version = "1.99"
+rust-version = "1.100"
 license = "Apache-2.0 OR MIT"
 homepage = "https://github.com/acje/cherry-pit"
 repository = "https://github.com/acje/cherry-pit"

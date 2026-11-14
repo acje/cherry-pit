@@ -133,8 +133,7 @@ impl InMemStore {
             .streams
             .iter()
             .find(|(k, _)| *k == id)
-            .map(|(_, v)| v.clone())
-            .unwrap_or_default()
+            .map_or_default(|(_, v)| v.clone())
     }
 }
 
