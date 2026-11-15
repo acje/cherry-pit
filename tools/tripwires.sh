@@ -11,4 +11,4 @@ case "${1:-}" in
   all) check=all ;;
   *) printf 'usage: bash tools/tripwires.sh <source-check-name>|all\n' >&2; exit 2 ;;
 esac
-exec python3.12 -B "$ROOT/tools/verify.py" "$check"
+exec python3 -B "$ROOT/tools/verify.py" "$check"
