@@ -43,21 +43,21 @@ jobs:
       - name: source-qualified ADR gates (gh-report RST-0007:R7)
         env:
           GH_REPORT_SOURCE: target/source-governance
-        run: python3.12 -B tools/verify.py static
+        run: python3 -B tools/verify.py static
       - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8
         with:
           toolchain: 1.100.0
           components: clippy, rustfmt
       - name: verify admitted execution context (CPP-0001:R7)
-        run: python3.12 -B tools/verify.py intake
+        run: python3 -B tools/verify.py intake
       - name: fetch locked sources without build execution (CPP-0001:R7)
-        run: python3.12 -B tools/verify.py fetch
+        run: python3 -B tools/verify.py fetch
       - name: verification guard regressions (gh-report RST-0007:R7)
-        run: python3.12 -B tools/test_verify.py
+        run: python3 -B tools/test_verify.py
       - name: deny async-trait and rearm pardosa-cherry-pit-projection DAG guard (gh-report CHE-0025:R1+R2 CHE-0084:R5+R9)
-        run: python3.12 -B tools/verify.py graph
+        run: python3 -B tools/verify.py graph
       - name: full workspace verification (gh-report CHE-0038:R1+R2+R3+R4+R5 RST-0003:R4)
-        run: python3.12 -B tools/verify.py rust
+        run: python3 -B tools/verify.py rust
       - name: provision canonical 1.100 toolchain for comment-free build
         run: rustup toolchain install 1.100.0 --profile minimal
       - name: install canonical comment-free (gh-report RST-0007:R2)
@@ -75,11 +75,11 @@ jobs:
         with:
           toolchain: 1.100.0
       - name: verify admitted execution context (CPP-0001:R7)
-        run: python3.12 -B tools/verify.py intake
+        run: python3 -B tools/verify.py intake
       - name: fetch locked sources without build execution (CPP-0001:R7)
-        run: python3.12 -B tools/verify.py fetch
+        run: python3 -B tools/verify.py fetch
       - name: closed library error enums (gh-report RST-0006:R1+R3)
-        run: python3.12 -B tools/verify.py non-exhaustive
+        run: python3 -B tools/verify.py non-exhaustive
 
   dead-code-inner-suppression-tripwire:
     name: ban module-level dead_code suppression (crates/*/src)
@@ -88,7 +88,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - name: ban inner dead_code suppression (gh-report RST-0003:R6)
-        run: python3.12 -B tools/verify.py dead-code
+        run: python3 -B tools/verify.py dead-code
 
   supply-chain:
     name: supply-chain (audit + deny)
@@ -97,15 +97,15 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - name: advisory ignore lifecycle (gh-report SEC-0013:R6)
-        run: python3.12 -B tools/verify.py deny-lifecycle
+        run: python3 -B tools/verify.py deny-lifecycle
       - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8
         with:
           toolchain: 1.100.0
       - name: verify admitted execution context (CPP-0001:R7)
-        run: python3.12 -B tools/verify.py intake
+        run: python3 -B tools/verify.py intake
       - name: verified official audit and deny assets (CPP-0001:R7)
-        run: python3.12 -B tools/verify.py provision
+        run: python3 -B tools/verify.py provision
       - name: fetch locked sources without build execution (CPP-0001:R7)
-        run: python3.12 -B tools/verify.py fetch
+        run: python3 -B tools/verify.py fetch
       - name: audit and deny (gh-report RST-0004:R3+R4 SEC-0009:R1)
-        run: python3.12 -B tools/verify.py supply-chain
+        run: python3 -B tools/verify.py supply-chain
