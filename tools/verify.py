@@ -19,7 +19,7 @@ ROOT = Path(__file__).resolve().parent.parent
 SOURCE = "c8507377b2748a015148751ce288be2bad9ec708"
 TOKEN = r"([A-Z]{2,4}-[0-9]{4}):(R[0-9]+(?:\+R[0-9]+)*)"
 LINUX = "x86_64-unknown-linux-gnu"
-CARGO_LOCK_DIGEST = "0b79603add39eb67e6cf1270c72166e37a63735a01e12a1612b48965379b41ce"
+CARGO_LOCK_DIGEST = "6f17b4acb9a8002388f030fd22a4260f65fce7b3449cc3871f720d84f3edd3ae"
 LINUX_IDENTITIES = {
     "bin/rustc": "5073422953727c9427a76b7fce03aa9404da46315e5a1e4965389512a41e8db0",
     "bin/cargo": "84d55d77232a921da96bcf2e1f78532ef5c5221803aae4448d9e220d48ebd808",
